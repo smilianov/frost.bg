@@ -3,12 +3,23 @@ import { TEXTS } from "./texts.js";
 
 const R_EARTH_M = 6371008.8;
 
+// Строго десетично: без интервали (веднъж подрязани), без 0x/1e2 форми, без ".5" или "42.".
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+
+// Закръгленото на нула излиза като +0, не -0 (-0 === 0, но JSON и downstream
+// логика не бива да пазят знака на нулата).
+const noNegZero = (x) => (x === 0 ? 0 : x);
+
 export function parseCoords(latStr, lonStr) {
-  if (latStr == null || lonStr == null || latStr === "" || lonStr === "") return null;
-  const lat = Number(latStr), lon = Number(lonStr);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (latStr == null || lonStr == null) return null;
+  const a = String(latStr).trim(), b = String(lonStr).trim();
+  if (!DECIMAL.test(a) || !DECIMAL.test(b)) return null;
+  const lat = Number(a), lon = Number(b);
   if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-  return { lat: Math.round(lat * 1000) / 1000, lon: Math.round(lon * 1000) / 1000 };
+  return {
+    lat: noNegZero(Math.round(lat * 1000) / 1000),
+    lon: noNegZero(Math.round(lon * 1000) / 1000),
+  };
 }
 
 export function haversineM(lat1, lon1, lat2, lon2) {
@@ -53,7 +64,7 @@ export function frostResponse(grid, lat, lon) {
     period: grid.period,
     threshold_c: grid.threshold_c,
     note: TEXTS.note,
-    source: TEXTS.sourceLabel(grid.period.start, grid.period.end),
+    source: TEXTS.sourceLabel(grid.period.start, grid.period.end, Number(grid.computed.slice(0, 4))),
     synthetic: grid.synthetic === true,
     version: "1",
   };
