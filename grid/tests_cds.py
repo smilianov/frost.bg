@@ -186,7 +186,7 @@ for field in ("typical", "safe"):
                 f.write(json.dumps({"period": [1996, 2025]}) + "\n")
                 f.write(json.dumps(rec) + "\n")
             logs8 = []
-            rc8 = cg._cross_check({"cells": [cell]}, path8, logs8.append)
+            rc8 = cg._cross_check({"period": {"start": 1996, "end": 2025}, "cells": [cell]}, path8, logs8.append)
             label = f"{field}[{season}] reverse={reverse}"
             check(f"None/стойност ({label}): rc 1", rc8 == 1, str(logs8))
             check(f"None/стойност ({label}): логва n/a — липсва стойност", any("n/a" in line for line in logs8), str(logs8))
@@ -202,7 +202,7 @@ with open(path9, "w", encoding="utf-8") as f:
     f.write(json.dumps({"lat": 42.2, "lon": 24.9, "typical": ["03-01", "10-20"], "safe": ["03-01", "10-20"]}) + "\n")
 logs9 = []
 try:
-    rc9 = cg._cross_check({"cells": [cell29]}, path9, logs9.append)
+    rc9 = cg._cross_check({"period": {"start": 1996, "end": 2025}, "cells": [cell29]}, path9, logs9.append)
     check("02-29 в клетка от мрежата: не гърми, разлика 0 дни, rc 0", rc9 == 0, str(logs9))
 except ValueError as e:
     check("02-29 в клетка от мрежата: не гърми, разлика 0 дни, rc 0", False, f"ValueError: {e}")
@@ -214,7 +214,7 @@ with open(path10, "w", encoding="utf-8") as f:
     f.write(json.dumps({"lat": 42.2, "lon": 24.9, "typical": ["02-29", "10-20"], "safe": ["02-29", "10-20"]}) + "\n")
 logs10 = []
 try:
-    rc10 = cg._cross_check({"cells": [cell_norm]}, path10, logs10.append)
+    rc10 = cg._cross_check({"period": {"start": 1996, "end": 2025}, "cells": [cell_norm]}, path10, logs10.append)
     check("02-29 в OM файла: не гърми, разлика 0 дни, rc 0", rc10 == 0, str(logs10))
 except ValueError as e:
     check("02-29 в OM файла: не гърми, разлика 0 дни, rc 0", False, f"ValueError: {e}")

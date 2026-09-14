@@ -390,7 +390,13 @@ def _cross_check(grid: dict, path: str, log) -> int:
     """Сравнява клетките на `grid` (от CDS) със записите в `path` (cells.jsonl от
     Open-Meteo, с header ред). За всяка съвпадаща клетка печата разликата в дни за
     typical/safe; разлика > 10 дни (или None срещу стойност) -> предупреждение и
-    крайният код е 1; иначе 0 с обобщение."""
+    крайният код е 1; иначе 0 с обобщение.
+
+    rc 0 значи „наистина сравнено“: header-ът трябва да е {"period": [Y0, Y1]}
+    със същия период като мрежата (иначе сравняваме различни 30-годишни
+    прозорци), и поне една клетка трябва да е обща. Празен файл, файл без
+    header, чужд период или нула общи клетки -> rc 1 с ясно съобщение — не
+    тих „успех“ преди публикуване."""
     by_key = {(c["lat"], c["lon"]): c for c in grid["cells"]}
     fmt = lambda x: "n/a" if x is None else str(x)          # noqa: E731
     n = 0
@@ -398,7 +404,22 @@ def _cross_check(grid: dict, path: str, log) -> int:
     any_over = False
     with open(path, encoding="utf-8") as f:
         lines = f.readlines()
-    for line in lines[1:]:                                   # прескача header реда
+    header = None
+    if lines:
+        try:
+            header = json.loads(lines[0])
+        except json.JSONDecodeError:
+            header = None
+    if not (isinstance(header, dict) and isinstance(header.get("period"), list) and len(header["period"]) == 2):
+        log(f"кръстосана проверка: {path} няма header {{\"period\": [Y0, Y1]}} "
+            "(празен файл или стар формат) — не се брои")
+        return 1
+    expected = [grid["period"]["start"], grid["period"]["end"]]
+    if list(header["period"]) != expected:
+        log(f"кръстосаната проверка е за друг период: {header['period'][0]}–{header['period'][1]}, "
+            f"мрежата е {expected[0]}–{expected[1]} — не се брои")
+        return 1
+    for line in lines[1:]:                                   # header-ът е проверен по-горе
         line = line.strip()
         if not line:
             continue
@@ -422,6 +443,9 @@ def _cross_check(grid: dict, path: str, log) -> int:
         if any(x is not None and x > 10 for x in deltas):
             any_over = True
             log(f"  ПРЕДУПРЕЖДЕНИЕ: ({key[0]}, {key[1]}) над 10 дни")
+    if n == 0:
+        log("кръстосана проверка: 0 клетки — няма какво да се сравни")
+        return 1
     log(f"кръстосана проверка: {n} клетки, най-голяма разлика {max_diff} дни")
     return 1 if any_over else 0
 

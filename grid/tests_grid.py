@@ -510,6 +510,49 @@ finally:
     cg.SLEEP = real_sleep
 
 
+section("Кръстосаната проверка отказва чужд период, файл без header, празен файл и нула клетки")
+# Сравнение без валиден вход не е „успех“: rc 0 трябва да значи, че наистина е
+# имало какво да се сравни, и за същия период като мрежата.
+tmp_cc = tempfile.mkdtemp()
+grid_cc = {"period": {"start": 1996, "end": 2025},
+           "cells": [{"lat": 42.2, "lon": 24.9, "typical": ["04-10", "10-20"], "safe": ["04-10", "10-20"]}]}
+om_rec = {"lat": 42.2, "lon": 24.9, "typical": ["04-10", "10-20"], "safe": ["04-10", "10-20"]}
+
+
+def _cc(name, lines):
+    path = os.path.join(tmp_cc, name)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("".join(lines))
+    logs = []
+    rc = cg._cross_check(grid_cc, path, logs.append)
+    return rc, logs
+
+
+rc_ok, logs_ok = _cc("ok.jsonl", [json.dumps({"period": [1996, 2025]}) + "\n", json.dumps(om_rec) + "\n"])
+check("контролна: същият период и една обща клетка -> rc 0", rc_ok == 0, str(logs_ok))
+# (1) header за друг период
+rc_p, logs_p = _cc("other_period.jsonl", [json.dumps({"period": [1995, 2024]}) + "\n", json.dumps(om_rec) + "\n"])
+check("header за друг период -> rc 1", rc_p == 1, str(logs_p))
+check("… и логва „за друг период … не се брои“", any("за друг период" in l and "не се брои" in l for l in logs_p), str(logs_p))
+check("… без да сравнява клетки", not any("Δ" in l for l in logs_p), str(logs_p))
+# (1б) без header — стар формат, първият ред е клетка
+rc_h, logs_h = _cc("no_header.jsonl", [json.dumps(om_rec) + "\n"])
+check("файл без header {\"period\": …} -> rc 1", rc_h == 1, str(logs_h))
+check("… и логва „не се брои“", any("не се брои" in l for l in logs_h), str(logs_h))
+# (2) нула съвпаднали клетки
+rc_z, logs_z = _cc("zero.jsonl", [json.dumps({"period": [1996, 2025]}) + "\n",
+                                  json.dumps({**om_rec, "lat": 43.0, "lon": 25.0}) + "\n"])
+check("нула съвпаднали клетки -> rc 1", rc_z == 1, str(logs_z))
+check("… и логва „0 клетки — няма какво да се сравни“",
+      any("0 клетки" in l and "няма какво да се сравни" in l for l in logs_z), str(logs_z))
+# (3) празен файл / само header
+rc_e, logs_e = _cc("empty.jsonl", [])
+check("празен файл -> rc 1", rc_e == 1, str(logs_e))
+check("… и логва „не се брои“", any("не се брои" in l for l in logs_e), str(logs_e))
+rc_ho, logs_ho = _cc("header_only.jsonl", [json.dumps({"period": [1996, 2025]}) + "\n"])
+check("само header -> rc 1", rc_ho == 1, str(logs_ho))
+check("… и логва „0 клетки“", any("0 клетки" in l for l in logs_ho), str(logs_ho))
+
 print("\n====================================================")
 print(f"  {OK} успешни, {FAIL} неуспешни")
 for f in FAILURES:
