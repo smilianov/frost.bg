@@ -23,13 +23,33 @@ function assertNoStore(r) {
 }
 
 // Стъб на Cache API (`caches.default`) — Cloudflare-специфично, липсва в Node.
-// Пази записите в обикновена Map по нормализирания URL на ключа.
+// Пази {body, init} по нормализирания URL и връща НОВ Response на всеки
+// match — както истинският Cache API, не същия консумиран обект. `put` чете
+// тялото директно от подадения Response, без вътрешно clone — точно както
+// реалният Cache API, който консумира каквото му подадеш; затова хендлърът
+// трябва сам да подаде `res.clone()`, не оригинала.
 function stubCache() {
-  const store = new Map();
+  const raw = new Map();
+  let puts = 0, matches = 0;
+  const store = {
+    has: (url) => raw.has(url),
+    set: (url, entry) => raw.set(url, entry),
+    get size() { return raw.size; },
+    get puts() { return puts; },
+    get matches() { return matches; },
+  };
   globalThis.caches = {
     default: {
-      match: async (req) => store.get(req.url) ?? undefined,
-      put: async (req, res) => { store.set(req.url, res); },
+      match: async (req) => {
+        matches++;
+        const entry = raw.get(req.url);
+        return entry ? new Response(entry.body, entry.init) : undefined;
+      },
+      put: async (req, res) => {
+        puts++;
+        const body = await res.text();
+        raw.set(req.url, { body, init: { status: res.status, headers: res.headers } });
+      },
     },
   };
   return store;
@@ -38,6 +58,39 @@ function clearCacheStub() {
   delete globalThis.caches;
 }
 const ctxWaitUntil = { waitUntil: (p) => p };
+
+// ctx.waitUntil удължава живота на заявката за фонова работа в истинския
+// Workers runtime, но НЕ забавя връщането на отговора — put() продължава,
+// след като клиентът вече е получил res. Тестове, които веднага след това
+// проверяват какво е записано в кеша, трябва изрично да изчакат тази фонова
+// работа — иначе проверяват състояние отпреди то да се е случило.
+function makeCtx() {
+  const pending = [];
+  return { waitUntil: (p) => { pending.push(p); }, settle: () => Promise.all(pending) };
+}
+async function getSettled(path, e, ctx) {
+  const r = await get(path, e, ctx);
+  await ctx.settle();
+  return r;
+}
+
+// Ръчно скалъпен запис за директно поставяне в кеша — тяло, което реално
+// изчисление никога не би върнало, за да докаже, че отговорът идва от кеша.
+function cachedEntry(body, cacheControl = "public, max-age=86400") {
+  return {
+    body: JSON.stringify(body),
+    init: {
+      status: 200,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-headers": "content-type",
+        "cache-control": cacheControl,
+      },
+    },
+  };
+}
 
 test("grid.json: 2080 клетки, всички в правоъгълника, дати MM-DD или null", () => {
   assert.equal(grid.cells.length, 2080);
@@ -104,10 +157,12 @@ test("непознат /api/* -> 404 JSON not_found", async () => {
   assert.equal((await r.json()).error.code, "not_found");
   assert.equal((await get("/api/")).status, 404);
 });
-test("OPTIONS на /api/* -> 204 с CORS", async () => {
+test("OPTIONS на /api/* -> 204 с точния CORS набор", async () => {
   const r = await worker.fetch(new Request("https://frost.bg/api/v1/frost", { method: "OPTIONS" }), env());
-  assert.equal(r.status, 204); assert.equal(r.headers.get("access-control-allow-origin"), "*");
-  assert.ok(r.headers.get("access-control-allow-methods").includes("GET"));
+  assert.equal(r.status, 204);
+  assert.equal(r.headers.get("access-control-allow-origin"), "*");
+  assert.equal(r.headers.get("access-control-allow-methods"), "GET, OPTIONS");
+  assert.equal(r.headers.get("access-control-allow-headers"), "content-type");
 });
 test("POST на /api/* -> 405 с Allow", async () => {
   const r = await worker.fetch(new Request("https://frost.bg/api/v1/frost", { method: "POST" }), env());
@@ -127,8 +182,10 @@ test("всичко извън /api отива към статичните фай
 });
 
 test("границите на маршрута: наклонена черта накрая, v2, главни букви, без наклонена черта", async () => {
-  assert.equal((await get("/api/v1/frost/")).status, 404);
-  assert.equal((await get("/api/v2/frost")).status, 404);
+  const trailing = await get("/api/v1/frost/");
+  assert.equal(trailing.status, 404); assertNoStore(trailing);
+  const v2 = await get("/api/v2/frost");
+  assert.equal(v2.status, 404); assertNoStore(v2);
   // Главни букви правят различен, нерегистриран път — пътищата са
   // чувствителни към регистър нарочно, затова маршрутът отива към статичните файлове.
   assert.equal(await (await get("/API/v1/frost")).text(), "asset:/API/v1/frost");
@@ -138,23 +195,53 @@ test("границите на маршрута: наклонена черта н
 test("/api/v1/frost: кешът се пълни под нормализиран ключ (закръглените 3 знака)", async () => {
   const store = stubCache();
   try {
-    const r1 = await get("/api/v1/frost?lat=42.18425&lon=24.92936", env(), ctxWaitUntil);
+    const r1 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
     assert.equal(r1.status, 200);
-    assert.equal(store.size, 1);
+    assert.equal(store.puts, 1);
     assert.ok(store.has("https://frost.bg/api/v1/frost?lat=42.184&lon=24.929"));
   } finally {
     clearCacheStub();
   }
 });
-test("/api/v1/frost: различно записани, но закръглено равни координати удрят кеша", async () => {
+test("/api/v1/frost: попадение връща каквото е в кеша (не прекомпилира), без нов put", async () => {
   const store = stubCache();
   try {
-    await get("/api/v1/frost?lat=42.18425&lon=24.92936", env(), ctxWaitUntil);
-    assert.equal(store.size, 1);
-    const r2 = await get("/api/v1/frost?lat=42.1841&lon=24.929", env(), ctxWaitUntil);
+    const r1 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(store.puts, 1);
+    // Подменяме записа с очевиден сентинел — истинско изчисление за тези
+    // координати никога няма да върне точно това тяло, затова връщането му
+    // непроменено доказва, че отговорът идва от кеша, не от ново пресмятане.
+    store.set("https://frost.bg/api/v1/frost?lat=42.184&lon=24.929", cachedEntry({ sentinel: true }));
+    // Различно записани, но закръглено същите координати -> същият нормализиран ключ.
+    const r2 = await get("/api/v1/frost?lat=42.1841&lon=24.929", env(), makeCtx());
     assert.equal(r2.status, 200);
-    assert.equal(store.size, 1, "втора заявка удря кеша, не добавя нов запис");
+    assertSharedHeaders(r2);
+    assert.deepEqual(await r2.json(), { sentinel: true });
+    assert.equal(store.puts, 1, "попадение не бива да вика put повторно");
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/frost: консумиран miss, после два консумирани удара — кешът връща свеж Response всеки път", async () => {
+  const store = stubCache();
+  try {
+    const r1 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
+    assert.equal(r1.status, 200);
+    // res.clone() преди put трябва да е запазил това тяло четимо за клиента.
+    assert.deepEqual((await r1.json()).query, { lat: 42.184, lon: 24.929 });
+
+    const r2 = await get("/api/v1/frost?lat=42.18425&lon=24.92936", env(), ctxWaitUntil);
+    assert.equal(r2.status, 200);
+    assertSharedHeaders(r2);
     assert.deepEqual((await r2.json()).query, { lat: 42.184, lon: 24.929 });
+
+    const r3 = await get("/api/v1/frost?lat=42.18425&lon=24.92936", env(), ctxWaitUntil);
+    assert.equal(r3.status, 200);
+    assertSharedHeaders(r3);
+    assert.deepEqual((await r3.json()).query, { lat: 42.184, lon: 24.929 });
+
+    assert.equal(store.puts, 1, "трите заявки след първата удрят кеша, не пишат отново");
   } finally {
     clearCacheStub();
   }
@@ -176,16 +263,52 @@ test("/api/v1/frost: без globalThis.caches всичко пак работи",
   assert.equal(r.status, 200);
   assert.deepEqual((await r.json()).query, { lat: 42.184, lon: 24.929 });
 });
-test("/api/v1/config: кешът се пълни под голия път и втора заявка го удря", async () => {
+
+test("/api/v1/config: кешът се пълни под голия път", async () => {
   const store = stubCache();
   try {
-    const r1 = await get("/api/v1/config", env(), ctxWaitUntil);
+    const r1 = await getSettled("/api/v1/config", env(), makeCtx());
     assert.equal(r1.status, 200);
-    assert.equal(store.size, 1);
+    assert.equal(store.puts, 1);
     assert.ok(store.has("https://frost.bg/api/v1/config"));
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/config: попадение връща каквото е в кеша (не прекомпилира), без нов put", async () => {
+  const store = stubCache();
+  try {
+    const r1 = await getSettled("/api/v1/config", env(), makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(store.puts, 1);
+    store.set("https://frost.bg/api/v1/config", cachedEntry({ sentinel: true }));
+    const r2 = await get("/api/v1/config", env(), makeCtx());
+    assert.equal(r2.status, 200);
+    assertSharedHeaders(r2);
+    assert.deepEqual(await r2.json(), { sentinel: true });
+    assert.equal(store.puts, 1, "попадение не бива да вика put повторно");
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/config: консумиран miss, после два консумирани удара — кешът връща свеж Response всеки път", async () => {
+  const store = stubCache();
+  try {
+    const r1 = await getSettled("/api/v1/config", env(), makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal((await r1.json()).map, "osm");
+
     const r2 = await get("/api/v1/config", env(), ctxWaitUntil);
     assert.equal(r2.status, 200);
-    assert.equal(store.size, 1, "втора заявка удря кеша, не добавя нов запис");
+    assertSharedHeaders(r2);
+    assert.equal((await r2.json()).map, "osm");
+
+    const r3 = await get("/api/v1/config", env(), ctxWaitUntil);
+    assert.equal(r3.status, 200);
+    assertSharedHeaders(r3);
+    assert.equal((await r3.json()).map, "osm");
+
+    assert.equal(store.puts, 1);
   } finally {
     clearCacheStub();
   }
