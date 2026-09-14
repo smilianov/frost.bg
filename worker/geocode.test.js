@@ -84,3 +84,90 @@ test("таймаут -> GeocodeError", async () => {
   const f = async (url, init) => new Promise((_, rej) => init.signal.addEventListener("abort", () => rej(new Error("aborted"))));
   await assert.rejects(() => geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f, timeoutMs: 20 }), GeocodeError);
 });
+test("таймаутът е твърд дедлайн — дори fetch да не пипа сигнала, отхвърля бързо", async () => {
+  const f = () => new Promise(() => {}); // никога не се уталожва, игнорира signal изцяло
+  const start = Date.now();
+  await assert.rejects(() => geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f, timeoutMs: 20 }), GeocodeError);
+  assert.ok(Date.now() - start < 200, `отне ${Date.now() - start}ms, очаквахме близо до 20ms`);
+});
+test("limit дробен се закръгля надолу до цяло число", async () => {
+  let seen;
+  const f = fakeFetch((u) => { seen = u; return okJson({ results: [] }); });
+  await geocode({ q: "Ма", lang: "bg", limit: 1.9, provider: "openmeteo", fetchImpl: f });
+  assert.equal(seen.searchParams.get("count"), "1");
+});
+test("limit нечислово -> подразбиращите се 5", async () => {
+  let seen;
+  const f = fakeFetch((u) => { seen = u; return okJson({ results: [] }); });
+  await geocode({ q: "Ма", lang: "bg", limit: "abc", provider: "openmeteo", fetchImpl: f });
+  assert.equal(seen.searchParams.get("count"), "5");
+});
+test("грешка от fetch не пренася Google ключа в съобщението или стека", async () => {
+  const f = async (url) => { throw new Error("request failed: " + url); };
+  await assert.rejects(
+    () => geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "SECRET123", fetchImpl: f }),
+    (e) => {
+      assert.ok(e instanceof GeocodeError);
+      assert.ok(!e.message.includes("SECRET123"), e.message);
+      assert.ok(!String(e.stack).includes("SECRET123"), e.stack);
+      assert.equal(e.cause, undefined);
+      return true;
+    },
+  );
+});
+test("грешка при четене на JSON не пренася URL-а (с ключа) в съобщението или стека", async () => {
+  const f = async (url) => ({ ok: true, json: async () => { throw new Error("parse error near " + url); } });
+  await assert.rejects(
+    () => geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "SECRET123", fetchImpl: f }),
+    (e) => {
+      assert.ok(e instanceof GeocodeError);
+      assert.ok(!e.message.includes("SECRET123"), e.message);
+      assert.ok(!String(e.stack).includes("SECRET123"), e.stack);
+      return true;
+    },
+  );
+});
+test("openmeteo: тяло null -> GeocodeError", async () => {
+  const f = fakeFetch(() => new Response("null", { status: 200, headers: { "content-type": "application/json" } }));
+  await assert.rejects(() => geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f }), GeocodeError);
+});
+test("openmeteo: results не е масив -> GeocodeError", async () => {
+  const f = fakeFetch(() => okJson({ results: {} }));
+  await assert.rejects(() => geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f }), GeocodeError);
+});
+test("openmeteo: невалиден елемент (null) в results се пропуска, не чупи целия отговор", async () => {
+  const f = fakeFetch(() => okJson({ results: [null,
+    { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }));
+  const r = await geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+});
+test("openmeteo: резултат без latitude/longitude се пропуска", async () => {
+  const f = fakeFetch(() => okJson({ results: [{ name: "Без координати", admin1: "X" }] }));
+  const r = await geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.deepEqual(r.results, []);
+});
+test("google: results не е масив -> GeocodeError", async () => {
+  const f = fakeFetch(() => okJson({ status: "OK", results: {} }));
+  await assert.rejects(() => geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f }), GeocodeError);
+});
+test("google: резултат без валидни координати (празен geometry) се пропуска", async () => {
+  const f = fakeFetch(() => okJson({ status: "OK", results: [{ geometry: {} }] }));
+  const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
+  assert.deepEqual(r.results, []);
+});
+test("q се подрязва вътре в geocode(), не само в рутера", async () => {
+  let seen;
+  const f = fakeFetch((u) => { seen = u; return okJson({ results: [] }); });
+  await geocode({ q: " Маноле ", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.equal(seen.searchParams.get("name"), "Маноле");
+});
+test("специални знаци в q стигат до доставчика като един name параметър, без да чупят URL-а", async () => {
+  let seen;
+  const f = fakeFetch((u) => { seen = u; return okJson({ results: [] }); });
+  const tricky = "Търсене&lang=en#x";
+  await geocode({ q: tricky, lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.equal(seen.hostname, "geocoding-api.open-meteo.com");
+  assert.equal(seen.searchParams.get("name"), tricky);
+  assert.equal(seen.searchParams.get("language"), "bg");
+  assert.equal(seen.hash, "");
+});
