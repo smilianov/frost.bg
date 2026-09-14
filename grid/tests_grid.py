@@ -231,6 +231,39 @@ try:
 finally:
     fe.fetch_daily_tmin = real
 
+# (b2) само header, БЕЗ нов ред накрая (прекъсване веднага след записването му) ->
+# header-ът получава своя нов ред, преди първата клетка да се допише; следващото пускане продължава
+tmp7b = tempfile.mkdtemp()
+cells_path7b = os.path.join(tmp7b, "cells.jsonl")
+with open(cells_path7b, "w", encoding="utf-8") as f:
+    f.write('{"period": [1996, 2025]}')   # нищо друго, без нов ред
+calls7b = []
+def _fetch7b(lat, lon, start, end):
+    calls7b.append((lat, lon)); return fe.DailyTmin(days=days, grid_elevation_m=100)
+fe.fetch_daily_tmin = _fetch7b
+try:
+    rc7b = cg.main(["--out", tmp7b, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
+    check("само header без нов ред: първото пускане връща 0 и смята една точка",
+          rc7b == 0 and calls7b == [(41.2, 22.3)], str((rc7b, calls7b)))
+    content7b = open(cells_path7b, encoding="utf-8").read()
+    lines7b = content7b.split("\n")
+    check("файлът е header + нов ред + една клетка + нов ред (всеки ред се парсва)",
+          content7b.endswith("\n") and len(lines7b) == 3 and lines7b[-1] == ""
+          and json.loads(lines7b[0]) == {"period": [1996, 2025]}
+          and json.loads(lines7b[1])["lat"] == 41.2 and json.loads(lines7b[1])["lon"] == 22.3,
+          repr(content7b[:80]))
+    calls7b.clear()
+    rc7b2 = cg.main(["--out", tmp7b, "--pause", "0", "--limit", "2", "--today", "2026-09-14"], stdout=io.StringIO())
+    check("второто пускане връща 0 и добавя точно една клетка",
+          rc7b2 == 0 and calls7b == [(41.2, 22.4)], str((rc7b2, calls7b)))
+    content7b2 = open(cells_path7b, encoding="utf-8").read()
+    good_lines7b2 = [l for l in content7b2.splitlines() if l.strip()]
+    check("след второто пускане: header + 2 записа, всички се парсват",
+          len(good_lines7b2) == 3 and all(json.loads(l) is not None for l in good_lines7b2)
+          and content7b2.endswith("\n"), str(len(good_lines7b2)))
+finally:
+    fe.fetch_daily_tmin = real
+
 # (c) повреда в средата (не в последния ред) -> спира с грешка, назовава реда, не докосва мрежата
 tmp8 = tempfile.mkdtemp()
 cells_path8 = os.path.join(tmp8, "cells.jsonl")
