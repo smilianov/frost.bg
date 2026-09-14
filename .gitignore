@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.dev.vars
+.superpowers/
+grid/cells.jsonl
+grid/compute.log
+__pycache__/
+.DS_Store

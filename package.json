@@ -1,0 +1,15 @@
+{
+  "name": "frost-bg",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Сланите по български координати — frost.bg",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "npm run test:py",
+    "test:py": "cd grid && python3 tests_frost.py"
+  },
+  "devDependencies": {
+    "wrangler": "^4.131.2"
+  }
+}
