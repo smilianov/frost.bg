@@ -13,10 +13,24 @@ export function formatMMDD(mmdd, lang) {
   return lang === "en" ? `${month} ${day}` : `${day} ${month}`;
 }
 
+// Строго десетично, като при Worker-а: без интервали (веднъж подрязани), без
+// 0x/1e2 форми, без ".5" или "42.". Извън диапазона (±max) -> null.
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+
+export function parseDecimal(raw, max) {
+  const s = String(raw ?? "").trim();
+  if (!DECIMAL.test(s)) return null;
+  const n = Number(s);
+  if (!Number.isFinite(n) || Math.abs(n) > max) return null;
+  return n;
+}
+
 export function readQuery(search) {
   const p = new URLSearchParams(search || "");
-  const lat = Number(p.get("lat")), lon = Number(p.get("lon"));
-  if (!p.has("lat") || !p.has("lon") || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (!p.has("lat") || !p.has("lon")) return null;
+  const lat = parseDecimal(p.get("lat"), 90);
+  const lon = parseDecimal(p.get("lon"), 180);
+  if (lat === null || lon === null) return null;
   return { lat, lon };
 }
 

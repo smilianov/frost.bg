@@ -15,12 +15,22 @@ function leafletMap({ container, onPick }) {
   return { setMarker, destroy: () => map.remove() };
 }
 
+// Скрипт, който се зарежда без грешка, но не дефинира window.google.maps
+// (или изобщо не се обажда) не бива да оставя обещанието вечно висящо —
+// createMap пада обратно към Leaflet само при reject.
+const GOOGLE_LOAD_TIMEOUT_MS = 10000;
+
 function loadGoogle(key) {
   return new Promise((resolve, reject) => {
     if (window.google?.maps) return resolve(window.google.maps);
     const s = document.createElement("script");
     s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&loading=async`;
-    s.async = true; s.onload = () => resolve(window.google.maps); s.onerror = reject;
+    s.async = true;
+    let done = false;
+    const settle = (fn) => { if (done) return; done = true; clearTimeout(timer); fn(); };
+    const timer = setTimeout(() => settle(() => reject(new Error("google maps: timeout"))), GOOGLE_LOAD_TIMEOUT_MS);
+    s.onload = () => settle(() => (window.google?.maps ? resolve(window.google.maps) : reject(new Error("google maps: missing after load"))));
+    s.onerror = () => settle(() => reject(new Error("google maps: script error")));
     document.head.appendChild(s);
   });
 }

@@ -3,6 +3,8 @@
   --ink: #1f2a1c;
   --line: #d9d6cc;
   --accent: #3f7d2f;
+  /* Текст върху --accent (бутонът „Покажи“). Бяло на #3f7d2f: ~5.0:1. */
+  --on-accent: #fff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -11,6 +13,9 @@
     --ink: #e7e5df;
     --line: #2c3234;
     --accent: #7cc46a;
+    /* Бяло на #7cc46a е само ~2.1:1 — тъмен текст върху светлия акцент
+       мери ~8.5:1 (над изисквания минимум 4.5:1). */
+    --on-accent: #0f1a0c;
   }
 }
 
@@ -161,7 +166,7 @@ button {
   border-radius: 8px;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 #locate.ghost {
