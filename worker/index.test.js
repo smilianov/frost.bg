@@ -325,3 +325,24 @@ test("/api/v1/config: без globalThis.caches всичко пак работи"
   const b = await (await get("/api/v1/config")).json();
   assert.equal(b.map, "osm");
 });
+
+test("/api/v1/geocode: q под 2 знака -> 400", async () => {
+  assert.equal((await get("/api/v1/geocode?q=М")).status, 400);
+  assert.equal((await get("/api/v1/geocode")).status, 400);
+});
+test("/api/v1/geocode: минава през доставчика с подменен fetch; кеш седмица", async () => {
+  const e = env({ FETCH: async () => new Response(JSON.stringify({ results: [
+    { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }), { status: 200 }) });
+  const r = await get("/api/v1/geocode?q=Маноле&lang=bg", e);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get("cache-control"), "public, max-age=604800");
+  const b = await r.json();
+  assert.deepEqual(b.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+  assert.equal(b.provider, "openmeteo");
+});
+test("/api/v1/geocode: доставчикът пада -> 502 geocoder_failed, no-store", async () => {
+  const e = env({ FETCH: async () => new Response("x", { status: 503 }) });
+  const r = await get("/api/v1/geocode?q=Маноле", e);
+  assert.equal(r.status, 502); assert.equal((await r.json()).error.code, "geocoder_failed");
+  assert.equal(r.headers.get("cache-control"), "no-store");
+});
