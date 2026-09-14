@@ -1,8 +1,9 @@
 """Тестове за мрежата (решетка, запис на клетка, сглобяване, пробег) — пускат се с: python tests_grid.py"""
 import email.message
+import email.utils
 import io, json, os, sys, tempfile
 import urllib.error
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import frost_estimate as fe                  # noqa: E402
@@ -252,6 +253,54 @@ try:
 finally:
     fe.fetch_daily_tmin = real
 
+# (d) поправката на опашката е едно os.truncate, не пренаписване на целия файл —
+# симулирано прекъсване точно след истинското съкращаване не бива да пипа валидния префикс
+tmp8b = tempfile.mkdtemp()
+calls8b = []
+def _fetch8b(lat, lon, start, end):
+    calls8b.append((lat, lon)); return fe.DailyTmin(days=days, grid_elevation_m=100)
+fe.fetch_daily_tmin = _fetch8b
+try:
+    cg.main(["--out", tmp8b, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
+finally:
+    fe.fetch_daily_tmin = real
+cells_path8b = os.path.join(tmp8b, "cells.jsonl")
+valid_prefix8b = open(cells_path8b, encoding="utf-8").read()
+with open(cells_path8b, "a", encoding="utf-8") as f:
+    f.write('{"lat":41.2,"lon":')          # скъсан запис накрая
+real_truncate = os.truncate
+def _truncate_then_boom(path_arg, offset_arg):
+    real_truncate(path_arg, offset_arg)     # истинското съкращаване наистина се случва
+    raise RuntimeError("симулирано прекъсване веднага след съкращаването")
+os.truncate = _truncate_then_boom
+try:
+    try:
+        cg._load_done(cells_path8b, (1996, 2025), lambda s: None)
+        check("очаквахме симулираното прекъсване (иначе тестът не проверява нищо)", False, "не гръмна")
+    except RuntimeError:
+        pass
+finally:
+    os.truncate = real_truncate
+on_disk8b = open(cells_path8b, encoding="utf-8").read()
+check("валидният префикс е недокоснат дори при прекъсване веднага след съкращаването",
+      on_disk8b == valid_prefix8b, repr(on_disk8b))
+
+section("Стар формат без header се отказва (не мигрира тихо, не гадае периода)")
+tmp8c = tempfile.mkdtemp()
+cells_path8c = os.path.join(tmp8c, "cells.jsonl")
+with open(cells_path8c, "w", encoding="utf-8") as f:
+    for lat, lon in cg.lattice():
+        f.write(json.dumps({**_valid_rec, "lat": lat, "lon": lon}, ensure_ascii=False) + "\n")
+fe.fetch_daily_tmin = _must_not_be_called
+try:
+    out8c = io.StringIO()
+    rc8c = cg.main(["--out", tmp8c, "--pause", "0", "--today", "2026-09-14"], stdout=out8c)
+    check("2 080 записа без header -> връща 2", rc8c == 2, str(rc8c))
+    check("съобщението казва стар формат", "стар формат" in out8c.getvalue(), out8c.getvalue())
+    check("grid.json не се пише", not os.path.exists(os.path.join(tmp8c, "grid.json")))
+finally:
+    fe.fetch_daily_tmin = real
+
 section("Годишното опресняване: cells.jsonl пази периода си, не се пише връз стар")
 tmp9 = tempfile.mkdtemp()
 calls9 = []
@@ -329,6 +378,34 @@ try:
     tmp12 = tempfile.mkdtemp()
     cg.main(["--out", tmp12, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
     check("Retry-After: 7 се спазва", waits == [7], str(waits))
+
+    # Retry-After като HTTP-дата (RFC 9110 §10.2.3), не само цяло число секунди
+    waits.clear()
+    attempts13 = {"n": 0}
+    future = datetime.now(timezone.utc) + timedelta(seconds=7)
+    http_date = email.utils.format_datetime(future, usegmt=True)
+    def _retry_after_httpdate(lat, lon, start, end):
+        attempts13["n"] += 1
+        if attempts13["n"] == 1:
+            raise _rate_limited(retry_after=http_date)
+        return fe.DailyTmin(days=days, grid_elevation_m=100)
+    fe.fetch_daily_tmin = _retry_after_httpdate
+    tmp13 = tempfile.mkdtemp()
+    cg.main(["--out", tmp13, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
+    check("Retry-After като HTTP-дата: изчаква ~7 s", len(waits) == 1 and abs(waits[0] - 7) <= 2, str(waits))
+
+    # негодна стойност на Retry-After -> връща се към подразбиращите се 60
+    waits.clear()
+    attempts14 = {"n": 0}
+    def _retry_after_garbage(lat, lon, start, end):
+        attempts14["n"] += 1
+        if attempts14["n"] == 1:
+            raise _rate_limited(retry_after="утре някой път")
+        return fe.DailyTmin(days=days, grid_elevation_m=100)
+    fe.fetch_daily_tmin = _retry_after_garbage
+    tmp14 = tempfile.mkdtemp()
+    cg.main(["--out", tmp14, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
+    check("негоден Retry-After -> връща се към подразбиращите се 60", waits == [60], str(waits))
 finally:
     fe.fetch_daily_tmin = real
     cg.SLEEP = real_sleep
