@@ -31,6 +31,10 @@ STEP = 0.1
 ATTEMPTS = 3
 SOURCE = "ERA5 през Open-Meteo, дневен минимум на 2 м"
 SOURCE_CDS = "ERA5-Land през Copernicus CDS, дневен минимум на 2 м"
+SOURCE_SYNTHETIC = "Синтетична мрежа — пробни данни, не истински температури"
+# Машинният етикет на произхода; Worker-ът (worker/frost.js) избира по него
+# какво да напише за източника и какво посочване иска лицензът.
+SOURCE_IDS = {"cds": SOURCE_CDS, "openmeteo": SOURCE, "synthetic": SOURCE_SYNTHETIC}
 SLEEP = time.sleep         # ниво на модула, за да могат тестовете да го подменят
 
 
@@ -76,7 +80,14 @@ def cell_record(lat: float, lon: float, tmin: fe.DailyTmin,
     }
 
 
-def build_grid(cells: List[dict], start_year: int, end_year: int, synthetic: bool = False) -> dict:
+def build_grid(cells: List[dict], start_year: int, end_year: int, synthetic: bool = False,
+               source_id: Optional[str] = None) -> dict:
+    """source_id: "cds" | "openmeteo" | "synthetic"; None -> "synthetic" при
+    synthetic=True, иначе "openmeteo" (пробегът точка по точка)."""
+    if source_id is None:
+        source_id = "synthetic" if synthetic else "openmeteo"
+    if source_id not in SOURCE_IDS:
+        raise ValueError(f"непознат source_id: {source_id!r}")
     return {
         "version": 1,
         "computed": date.today().isoformat(),
@@ -85,7 +96,8 @@ def build_grid(cells: List[dict], start_year: int, end_year: int, synthetic: boo
         "threshold_c": fe.FROST_THRESHOLD_C,
         "step_deg": STEP,
         "bbox": {"lat": [LAT_MIN, LAT_MAX], "lon": [LON_MIN, LON_MAX]},
-        "source": SOURCE,
+        "source": SOURCE_IDS[source_id],
+        "source_id": source_id,
         "cells": cells,
     }
 
@@ -292,8 +304,7 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
                 cells.append(cell_record(lat, lon, fe.DailyTmin(days=[], grid_elevation_m=elev.get((lat, lon))), start.year, end.year))
                 continue
             cells.append(cell_record(lat, lon, fe.DailyTmin(days=days, grid_elevation_m=elev.get((lat, lon))), start.year, end.year))
-        grid = build_grid(cells, start.year, end.year)
-        grid["source"] = SOURCE_CDS
+        grid = build_grid(cells, start.year, end.year, source_id="cds")
         rc = 0
         if a.cross_check:
             rc = _cross_check(grid, a.cross_check, log)

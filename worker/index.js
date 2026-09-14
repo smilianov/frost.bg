@@ -19,7 +19,7 @@ const APP_VERSION = "0.1.0";
 export function json(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8", ...CORS, ...extra },
+    headers: { "content-type": "application/json; charset=utf-8", "x-content-type-options": "nosniff", ...CORS, ...extra },
   });
 }
 
@@ -36,11 +36,28 @@ function cacheOf() {
   return globalThis.caches?.default ?? null;
 }
 
-async function handleFrost(url, ctx) {
+// Ефективните карта и геокодер — същите, които /config докладва: `google`
+// само с наличния ключ, иначе подразбиращите се.
+const effectiveMap = (env) => (env.MAP === "google" && !!env.GOOGLE_MAPS_KEY ? "google" : "osm");
+const effectiveGeocoder = (env) => (env.GEOCODER === "google" && !!env.GOOGLE_KEY ? "google" : "openmeteo");
+
+// Ревизията в ключа на кеша (`rev=`, първи параметър): версията на
+// приложението, датата на мрежата и ефективните карта/геокодер. Кешът се
+// пази между deploy-ите, така че без това нов deploy или сменена
+// конфигурация би сервирал стария отговор до изтичане на TTL-а. Нова версия,
+// нова мрежа или друга карта/геокодер = други ключове; старите записи
+// просто изтичат по TTL (нищо не се трие). Deploy, който не сменя нито едно
+// от четирите, продължава да улучва старите записи — затова версията се
+// вдига при всяко издание (operations.md).
+function cacheRev(env) {
+  return encodeURIComponent([APP_VERSION, grid.computed, effectiveMap(env), effectiveGeocoder(env)].join("|"));
+}
+
+async function handleFrost(url, env, ctx) {
   const q = parseCoords(url.searchParams.get("lat"), url.searchParams.get("lon"));
   if (!q) return error("bad_request", 400);
   const cache = cacheOf();
-  const key = cache ? new Request(`${url.origin}/api/v1/frost?lat=${q.lat}&lon=${q.lon}`) : null;
+  const key = cache ? new Request(`${url.origin}/api/v1/frost?rev=${cacheRev(env)}&lat=${q.lat}&lon=${q.lon}`) : null;
   if (cache) {
     const hit = await cache.match(key);
     if (hit) return hit;
@@ -54,17 +71,19 @@ async function handleFrost(url, ctx) {
 
 async function handleConfig(env, url, ctx) {
   const cache = cacheOf();
-  const key = cache ? new Request(`${url.origin}/api/v1/config`) : null;
+  const key = cache ? new Request(`${url.origin}/api/v1/config?rev=${cacheRev(env)}`) : null;
   if (cache) {
     const hit = await cache.match(key);
     if (hit) return hit;
   }
-  const googleMap = env.MAP === "google" && !!env.GOOGLE_MAPS_KEY;
+  const map = effectiveMap(env);
   const res = json({
-    map: googleMap ? "google" : "osm",
-    google_maps_key: googleMap ? env.GOOGLE_MAPS_KEY : null,
+    map,
+    google_maps_key: map === "google" ? env.GOOGLE_MAPS_KEY : null,
+    geocoder: effectiveGeocoder(env),                       // кой доставчик, без самия ключ
     languages: ["bg", "en"],
-    grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true },
+    grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true,
+            source_id: grid.source_id ?? "cds" },           // за footer-а на страницата (както frost.js)
     version: "1",
     app_version: APP_VERSION,
   }, 200, { "cache-control": DAY });
@@ -80,7 +99,7 @@ async function handleGeocode(url, env, ctx) {
   const limit = url.searchParams.get("limit") || 5;
   const cache = cacheOf();
   const key = cache
-    ? new Request(`${url.origin}/api/v1/geocode?q=${encodeURIComponent(q)}&lang=${langKey}&limit=${clampLimit(limit)}`)
+    ? new Request(`${url.origin}/api/v1/geocode?rev=${cacheRev(env)}&q=${encodeURIComponent(q)}&lang=${langKey}&limit=${clampLimit(limit)}`)
     : null;
   if (cache) {
     const hit = await cache.match(key);
@@ -110,7 +129,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (request.method !== "GET") return error("not_found", 405, { allow: ALLOW });
     switch (url.pathname) {
-      case "/api/v1/frost": return handleFrost(url, ctx);
+      case "/api/v1/frost": return handleFrost(url, env, ctx);
       case "/api/v1/config": return handleConfig(env, url, ctx);
       case "/api/v1/geocode": return handleGeocode(url, env, ctx);
       default: return error("not_found", 404);

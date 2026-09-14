@@ -141,6 +141,7 @@ check("типична/сигурна от 30 години, по формулат
 check("височината от геопотенциала", c["elev"] == round(42.2 * 100 + 24.9), str(c["elev"]))
 check("years_used 30", c["years_used"] == 30)
 check("source казва CDS, synthetic false", "CDS" in g["source"] and g["synthetic"] is False, g["source"])
+check("source_id е cds (Worker-ът етикетира източника по него)", g.get("source_id") == "cds", str(g.get("source_id")))
 check("period 1996–2025", g["period"] == {"start": 1996, "end": 2025})
 
 section("Липсваща година -> грешка, не тиха мрежа")

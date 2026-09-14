@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { geocode, GeocodeError } from "./geocode.js";
+import { geocode, GeocodeError, clampLimit } from "./geocode.js";
 
 const fakeFetch = (handler) => async (url, init) => handler(new URL(url), init);
 const okJson = (body) => new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
@@ -182,6 +182,60 @@ test("google: произволен status не изтича в съобщени�
       return true;
     },
   );
+});
+// Защитен таван и проверка на записите: доставчикът е договор, не гаранция.
+test("openmeteo: 1000 резултата при limit 1 -> точно 1", async () => {
+  const many = Array.from({ length: 1000 }, (_, i) => ({ name: `Село ${i}`, latitude: 42 + i / 10000, longitude: 24 + i / 10000 }));
+  const f = fakeFetch(() => okJson({ results: many }));
+  const r = await geocode({ q: "Се", lang: "bg", limit: 1, provider: "openmeteo", fetchImpl: f });
+  assert.equal(r.results.length, 1);
+  assert.equal(r.results[0].name, "Село 0");
+});
+test("openmeteo: таванът е след филтъра — негодните записи не заемат места", async () => {
+  const f = fakeFetch(() => okJson({ results: [
+    { name: "Никъде", latitude: 999, longitude: 999 },
+    { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" },
+  ] }));
+  const r = await geocode({ q: "Ма", lang: "bg", limit: 1, provider: "openmeteo", fetchImpl: f });
+  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+});
+test("openmeteo: запис с координати извън ±90/±180 (999/999) се изхвърля", async () => {
+  const f = fakeFetch(() => okJson({ results: [
+    { name: "Никъде", latitude: 999, longitude: 999 },
+    { name: "Ръб", latitude: 90.0001, longitude: 24 },
+    { name: "Ръб2", latitude: 42, longitude: -180.5 },
+  ] }));
+  const r = await geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.deepEqual(r.results, []);
+});
+test("openmeteo: запис без непразно име (липсва, празно, само интервали, не низ) се изхвърля", async () => {
+  const f = fakeFetch(() => okJson({ results: [
+    { latitude: 42.1, longitude: 24.1 },
+    { name: "", latitude: 42.1, longitude: 24.1 },
+    { name: "   ", latitude: 42.1, longitude: 24.1 },
+    { name: 42, latitude: 42.1, longitude: 24.1 },
+    { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" },
+  ] }));
+  const r = await geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+});
+test("google: запис с координати извън ±90/±180 се изхвърля", async () => {
+  const f = fakeFetch(() => okJson({ status: "OK", results: [
+    { formatted_address: "Nowhere", geometry: { location: { lat: 999, lng: 999 } }, address_components: [] },
+    { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] },
+  ] }));
+  const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
+  assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+});
+test("limit само от интервали -> подразбиращите се 5, не 1 (Number('  ') е 0)", async () => {
+  assert.equal(clampLimit("  "), 5);
+  assert.equal(clampLimit(""), 5);
+  assert.equal(clampLimit("\t\n"), 5);
+  assert.equal(clampLimit("0"), 1, "истинска нула остава стегната до 1");
+  let seen;
+  const f = fakeFetch((u) => { seen = u; return okJson({ results: [] }); });
+  await geocode({ q: "Ма", lang: "bg", limit: "  ", provider: "openmeteo", fetchImpl: f });
+  assert.equal(seen.searchParams.get("count"), "5");
 });
 test("openmeteo: тяло, което е масив на върха (не обект) -> GeocodeError", async () => {
   const f1 = fakeFetch(() => okJson([]));

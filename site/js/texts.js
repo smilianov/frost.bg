@@ -18,6 +18,9 @@ export const T = {
     synthetic_banner: "Пробни данни — истинската мрежа още се смята.",
     coords_missing: "Въведи и двете координати.",
     lang_switch: "English", lang_switch_href: "/en/",
+    // footer: източникът на мрежата (по /config grid.source_id) и кой дава имената на местата (по /config geocoder)
+    src_cds: "ERA5-Land през Copernicus CDS", src_openmeteo: "ERA5 през Open-Meteo", src_synthetic: "пробни данни (синтетична мрежа)",
+    credit_openmeteo: "Open-Meteo (имена на места)", credit_google: "Google (имена на места)",
   },
   en: {
     title: "When is the frost at your place?",
@@ -37,5 +40,8 @@ export const T = {
     synthetic_banner: "Sample data — the real grid is still being computed.",
     coords_missing: "Enter both coordinates.",
     lang_switch: "Български", lang_switch_href: "/",
+    // footer: the grid's source (from /config grid.source_id) and who provides place names (from /config geocoder)
+    src_cds: "ERA5-Land via Copernicus CDS", src_openmeteo: "ERA5 via Open-Meteo", src_synthetic: "sample data (synthetic grid)",
+    credit_openmeteo: "Open-Meteo (place names)", credit_google: "Google (place names)",
   },
 };

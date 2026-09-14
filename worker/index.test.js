@@ -10,6 +10,12 @@ const env = (over = {}) => ({
 });
 const get = (path, e = env(), ctx) => worker.fetch(new Request(`https://frost.bg${path}`), e, ctx);
 
+// Ревизията в ключа на кеша: версията на приложението, датата на мрежата и
+// ЕФЕКТИВНИТЕ карта/геокодер (същите, които /config докладва). Нов deploy с
+// нова версия, нова мрежа или друга карта/геокодер = други ключове; старите
+// записи просто изтичат по TTL.
+const REV = (map = "osm", geocoder = "openmeteo") => encodeURIComponent(`0.1.0|${grid.computed}|${map}|${geocoder}`);
+
 // Заглавките, общи за всеки JSON отговор (успех или грешка) — CORS и content-type
 // не бива да изчезват тихо при бъдещи промени.
 function assertSharedHeaders(r) {
@@ -17,6 +23,7 @@ function assertSharedHeaders(r) {
   assert.equal(r.headers.get("access-control-allow-origin"), "*");
   assert.equal(r.headers.get("access-control-allow-methods"), "GET, OPTIONS");
   assert.equal(r.headers.get("access-control-allow-headers"), "content-type");
+  assert.equal(r.headers.get("x-content-type-options"), "nosniff");
 }
 function assertNoStore(r) {
   assert.equal(r.headers.get("cache-control"), "no-store");
@@ -33,6 +40,7 @@ function stubCache() {
   let puts = 0, matches = 0;
   const store = {
     has: (url) => raw.has(url),
+    keys: () => raw.keys(),
     set: (url, entry) => raw.set(url, entry),
     get size() { return raw.size; },
     get puts() { return puts; },
@@ -86,6 +94,7 @@ function cachedEntry(body, cacheControl = "public, max-age=86400") {
         "access-control-allow-origin": "*",
         "access-control-allow-methods": "GET, OPTIONS",
         "access-control-allow-headers": "content-type",
+        "x-content-type-options": "nosniff",
         "cache-control": cacheControl,
       },
     },
@@ -94,6 +103,8 @@ function cachedEntry(body, cacheControl = "public, max-age=86400") {
 
 test("grid.json: 2080 клетки, всички в правоъгълника, дати MM-DD или null", () => {
   assert.equal(grid.cells.length, 2080);
+  // Произходът е машинно четим — Worker-ът етикетира източника по него.
+  assert.ok(["cds", "openmeteo", "synthetic"].includes(grid.source_id), String(grid.source_id));
   const re = /^\d{2}-\d{2}$/;
   for (const c of grid.cells) {
     assert.ok(c.lat >= 41.2 && c.lat <= 44.3 && c.lon >= 22.3 && c.lon <= 28.7, `${c.lat},${c.lon}`);
@@ -137,9 +148,19 @@ test("/api/v1/config: osm без ключ", async () => {
   assertSharedHeaders(r);
   assert.equal(r.headers.get("cache-control"), "public, max-age=86400");
   const b = await r.json();
-  assert.deepEqual(b, { map: "osm", google_maps_key: null, languages: ["bg", "en"],
-    grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true },
+  assert.deepEqual(b, { map: "osm", google_maps_key: null, geocoder: "openmeteo", languages: ["bg", "en"],
+    grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true, source_id: grid.source_id },
     version: "1", app_version: "0.1.0" });
+});
+test("/api/v1/config: GEOCODER=google с GOOGLE_KEY -> geocoder google, без да разкрива ключа", async () => {
+  const r = await get("/api/v1/config", env({ GEOCODER: "google", GOOGLE_KEY: "SECRET123" }));
+  const text = await r.text();
+  assert.ok(!text.includes("SECRET123"), text);
+  assert.equal(JSON.parse(text).geocoder, "google");
+});
+test("/api/v1/config: GEOCODER=google без GOOGLE_KEY пада обратно на openmeteo", async () => {
+  const b = await (await get("/api/v1/config", env({ GEOCODER: "google", GOOGLE_KEY: "" }))).json();
+  assert.equal(b.geocoder, "openmeteo");
 });
 test("/api/v1/config носи app_version", async () => {
   const b = await (await get("/api/v1/config")).json();
@@ -203,7 +224,7 @@ test("/api/v1/frost: кешът се пълни под нормализиран 
     const r1 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    assert.ok(store.has("https://frost.bg/api/v1/frost?lat=42.184&lon=24.929"));
+    assert.ok(store.has(`https://frost.bg/api/v1/frost?rev=${REV()}&lat=42.184&lon=24.929`), [...store.keys()].join(" "));
   } finally {
     clearCacheStub();
   }
@@ -217,7 +238,7 @@ test("/api/v1/frost: попадение връща каквото е в кеша
     // Подменяме записа с очевиден сентинел — истинско изчисление за тези
     // координати никога няма да върне точно това тяло, затова връщането му
     // непроменено доказва, че отговорът идва от кеша, не от ново пресмятане.
-    store.set("https://frost.bg/api/v1/frost?lat=42.184&lon=24.929", cachedEntry({ sentinel: true }));
+    store.set(`https://frost.bg/api/v1/frost?rev=${REV()}&lat=42.184&lon=24.929`, cachedEntry({ sentinel: true }));
     // Различно записани, но закръглено същите координати -> същият нормализиран ключ.
     const r2 = await get("/api/v1/frost?lat=42.1841&lon=24.929", env(), makeCtx());
     assert.equal(r2.status, 200);
@@ -282,7 +303,7 @@ test("/api/v1/config: кешът се пълни под голия път", asyn
     const r1 = await getSettled("/api/v1/config", env(), makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    assert.ok(store.has("https://frost.bg/api/v1/config"));
+    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${REV()}`), [...store.keys()].join(" "));
   } finally {
     clearCacheStub();
   }
@@ -293,7 +314,7 @@ test("/api/v1/config: попадение връща каквото е в кеш�
     const r1 = await getSettled("/api/v1/config", env(), makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    store.set("https://frost.bg/api/v1/config", cachedEntry({ sentinel: true }));
+    store.set(`https://frost.bg/api/v1/config?rev=${REV()}`, cachedEntry({ sentinel: true }));
     const r2 = await get("/api/v1/config", env(), makeCtx());
     assert.equal(r2.status, 200);
     assertSharedHeaders(r2);
@@ -329,6 +350,90 @@ test("/api/v1/config: без globalThis.caches всичко пак работи"
   delete globalThis.caches;
   const b = await (await get("/api/v1/config")).json();
   assert.equal(b.map, "osm");
+});
+
+// Ревизията в ключа: запазен кеш + друга конфигурация/мрежа = miss, не
+// стария отговор. Сентинелът под стария ключ доказва, че miss-ът е заради
+// ключа, не заради изтекъл или липсващ запис.
+test("/api/v1/config: друг MAP в env при запазен кеш -> друг ключ, втори put, свеж отговор", async () => {
+  const store = stubCache();
+  try {
+    const r1 = await getSettled("/api/v1/config", env(), makeCtx());
+    assert.equal((await r1.json()).map, "osm");
+    assert.equal(store.puts, 1);
+    store.set(`https://frost.bg/api/v1/config?rev=${REV()}`, cachedEntry({ sentinel: true }));
+    const r2 = await getSettled("/api/v1/config", env({ MAP: "google", GOOGLE_MAPS_KEY: "AIzaTEST" }), makeCtx());
+    const b2 = await r2.json();
+    assert.notDeepEqual(b2, { sentinel: true }, "смяната на картата не бива да връща стария запис");
+    assert.equal(b2.map, "google");
+    assert.equal(store.puts, 2, "нов ключ -> нов put");
+    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${REV("google", "openmeteo")}`), [...store.keys()].join(" "));
+    // а старият ключ си стои непокътнат (изтича по TTL, не се трие)
+    const r3 = await get("/api/v1/config", env(), makeCtx());
+    assert.deepEqual(await r3.json(), { sentinel: true });
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/config: MAP=google БЕЗ ключ е ефективно osm -> същият ключ като osm (попадение)", async () => {
+  const store = stubCache();
+  try {
+    await getSettled("/api/v1/config", env(), makeCtx());
+    store.set(`https://frost.bg/api/v1/config?rev=${REV()}`, cachedEntry({ sentinel: true }));
+    const r = await get("/api/v1/config", env({ MAP: "google", GOOGLE_MAPS_KEY: "" }), makeCtx());
+    assert.deepEqual(await r.json(), { sentinel: true });
+    assert.equal(store.puts, 1);
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/geocode: смяна на GEOCODER (с ключ) при запазен кеш -> доставчикът се вика пак, provider google", async () => {
+  const store = stubCache();
+  try {
+    let calls = 0;
+    const meteoBody = { results: [{ name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] };
+    const googleBody = { status: "OK", results: [{ formatted_address: "Manole, Bulgaria",
+      geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] }] };
+    const fetchBoth = async (url) => { calls++; return new Response(JSON.stringify(
+      new URL(url).hostname === "maps.googleapis.com" ? googleBody : meteoBody), { status: 200 }); };
+    const r1 = await getSettled("/api/v1/geocode?q=Manole&lang=en", env({ FETCH: fetchBoth }), makeCtx());
+    assert.equal((await r1.json()).provider, "openmeteo");
+    assert.equal(calls, 1);
+    store.set(`https://frost.bg/api/v1/geocode?rev=${REV()}&q=Manole&lang=en&limit=5`,
+      cachedEntry({ sentinel: true }, "public, max-age=604800"));
+    const r2 = await getSettled("/api/v1/geocode?q=Manole&lang=en",
+      env({ FETCH: fetchBoth, GEOCODER: "google", GOOGLE_KEY: "k" }), makeCtx());
+    const b2 = await r2.json();
+    assert.notDeepEqual(b2, { sentinel: true }, "смяната на геокодера не бива да връща стария Open-Meteo запис");
+    assert.equal(b2.provider, "google");
+    assert.equal(calls, 2, "нов ключ -> нова заявка към доставчика");
+    assert.ok(store.has(`https://frost.bg/api/v1/geocode?rev=${REV("osm", "google")}&q=Manole&lang=en&limit=5`), [...store.keys()].join(" "));
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/frost: нова мрежа (друг grid.computed) при запазен кеш -> miss, не старият отговор", async () => {
+  const store = stubCache();
+  const computed0 = grid.computed;
+  try {
+    const r1 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(store.puts, 1);
+    store.set(`https://frost.bg/api/v1/frost?rev=${REV()}&lat=42.184&lon=24.929`, cachedEntry({ sentinel: true }));
+    // Импортираният grid е един и същ обект в теста и в Worker-а — „нова мрежа“
+    // е просто друга дата на смятане; frost.js индексира клетките, не датата.
+    grid.computed = "2031-01-05";
+    const r2 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
+    const b2 = await r2.json();
+    assert.notDeepEqual(b2, { sentinel: true }, "новата мрежа не бива да връща стария запис");
+    assert.deepEqual(b2.query, { lat: 42.184, lon: 24.929 });
+    assert.equal(store.puts, 2);
+    assert.ok(store.has(`https://frost.bg/api/v1/frost?rev=${encodeURIComponent("0.1.0|2031-01-05|osm|openmeteo")}&lat=42.184&lon=24.929`),
+      [...store.keys()].join(" "));
+  } finally {
+    grid.computed = computed0;
+    clearCacheStub();
+  }
 });
 
 test("/api/v1/geocode: q под 2 знака -> 400 bad_query", async () => {
@@ -375,7 +480,7 @@ test("/api/v1/geocode: кешът се пълни под нормализира�
     const r1 = await getSettled("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    assert.ok(store.has("https://frost.bg/api/v1/geocode?q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5"));
+    assert.ok(store.has(`https://frost.bg/api/v1/geocode?rev=${REV()}&q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5`), [...store.keys()].join(" "));
   } finally {
     clearCacheStub();
   }
@@ -389,7 +494,7 @@ test("/api/v1/geocode: попадение връща каквото е в кеш
     const r1 = await getSettled("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(calls, 1);
-    store.set("https://frost.bg/api/v1/geocode?q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5",
+    store.set(`https://frost.bg/api/v1/geocode?rev=${REV()}&q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5`,
       cachedEntry({ sentinel: true }, "public, max-age=604800"));
     const r2 = await get("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
     assert.equal(r2.status, 200);
@@ -412,6 +517,19 @@ test("/api/v1/geocode: различно записани, но нормализ�
     const r2 = await getSettled("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
     assert.equal(r2.status, 200);
     assert.equal(calls, 1, "нормализираният ключ трябва да съвпадне — без нов провайдър извикване");
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/geocode: limit само от интервали -> подразбиращите се 5 (в заявката и в ключа)", async () => {
+  const store = stubCache();
+  try {
+    let seen;
+    const e = env({ FETCH: async (url) => { seen = new URL(url); return new Response(JSON.stringify({ results: [] }), { status: 200 }); } });
+    const r = await getSettled("/api/v1/geocode?q=Manole&lang=en&limit=%20%20", e, makeCtx());
+    assert.equal(r.status, 200);
+    assert.equal(seen.searchParams.get("count"), "5");
+    assert.ok(store.has(`https://frost.bg/api/v1/geocode?rev=${REV()}&q=Manole&lang=en&limit=5`), [...store.keys()].join(" "));
   } finally {
     clearCacheStub();
   }

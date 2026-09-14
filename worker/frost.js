@@ -64,7 +64,8 @@ export function frostResponse(grid, lat, lon) {
     period: grid.period,
     threshold_c: grid.threshold_c,
     note: TEXTS.note,
-    source: TEXTS.sourceLabel(grid.period.start, grid.period.end, Number(grid.computed.slice(0, 4))),
+    // Стара мрежа без source_id (отпреди етикета) е CDS по подразбиране.
+    source: TEXTS.sourceLabel(grid.period.start, grid.period.end, Number(grid.computed.slice(0, 4)), grid.source_id ?? "cds"),
     synthetic: grid.synthetic === true,
     version: "1",
   };

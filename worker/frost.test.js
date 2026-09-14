@@ -6,7 +6,7 @@ import { TEXTS } from "./texts.js";
 const grid = {
   version: 1, computed: "2026-09-14", synthetic: true,
   period: { start: 1996, end: 2025 }, threshold_c: 0, step_deg: 0.1,
-  bbox: { lat: [41.2, 44.3], lon: [22.3, 28.7] }, source: "x",
+  bbox: { lat: [41.2, 44.3], lon: [22.3, 28.7] }, source: "x", source_id: "cds",
   cells: [
     { lat: 42.2, lon: 24.9, elev: 152, typical: ["03-27", "11-23"], safe: ["04-10", "10-30"],
       years_used: 30, years_with_spring: 30, years_with_autumn: 30, years: [[1996, "04-10", "11-02"]] },
@@ -135,6 +135,40 @@ test("frostResponse: source.bg/en и period идват от grid.period, не с
   assert.equal(r.source.en, "ERA5-Land via Copernicus CDS, 2000–2029");
   assert.deepEqual(r.period, { start: 2000, end: 2029 });
   assert.ok(r.source.attribution.endsWith("2030"), r.source.attribution);
+});
+// Произходът идва от данните: source_id в grid.json решава етикета, връзката
+// и посочването — не Worker-ът да твърди CDS за всяка мрежа.
+test("frostResponse: source_id openmeteo -> етикет „през Open-Meteo“, url open-meteo.com, посочване на Open-Meteo (без CC-BY на CDS)", () => {
+  const r = frostResponse({ ...grid, source_id: "openmeteo" }, 42.2, 24.9);
+  assert.equal(r.source.bg, "ERA5 през Open-Meteo, 1996–2025");
+  assert.equal(r.source.en, "ERA5 via Open-Meteo, 1996–2025");
+  assert.equal(r.source.url, "https://open-meteo.com/");
+  assert.equal(r.source.attribution, "Weather data by Open-Meteo.com");
+  assert.ok(!r.source.attribution.includes("Copernicus"), r.source.attribution);
+});
+test("frostResponse: source_id synthetic -> „пробни данни“, url null, attribution null", () => {
+  const r = frostResponse({ ...grid, source_id: "synthetic", synthetic: true }, 42.2, 24.9);
+  assert.equal(r.source.bg, "Пробни данни (синтетична мрежа)");
+  assert.equal(r.source.en, "Sample data (synthetic grid)");
+  assert.equal(r.source.url, null);
+  assert.equal(r.source.attribution, null);
+  assert.deepEqual(Object.keys(r.source).sort(), ["attribution", "bg", "en", "url"]);
+});
+test("frostResponse: без source_id (стара мрежа) -> CDS, както досега", () => {
+  const { source_id, ...legacy } = grid;
+  const r = frostResponse(legacy, 42.2, 24.9);
+  assert.equal(r.source.bg, "ERA5-Land през Copernicus CDS, 1996–2025");
+  assert.equal(r.source.url, "https://cds.climate.copernicus.eu/datasets/derived-era5-land-daily-statistics");
+  assert.ok(r.source.attribution.startsWith("Contains modified Copernicus"), r.source.attribution);
+});
+test("TEXTS.sourceLabel: трите източника на двата езика, без „мраз“, en/bg различни", () => {
+  for (const id of ["cds", "openmeteo", "synthetic"]) {
+    const s = TEXTS.sourceLabel(1996, 2025, 2026, id);
+    assert.ok(s.bg && s.en && s.bg !== s.en, id);
+    assert.ok(!s.bg.includes("мраз"), id);
+    assert.ok("url" in s && "attribution" in s, id);
+  }
+  assert.throws(() => TEXTS.sourceLabel(1996, 2025, 2026, "nope"), /source_id/);
 });
 test("note: непразни, различни на двата езика, en съдържа „frost“", () => {
   assert.ok(TEXTS.note.bg.length > 0);

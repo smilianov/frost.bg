@@ -85,6 +85,16 @@ check("computed е днешната дата", g["computed"] == date.today().iso
 check("synthetic е false по подразбиране", g["synthetic"] is False)
 check("cells са точно подадените, в реда си", g["cells"] == [rec, rec2], str(len(g["cells"])))
 check("synthetic=True се записва", cg.build_grid([], 1996, 2025, synthetic=True)["synthetic"] is True)
+# source_id — машинният етикет на произхода, който Worker-ът чете (worker/frost.js): cds | openmeteo | synthetic
+check("source_id е openmeteo по подразбиране (Open-Meteo пробег)", g.get("source_id") == "openmeteo", str(g.get("source_id")))
+g_syn = cg.build_grid([], 1996, 2025, synthetic=True)
+check("synthetic=True -> source_id synthetic", g_syn.get("source_id") == "synthetic", str(g_syn.get("source_id")))
+try:
+    g_cds = cg.build_grid([], 1996, 2025, source_id="cds")
+    check("source_id=cds -> source_id cds и source текстът на CDS",
+          g_cds.get("source_id") == "cds" and g_cds["source"] == cg.SOURCE_CDS, str(g_cds.get("source_id")))
+except TypeError as e:
+    check("source_id=cds -> source_id cds и source текстът на CDS", False, f"TypeError: {e}")
 
 section("Синтетичната мрежа (за разработка, докато истинската се смята)")
 st = cg.synthetic_tmin(42.2, 24.9, 1996, 2025)
@@ -160,6 +170,7 @@ rc = cg.main(["--out", tmp3, "--synthetic", "--today", "2026-09-14"], stdout=io.
 g3 = json.load(open(os.path.join(tmp3, "grid.json"), encoding="utf-8"))
 check("2 080 синтетични клетки, synthetic true", len(g3["cells"]) == 2080 and g3["synthetic"] is True)
 check("всяка има typical и safe от 2 елемента", all(len(c["typical"]) == 2 and len(c["safe"]) == 2 for c in g3["cells"]))
+check("--synthetic пише source_id synthetic", g3.get("source_id") == "synthetic", str(g3.get("source_id")))
 
 section("--limit: помощният текст вече не лъже за „нови точки“")
 import contextlib

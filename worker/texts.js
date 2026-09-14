@@ -5,11 +5,25 @@ export const TEXTS = {
     en: "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation.",
   },
   // year идва от данните (grid.computed), не от часовника — иначе тестовете
-  // и продукцията заедно остаряват на Нова година.
-  sourceLabel(start, end, year) {
-    return { bg: `ERA5-Land през Copernicus CDS, ${start}–${end}`, en: `ERA5-Land via Copernicus CDS, ${start}–${end}`,
-             url: "https://cds.climate.copernicus.eu/datasets/derived-era5-land-daily-statistics",
-             attribution: `Contains modified Copernicus Climate Change Service information ${year}` };
+  // и продукцията заедно остаряват на Нова година. sourceId идва от
+  // grid.source_id (compute_grid.py): cds | openmeteo | synthetic — етикетът,
+  // връзката и посочването (изисквано от лиценза) следват истинския произход.
+  // attribution е един низ, не двойка: това е задължителната формулировка на
+  // самия лиценз (CDS, Open-Meteo), не превод.
+  sourceLabel(start, end, year, sourceId = "cds") {
+    switch (sourceId) {
+      case "cds":
+        return { bg: `ERA5-Land през Copernicus CDS, ${start}–${end}`, en: `ERA5-Land via Copernicus CDS, ${start}–${end}`,
+                 url: "https://cds.climate.copernicus.eu/datasets/derived-era5-land-daily-statistics",
+                 attribution: `Contains modified Copernicus Climate Change Service information ${year}` };
+      case "openmeteo":
+        return { bg: `ERA5 през Open-Meteo, ${start}–${end}`, en: `ERA5 via Open-Meteo, ${start}–${end}`,
+                 url: "https://open-meteo.com/", attribution: "Weather data by Open-Meteo.com" };
+      case "synthetic":
+        return { bg: "Пробни данни (синтетична мрежа)", en: "Sample data (synthetic grid)", url: null, attribution: null };
+      default:
+        throw new Error(`непознат source_id: ${sourceId}`);
+    }
   },
   errors: {
     bad_request: { bg: "Невалидни координати: lat и lon са десетични градуси.",

@@ -192,24 +192,46 @@ $("locate").onclick = () => {
 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
+// Footer-ът следва /config: източникът на мрежата (grid.source_id) и
+// доставчикът на имената (geocoder). Връзка и посочване — само където
+// лицензът ги иска (CDS, Open-Meteo); синтетичната мрежа няма нито едното.
+// Същите три етикета дава и API-то в `source` (worker/texts.js).
+const SOURCES = {
+  cds: { label: "src_cds", url: "https://cds.climate.copernicus.eu/",
+         attribution: (year) => `Contains modified Copernicus Climate Change Service information${year ? ` ${year}` : ""}` },
+  openmeteo: { label: "src_openmeteo", url: "https://open-meteo.com/", attribution: () => "Weather data by Open-Meteo.com" },
+  synthetic: { label: "src_synthetic", url: null, attribution: () => null },
+};
 function footerSource(cfg) {
   const period = cfg?.grid?.period;
   const periodText = Number.isFinite(period?.start) && Number.isFinite(period?.end) ? ` ${period.start}–${period.end}` : "";
   const computed = typeof cfg?.grid?.computed === "string" ? cfg.grid.computed : "";
   const year = /^\d{4}/.test(computed) ? computed.slice(0, 4) : "";
-  const attribution = `Contains modified Copernicus Climate Change Service information${year ? ` ${year}` : ""}`;
-  $("source").textContent = `${t.source}: ERA5-Land${periodText} · ${attribution}`;
+  const src = SOURCES[cfg?.grid?.source_id] ?? SOURCES.cds; // стара мрежа без етикет = CDS, както в Worker-а
+  const label = `${t[src.label]}${periodText}`;
+  const node = $("source");
+  node.replaceChildren(text(`${t.source}: `), src.url ? el("a", { href: src.url, rel: "noopener", text: label }) : text(label));
+  const attribution = src.attribution(year);
+  if (attribution) node.append(text(` · ${attribution}`));
+}
+function footerGeocoder(cfg) {
+  const google = cfg?.geocoder === "google";
+  $("geocoder-credit").replaceChildren(el("a", {
+    href: google ? "https://developers.google.com/maps" : "https://open-meteo.com/", rel: "noopener",
+    text: google ? t.credit_google : t.credit_openmeteo,
+  }));
 }
 
 // 2. картата — след config, за да знаем доставчика; после адресът със ?lat&lon
 (async () => {
-  let cfg = { map: "osm", google_maps_key: null, grid: {} };
+  let cfg = { map: "osm", google_maps_key: null, geocoder: "openmeteo", grid: {} };
   try {
     const parsed = await (await fetch("/api/v1/config")).json();
     if (parsed && typeof parsed === "object") cfg = parsed; // не-обект (напр. null) -> подразбиращите се
   } catch (_) { /* картата пак ще е OSM */ }
   $("synthetic").hidden = !cfg?.grid?.synthetic;
   footerSource(cfg);
+  footerGeocoder(cfg);
   map = await createMap({ container: $("map"), provider: cfg?.map, googleKey: cfg?.google_maps_key, onPick: lookup });
   const q = readQuery(location.search);
   if (q) lookup(q.lat, q.lon);

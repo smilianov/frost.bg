@@ -5,6 +5,9 @@ const OPEN_METEO = "https://geocoding-api.open-meteo.com/v1/search";
 const GOOGLE = "https://maps.googleapis.com/maps/api/geocode/json";
 const round3 = (x) => Math.round(x * 1000) / 1000;
 const isFiniteNum = (x) => typeof x === "number" && Number.isFinite(x);
+// Координати извън ±90/±180 (напр. 999/999 от развален upstream) не са място.
+const validLatLon = (lat, lon) => isFiniteNum(lat) && isFiniteNum(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+const nonEmptyName = (x) => typeof x === "string" && x.trim() !== "";
 // Само тези статуси на Google може да влязат в текста на GeocodeError —
 // произволна стойност на `status` не е доверен вход (виж коментара при
 // fetchJson) и никога не се прекопира сурова.
@@ -14,7 +17,9 @@ const GOOGLE_ERROR_STATUSES = new Set(["OVER_QUERY_LIMIT", "REQUEST_DENIED", "IN
 // копия на политиката. Изрична Number.isFinite проверка, не `Number(limit) ||
 // 5`: 0 е лъжливо в JS, `Number(0) || 5` би дало 5 вместо да се скове до 1.
 // Math.trunc отрязва дробната част (1.9 -> 1), не я праща сурова на доставчика.
+// Празен/само интервали низ е „липсващо“ (-> 5), не Number("  ") === 0 -> 1.
 export function clampLimit(limit) {
+  if (limit == null || String(limit).trim() === "") return 5;
   const n = Number(limit);
   return Number.isFinite(n) ? Math.min(10, Math.max(1, Math.trunc(n))) : 5;
 }
@@ -60,14 +65,17 @@ async function fetchJson(fetchImpl, url, timeoutMs) {
 // Валидният отговор без "results" (Open-Meteo при нула съвпадения) остава
 // празен списък — не грешка. Но невалидна форма (тяло не е обект, `results`
 // не е масив) е GeocodeError; отделен невалиден елемент вътре в масива се
-// пропуска мълчаливо, не чупи целия отговор.
-function normalizeMeteo(body) {
+// пропуска мълчаливо, не чупи целия отговор. `count` е само молба към
+// доставчика — таванът `limit` се налага и тук, след филтъра, за да не
+// стигнат 1 000 записа до клиента (и негодните да не заемат места).
+function normalizeMeteo(body, limit) {
   try {
     if (body === null || typeof body !== "object" || Array.isArray(body)) throw new GeocodeError("upstream returned malformed data");
     if (body.results !== undefined && !Array.isArray(body.results)) throw new GeocodeError("upstream returned malformed data");
     const list = Array.isArray(body.results) ? body.results : [];
     return list
-      .filter((r) => r && typeof r === "object" && isFiniteNum(r.latitude) && isFiniteNum(r.longitude))
+      .filter((r) => r && typeof r === "object" && nonEmptyName(r.name) && validLatLon(r.latitude, r.longitude))
+      .slice(0, limit)
       .map((r) => ({ name: r.name, admin: r.admin1 || "", lat: round3(r.latitude), lon: round3(r.longitude) }));
   } catch (e) {
     if (e instanceof GeocodeError) throw e;
@@ -88,7 +96,7 @@ function normalizeGoogle(body, limit) {
     const comp = (r, type) => (r.address_components || []).find((c) => (c.types || []).includes(type))?.long_name;
     return body.results
       .filter((r) => r && typeof r === "object" && r.geometry && r.geometry.location
-        && isFiniteNum(r.geometry.location.lat) && isFiniteNum(r.geometry.location.lng))
+        && validLatLon(r.geometry.location.lat, r.geometry.location.lng))
       .slice(0, limit)
       .map((r) => ({
         name: comp(r, "locality") || String(r.formatted_address || "").split(",")[0].trim(),
@@ -107,7 +115,7 @@ async function openMeteo({ q, lang, limit, fetchImpl, timeoutMs }) {
   url.searchParams.set("language", lang); url.searchParams.set("countryCode", "BG");
   url.searchParams.set("format", "json");
   const body = await fetchJson(fetchImpl, url.toString(), timeoutMs);
-  return { results: normalizeMeteo(body), provider: "openmeteo" };
+  return { results: normalizeMeteo(body, limit), provider: "openmeteo" };
 }
 
 async function google({ q, lang, limit, googleKey, fetchImpl, timeoutMs }) {
