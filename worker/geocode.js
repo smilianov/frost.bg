@@ -93,15 +93,23 @@ function normalizeGoogle(body, limit) {
       throw new GeocodeError(`upstream returned an error status${status}`);
     }
     if (!Array.isArray(body.results)) throw new GeocodeError("upstream returned malformed data");
-    const comp = (r, type) => (r.address_components || []).find((c) => (c.types || []).includes(type))?.long_name;
+    // Всеки запис се проверява сам за себе си и негодният отпада тихо (както
+    // при Open-Meteo) — един счупен запис в списъка не бива да прави 502 от
+    // цялото търсене; таванът е след филтъра, така че се гледат и записите
+    // отвъд първите `limit`.
+    const wellFormed = (r) => r && typeof r === "object" && r.geometry && r.geometry.location
+      && validLatLon(r.geometry.location.lat, r.geometry.location.lng)
+      && (r.address_components === undefined || Array.isArray(r.address_components));
+    const comp = (r, type) => (r.address_components || [])
+      .find((c) => c && typeof c === "object" && Array.isArray(c.types) && c.types.includes(type))?.long_name;
+    const str = (x) => (typeof x === "string" ? x : "");
     // Името се извлича, после се филтрира (без locality и без адрес -> празно),
-    // и чак тогава таванът — както при Open-Meteo, негодните не заемат места.
+    // и чак тогава таванът — негодните не заемат места.
     return body.results
-      .filter((r) => r && typeof r === "object" && r.geometry && r.geometry.location
-        && validLatLon(r.geometry.location.lat, r.geometry.location.lng))
+      .filter(wellFormed)
       .map((r) => ({
-        name: comp(r, "locality") || String(r.formatted_address || "").split(",")[0].trim(),
-        admin: comp(r, "administrative_area_level_1") || "",
+        name: str(comp(r, "locality")) || str(r.formatted_address).split(",")[0].trim(),
+        admin: str(comp(r, "administrative_area_level_1")),
         lat: round3(r.geometry.location.lat), lon: round3(r.geometry.location.lng),
       }))
       .filter((r) => nonEmptyName(r.name))

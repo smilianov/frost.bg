@@ -236,6 +236,30 @@ test("google: запис без locality и без formatted_address (празн
   const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
   assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
 });
+// Негоден запис се изхвърля сам, не проваля цялото търсене — дори когато е
+// извън първите `limit` валидни (таванът е след филтъра).
+test("google: негоден запис (address_components: {}) след валиден се изхвърля; limit 1 -> валидният, без грешка", async () => {
+  const f = fakeFetch(() => okJson({ status: "OK", results: [
+    { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] },
+    { formatted_address: "Broken, Bulgaria", geometry: { location: { lat: 42.1, lng: 24.1 } }, address_components: {} },
+  ] }));
+  const r = await geocode({ q: "Manole", lang: "en", limit: 1, provider: "google", googleKey: "k", fetchImpl: f });
+  assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+});
+test("google: негодни записи по отделно — components не масив, component без types масив, location не числа — само негодният отпада", async () => {
+  const f = fakeFetch(() => okJson({ status: "OK", results: [
+    { formatted_address: "Broken, Bulgaria", geometry: { location: { lat: 42.1, lng: 24.1 } }, address_components: "nope" },
+    { formatted_address: "Rhodope, Bulgaria", geometry: { location: { lat: 41.7, lng: 24.7 } },
+      address_components: [{ long_name: "X", types: "locality" }, null, { long_name: "Smolyan Province", types: ["administrative_area_level_1"] }] },
+    { formatted_address: "Nowhere, Bulgaria", geometry: { location: { lat: "42.1", lng: 24.1 } }, address_components: [] },
+    { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } } },
+  ] }));
+  const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
+  assert.deepEqual(r.results, [
+    { name: "Rhodope", admin: "Smolyan Province", lat: 41.7, lon: 24.7 },
+    { name: "Manole", admin: "", lat: 42.184, lon: 24.929 },
+  ]);
+});
 test("limit само от интервали -> подразбиращите се 5, не 1 (Number('  ') е 0)", async () => {
   assert.equal(clampLimit("  "), 5);
   assert.equal(clampLimit(""), 5);

@@ -169,19 +169,29 @@ itself — `Cache-Control: public, max-age=…` on those only reaches the
 browser. So `worker/index.js` caches explicitly through the Cache API
 (`caches.default`): on a request, first `match` by a normalized key; on a
 miss, compute and `put` a copy of the response. Errors (`no-store`) are
-never written. TTL: a day for `/frost` and `/config`, a week for
-`/geocode`.
+never written.
+
+**Two lifetimes in one header.** `Cache-Control: public, max-age=300,
+s-maxage=86400` (`/frost`, `/config`) and `…, s-maxage=604800`
+(`/geocode`): `s-maxage` is for the edge (the Cache API honours it) — a
+day, respectively a week; `max-age` is for the browser — **5 minutes**.
+The browser knows nothing about the revision in the key below, so its
+lifetime is deliberately short: after a configuration or grid change the
+edge is fresh immediately, and browsers revalidate within 5 minutes.
 
 **The key carries a revision.** The cache survives deploys, so the key
 includes, as its first parameter `rev=`, four things:
 `application version | grid date (grid.computed) | effective map |
 effective geocoder` (URL-encoded; effective = what `/api/v1/config`
 reports: `google` only with its key present, otherwise `osm` /
-`openmeteo`). Consequences:
+`openmeteo`). Consequences — everywhere below, "a fresh cache" means:
+**edge — immediately on a new rev; browsers — within 5 minutes**:
 
 - a deploy with a **new version** (`APP_VERSION` in `worker/index.js`,
   `package.json`, the changelog) = a fresh cache;
 - a **new grid** (`grid.computed` is a different date) = a fresh cache;
+  `computed` is date-only — **a new grid on the same day → bump
+  `APP_VERSION`**, otherwise the edge keeps the old one until it expires;
 - **changing `MAP` or `GEOCODER`** (or adding a key that was missing, which
   changes the effective provider) = a fresh cache;
 - **old entries are not deleted** — they expire on their own by TTL (a week
@@ -190,8 +200,8 @@ reports: `google` only with its key present, otherwise `osm` /
   keeps hitting the old entries until TTL — which is why every release bumps
   the version;
 - rotating `GOOGLE_MAPS_KEY` itself with `MAP = "google"` unchanged does
-  not change the key: the old `/config` stays for up to a day. If it must
-  be immediate — bump the version.
+  not change the key: the edge keeps the old `/config` for up to a day
+  (bump the version to replace it), browsers for up to 5 minutes.
 
 ## Map tiles
 
@@ -212,9 +222,11 @@ Local work isn't blocked on any of this:
   download and compute above, **the cross-check with exit code 0** (cells
   actually compared, same period, no difference over 10 days — or one that
   was reviewed and explained), `synthetic: false` and `source_id: "cds"` in
-  `grid/grid.json`, `npm test` green; then **a new deploy** — the cache
-  switches by itself, because the grid date is in the key (see "The API
-  cache"), nothing is purged by hand;
+  `grid/grid.json`, `npm test` green; then **a new deploy** — the grid
+  date is in the edge key, so the edge is fresh immediately on the new rev
+  and browsers within 5 minutes (see "The API cache"); nothing is purged by
+  hand. **A new grid on the same day → bump `APP_VERSION`**, otherwise the
+  edge keeps the old one until it expires;
 - registering the `frost.bg` domain and its DNS in Cloudflare — an owner
   step;
 - `npx wrangler login` (linking the Cloudflare account) and

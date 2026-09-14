@@ -29,13 +29,15 @@
   API формата) и `app_version` (на приложението) — без нито една тайна да
   излиза от Worker-а.
 - Общо за трите: CORS отворен, `X-Content-Type-Options: nosniff`, кеш през
-  Cache API на Cloudflare (денонощие за `/frost` и `/config`, седмица за
-  `/geocode`) с ревизия в ключа — нова версия, нова мрежа или друга
-  карта/геокодер = нов кеш, старите записи изтичат по TTL; грешки на двата
-  езика с единна форма, версия в пътя (`/api/v1/`).
+  Cache API на Cloudflare (`s-maxage`: денонощие за `/frost` и `/config`,
+  седмица за `/geocode`; браузърът — `max-age` 5 минути) с ревизия в
+  ключа на ръба — нова версия, нова мрежа или друга карта/геокодер = нов
+  кеш на ръба веднага, в браузърите до 5 минути; старите записи изтичат
+  по TTL; грешки на двата езика с единна форма, версия в пътя (`/api/v1/`).
 - `/geocode`: най-много `limit` резултата от всеки доставчик; записи без
-  име или с координати извън ±90°/±180° се пропускат; `limit` от празни
-  интервали е „липсващо“ (5).
+  име, с координати извън ±90°/±180° или негодни (напр. `address_components`
+  не е списък) се пропускат поотделно, без да провалят търсенето; `limit`
+  от празни интервали е „липсващо“ (5).
 
 #### Ново: мрежата
 
@@ -91,13 +93,16 @@
   `source_id`), `version` (of the API format) and `app_version` (of the
   application) — with no secret ever leaving the Worker.
 - Shared across all three: open CORS, `X-Content-Type-Options: nosniff`,
-  caching via Cloudflare's Cache API (a day for `/frost` and `/config`, a
-  week for `/geocode`) with a revision in the key — a new version, a new
-  grid or a different map/geocoder = a fresh cache, old entries expire by
-  TTL; bilingual errors in one shape, a version in the path (`/api/v1/`).
+  caching via Cloudflare's Cache API (`s-maxage`: a day for `/frost` and
+  `/config`, a week for `/geocode`; the browser — `max-age` 5 minutes)
+  with a revision in the edge key — a new version, a new grid or a
+  different map/geocoder = a fresh edge cache immediately, browsers within
+  5 minutes; old entries expire by TTL; bilingual errors in one shape, a
+  version in the path (`/api/v1/`).
 - `/geocode`: at most `limit` results from either provider; records without
-  a name or with coordinates outside ±90°/±180° are dropped; a
-  whitespace-only `limit` counts as missing (5).
+  a name, with coordinates outside ±90°/±180° or malformed (e.g.
+  `address_components` not a list) are dropped individually without failing
+  the search; a whitespace-only `limit` counts as missing (5).
 
 #### New: the grid
 

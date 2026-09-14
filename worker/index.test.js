@@ -84,7 +84,7 @@ async function getSettled(path, e, ctx) {
 
 // Ръчно скалъпен запис за директно поставяне в кеша — тяло, което реално
 // изчисление никога не би върнало, за да докаже, че отговорът идва от кеша.
-function cachedEntry(body, cacheControl = "public, max-age=86400") {
+function cachedEntry(body, cacheControl = "public, max-age=300, s-maxage=86400") {
   return {
     body: JSON.stringify(body),
     init: {
@@ -117,7 +117,7 @@ test("/api/v1/frost: 200, JSON, CORS, кеш", async () => {
   const r = await get("/api/v1/frost?lat=42.18425&lon=24.92936");
   assert.equal(r.status, 200);
   assertSharedHeaders(r);
-  assert.equal(r.headers.get("cache-control"), "public, max-age=86400");
+  assert.equal(r.headers.get("cache-control"), "public, max-age=300, s-maxage=86400");
   const b = await r.json();
   assert.deepEqual(b.query, { lat: 42.184, lon: 24.929 });
   assert.deepEqual(b.cell.lat, 42.2); assert.deepEqual(b.cell.lon, 24.9);
@@ -146,7 +146,7 @@ test("/api/v1/config: osm без ключ", async () => {
   const r = await get("/api/v1/config");
   assert.equal(r.status, 200);
   assertSharedHeaders(r);
-  assert.equal(r.headers.get("cache-control"), "public, max-age=86400");
+  assert.equal(r.headers.get("cache-control"), "public, max-age=300, s-maxage=86400");
   const b = await r.json();
   assert.deepEqual(b, { map: "osm", google_maps_key: null, geocoder: "openmeteo", languages: ["bg", "en"],
     grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true, source_id: grid.source_id },
@@ -400,7 +400,7 @@ test("/api/v1/geocode: смяна на GEOCODER (с ключ) при запаз�
     assert.equal((await r1.json()).provider, "openmeteo");
     assert.equal(calls, 1);
     store.set(`https://frost.bg/api/v1/geocode?rev=${REV()}&q=Manole&lang=en&limit=5`,
-      cachedEntry({ sentinel: true }, "public, max-age=604800"));
+      cachedEntry({ sentinel: true }, "public, max-age=300, s-maxage=604800"));
     const r2 = await getSettled("/api/v1/geocode?q=Manole&lang=en",
       env({ FETCH: fetchBoth, GEOCODER: "google", GOOGLE_KEY: "k" }), makeCtx());
     const b2 = await r2.json();
@@ -453,7 +453,7 @@ test("/api/v1/geocode: минава през доставчика с подме�
     { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }), { status: 200 }) });
   const r = await get("/api/v1/geocode?q=Маноле&lang=bg", e);
   assert.equal(r.status, 200);
-  assert.equal(r.headers.get("cache-control"), "public, max-age=604800");
+  assert.equal(r.headers.get("cache-control"), "public, max-age=300, s-maxage=604800");
   const b = await r.json();
   assert.deepEqual(b.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
   assert.equal(b.provider, "openmeteo");
@@ -495,7 +495,7 @@ test("/api/v1/geocode: попадение връща каквото е в кеш
     assert.equal(r1.status, 200);
     assert.equal(calls, 1);
     store.set(`https://frost.bg/api/v1/geocode?rev=${REV()}&q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5`,
-      cachedEntry({ sentinel: true }, "public, max-age=604800"));
+      cachedEntry({ sentinel: true }, "public, max-age=300, s-maxage=604800"));
     const r2 = await get("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
     assert.equal(r2.status, 200);
     assertSharedHeaders(r2);
@@ -533,6 +533,17 @@ test("/api/v1/geocode: limit само от интервали -> подразб�
   } finally {
     clearCacheStub();
   }
+});
+test("/api/v1/geocode: негоден Google запис след валиден -> 200 с валидния, не 502 (limit=1)", async () => {
+  const e = env({ GEOCODER: "google", GOOGLE_KEY: "k", FETCH: async () => new Response(JSON.stringify({ status: "OK", results: [
+    { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] },
+    { formatted_address: "Broken, Bulgaria", geometry: { location: { lat: 42.1, lng: 24.1 } }, address_components: {} },
+  ] }), { status: 200 }) });
+  const r = await get("/api/v1/geocode?q=Manole&lang=en&limit=1", e);
+  assert.equal(r.status, 200);
+  const b = await r.json();
+  assert.deepEqual(b.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+  assert.equal(b.provider, "google");
 });
 test("/api/v1/geocode: 502 никога не влиза в кеша", async () => {
   const store = stubCache();

@@ -9,8 +9,12 @@ const CORS = {
   "access-control-allow-methods": "GET, OPTIONS",
   "access-control-allow-headers": "content-type",
 };
-const DAY = "public, max-age=86400";
-const WEEK = "public, max-age=604800";
+// max-age е за браузъра, s-maxage — за ръба (Cache API чете s-maxage): след
+// нов deploy/конфигурация ръбът е свеж веднага (нов rev в ключа), а браузърът
+// проверява отново до 5 минути, вместо да пази стар /config ден или
+// /geocode седмица.
+const DAY = "public, max-age=300, s-maxage=86400";
+const WEEK = "public, max-age=300, s-maxage=604800";
 // Локален const, НЕ export: workerd разгръща export-ите на входния модул
 // като handler обекти или функции/класове конструктори — низ не отговаря на
 // нито едното и чупи `wrangler dev` (виж бележката накрая на файла).

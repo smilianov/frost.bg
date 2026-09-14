@@ -84,8 +84,9 @@ below (the application's own version).
 | `openmeteo` | `ERA5 през Open-Meteo, 1996–2025` / `ERA5 via Open-Meteo, 1996–2025` | `https://open-meteo.com/` | `Weather data by Open-Meteo.com` |
 | `synthetic` | `Пробни данни (синтетична мрежа)` / `Sample data (synthetic grid)` | `null` | `null` |
 
-Caching: `Cache-Control: public, max-age=86400` (a day) — via Cloudflare's
-Cache API, explicitly, not just the header; the key also carries a
+Caching: `Cache-Control: public, max-age=300, s-maxage=86400` — the browser
+keeps the response for 5 minutes, Cloudflare's edge (the Cache API,
+explicitly, not just the header) for a day; the edge key also carries a
 revision (version, grid date, map, geocoder). Why, and what that means on
 deploy — "The API cache" in [`operations.md`](operations.md).
 
@@ -104,8 +105,9 @@ Place name → a list of candidates with coordinates, for search suggestions.
   or `google` (only when `env.GEOCODER == "google"` **and** the secret
   `GOOGLE_KEY` is set; otherwise falls back to Open-Meteo); both go through
   the same normalization, so the response shape is identical regardless of
-  provider; records without a name or with coordinates outside ±90°/±180°
-  are dropped; 8-second timeout;
+  provider; records without a name, with coordinates outside ±90°/±180° or
+  malformed (e.g. `address_components` not a list) are dropped individually
+  without failing the search; 8-second timeout;
 - the provider doesn't respond, responds with an error, or its body is
   malformed → **502** `geocoder_failed` (the secret `GOOGLE_KEY` is never
   carried into the error message, even when it was part of the requested
@@ -126,8 +128,9 @@ carries no format version. `lat`/`lon` in the results are rounded to 3
 decimals. An empty `"results": []` (not an error) just means the provider
 found nothing.
 
-Caching: `Cache-Control: public, max-age=604800` (a week) — place names
-don't move.
+Caching: `Cache-Control: public, max-age=300, s-maxage=604800` — the
+browser 5 minutes, the edge a week: place names don't move, but a geocoder
+change must reach the browser in minutes, not in a week.
 
 ## `GET /api/v1/config`
 
@@ -168,9 +171,10 @@ secret. Exactly these keys:
   version (`package.json`, tracked from the changelog — see
   [`../../CHANGELOG.md`](../../CHANGELOG.md)).
 
-Caching: `Cache-Control: public, max-age=86400`; the key carries a
-revision, so a change of map/geocoder or a new grid shows up immediately,
-not after a day (see [`operations.md`](operations.md)).
+Caching: `Cache-Control: public, max-age=300, s-maxage=86400`; the edge key
+carries a revision, so a change of map/geocoder or a new grid reaches the
+edge immediately on a new rev, and browsers within 5 minutes (see
+[`operations.md`](operations.md)).
 
 ## Errors
 
