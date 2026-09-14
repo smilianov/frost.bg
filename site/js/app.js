@@ -150,9 +150,16 @@ $("q").addEventListener("input", () => {
       return;
     }
     if (mySeq !== searchSeq) return;
-    // bad_query (заявката се е оказала твърде къса по правилата на API-то) —
-    // третираме я като късата заявка: скриваме списъка, не показваме грешка.
-    if (res.status === 400) { ul.hidden = true; return; }
+    if (res.status === 400) {
+      // Само bad_query (заявката се е оказала твърде къса по правилата на
+      // API-то) се третира като късата заявка: скриваме списъка, без грешка.
+      // Всеки друг 400 (друг код, HTML тяло, празно тяло) е истинска грешка.
+      const body = await res.json().catch(() => null);
+      if (mySeq !== searchSeq) return;
+      if (body?.error?.code === "bad_query") { ul.hidden = true; return; }
+      ul.innerHTML = `<li class="muted">${t.network_error}</li>`;
+      return;
+    }
     if (!res.ok) { ul.innerHTML = `<li class="muted">${t.network_error}</li>`; return; }
     let data;
     try { data = await res.json(); }
