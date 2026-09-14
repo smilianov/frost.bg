@@ -18,39 +18,65 @@ export function json(body, status = 200, extra = {}) {
   });
 }
 
-export function error(code, status) {
+export function error(code, status, extra = {}) {
   const t = TEXTS.errors[code];
-  return json({ error: { code, bg: t.bg, en: t.en } }, status, { "cache-control": "no-store" });
+  return json({ error: { code, bg: t.bg, en: t.en } }, status, { "cache-control": "no-store", ...extra });
 }
 
-function handleFrost(url) {
+// Cloudflare не кешира по Cache-Control сам по себе си — трябва изрично Cache
+// API (Р2 в спецификацията). Ключът е нормализиран URL; грешките никога не се
+// пишат в кеша (и без друго са no-store). Без `env.ctx`/`globalThis.caches`
+// (локални тестове) — просто пресмята директно, без грешка.
+function cacheOf() {
+  return globalThis.caches?.default ?? null;
+}
+
+async function handleFrost(url, ctx) {
   const q = parseCoords(url.searchParams.get("lat"), url.searchParams.get("lon"));
   if (!q) return error("bad_request", 400);
+  const cache = cacheOf();
+  const key = cache ? new Request(`${url.origin}/api/v1/frost?lat=${q.lat}&lon=${q.lon}`) : null;
+  if (cache) {
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
   const body = frostResponse(grid, q.lat, q.lon);
   if (!body) return error("outside_bulgaria", 400);
-  return json(body, 200, { "cache-control": DAY });
+  const res = json(body, 200, { "cache-control": DAY });
+  if (cache) ctx?.waitUntil?.(cache.put(key, res.clone()));
+  return res;
 }
 
-function handleConfig(env) {
+async function handleConfig(env, url, ctx) {
+  const cache = cacheOf();
+  const key = cache ? new Request(`${url.origin}/api/v1/config`) : null;
+  if (cache) {
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
   const googleMap = env.MAP === "google" && !!env.GOOGLE_MAPS_KEY;
-  return json({
+  const res = json({
     map: googleMap ? "google" : "osm",
     google_maps_key: googleMap ? env.GOOGLE_MAPS_KEY : null,
     languages: ["bg", "en"],
     grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true },
     version: "1",
   }, 200, { "cache-control": DAY });
+  if (cache) ctx?.waitUntil?.(cache.put(key, res.clone()));
+  return res;
 }
 
+const ALLOW = "GET, OPTIONS";
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-    if (request.method !== "GET") return error("not_found", 405);
+    if (request.method !== "GET") return error("not_found", 405, { allow: ALLOW });
     switch (url.pathname) {
-      case "/api/v1/frost": return handleFrost(url);
-      case "/api/v1/config": return handleConfig(env);
+      case "/api/v1/frost": return handleFrost(url, ctx);
+      case "/api/v1/config": return handleConfig(env, url, ctx);
       case "/api/v1/geocode": return error("not_found", 404);   // Task 5
       default: return error("not_found", 404);
     }
@@ -58,6 +84,6 @@ export default {
 };
 
 // Забележка (workerd): `export { WEEK }` от входния модул чупи `wrangler dev` —
-// всеки именуван export на входния модул се третира като отделен entrypoint и
-// трябва да е функция/ExportedHandler, не стойност. Task 5 да си дефинира WEEK
-// локално (или да го внесе от отделен, невходен модул), не от тук.
+// workerd разгръща export-ите на входния модул като handler обекти или
+// функции/класове конструктори; низ не отговаря на нито едното. Task 5 живее в
+// същия файл (handleGeocode) и просто ползва локалния WEEK по-горе.
