@@ -249,9 +249,16 @@ test("/api/v1/frost: консумиран miss, после два консуми
 test("/api/v1/frost: грешките никога не влизат в кеша", async () => {
   const store = stubCache();
   try {
-    assert.equal((await get("/api/v1/frost?lat=abc&lon=24", env(), ctxWaitUntil)).status, 400);
+    // store.size сам по себе си рискува състезание с фоновия put (raw.set
+    // пише след await в стъба) — броим извикванията на put (синхронен брояч)
+    // и изчакваме ctx.waitUntil да се уталожи, преди да проверим кеша.
+    const r1 = await getSettled("/api/v1/frost?lat=abc&lon=24", env(), makeCtx());
+    assert.equal(r1.status, 400);
+    assert.equal(store.puts, 0);
     assert.equal(store.size, 0);
-    assert.equal((await get("/api/v1/frost?lat=48.85&lon=2.35", env(), ctxWaitUntil)).status, 400);
+    const r2 = await getSettled("/api/v1/frost?lat=48.85&lon=2.35", env(), makeCtx());
+    assert.equal(r2.status, 400);
+    assert.equal(store.puts, 0);
     assert.equal(store.size, 0);
   } finally {
     clearCacheStub();
