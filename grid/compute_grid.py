@@ -6,7 +6,9 @@
 
 Всяка сметната точка се записва веднага в cells.jsonl; при ново пускане
 готовите се прескачат. Open-Meteo има дневни лимити — --pause (s) между
-заявките; 429/мрежова грешка → до 3 опита с нарастващо изчакване.
+заявките; 429/мрежова грешка → до 3 опита с нарастващо изчакване; трети
+пореден 429 спира целия пробег (квотата явно е изчерпана — контролната
+точка вече е на диска, пусни пак по-късно).
 """
 from __future__ import annotations
 
@@ -16,6 +18,7 @@ import math
 import os
 import sys
 import time
+import urllib.error
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
@@ -26,6 +29,19 @@ LON_MIN, LON_MAX = 22.3, 28.7
 STEP = 0.1
 ATTEMPTS = 3
 SOURCE = "ERA5 през Open-Meteo, дневен минимум на 2 м"
+SLEEP = time.sleep         # ниво на модула, за да могат тестовете да го подменят
+
+
+class _CorruptCheckpoint(Exception):
+    """Повреда в cells.jsonl другаде освен в последния (прекъснат) ред."""
+
+
+class _PeriodMismatch(Exception):
+    """cells.jsonl е за друг период от поискания — не бива да се пише връз него."""
+
+
+class QuotaExhausted(Exception):
+    """Open-Meteo отказва с 429 и на третия опит — дневната/часовата квота е изчерпана."""
 
 
 def lattice() -> List[Tuple[float, float]]:
@@ -42,8 +58,9 @@ def _mmdd(d: Optional[date]) -> Optional[str]:
 
 def cell_record(lat: float, lon: float, tmin: fe.DailyTmin,
                 start_year: int, end_year: int) -> dict:
-    est = fe.estimate_frost(tmin.days, year=2001)      # невисокосна: датите са само (месец, ден)
-    per_year = fe._per_year(tmin.days, fe.FROST_THRESHOLD_C)
+    period_days = [(d, t) for d, t in tmin.days if start_year <= d.year <= end_year]
+    est = fe.estimate_frost(period_days, year=2001)     # невисокосна: датите са само (месец, ден)
+    per_year = fe._per_year(period_days, fe.FROST_THRESHOLD_C)
     years = [[y, _mmdd(fe._to_date(s, 2001) if s else None), _mmdd(fe._to_date(a, 2001) if a else None)]
              for y, (s, a) in sorted(per_year.items()) if start_year <= y <= end_year]
     return {
@@ -96,15 +113,82 @@ def synthetic_tmin(lat: float, lon: float, start_year: int, end_year: int) -> fe
     return fe.DailyTmin(days=days, grid_elevation_m=elev)
 
 
-def _load_done(path: str) -> Dict[Tuple[float, float], dict]:
-    done = {}
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
-                    rec = json.loads(line)
-                    done[(rec["lat"], rec["lon"])] = rec
+def _truncate_torn_tail(path: str, keep_lines: List[str]) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        for line in keep_lines:
+            if line.strip():
+                f.write(line + "\n")
+
+
+def _load_done(path: str, expected_period: Tuple[int, int], log) -> Dict[Tuple[float, float], dict]:
+    """Чете cells.jsonl: първият ред е header {"period":[Y0,Y1]}, после по един запис на ред.
+
+    Скъсан последен ред (прекъснато пускане по средата на запис) се маха
+    тихо — точката просто се пресмята пак при това пускане. Валиден
+    последен запис без завършващ нов ред се доогражда с такъв. Повреда
+    другаде във файла е фатална грешка — там няма как записът да е просто
+    „недовършен“. Периодът в header-а трябва да съвпада с поискания,
+    иначе годишното опресняване би написало нова година върху стара мрежа.
+    """
+    done: Dict[Tuple[float, float], dict] = {}
+    if not os.path.exists(path):
+        return done
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
+    if not text:
+        return done
+    ends_with_newline = text.endswith("\n")
+    lines = text.split("\n")
+    if ends_with_newline:
+        lines = lines[:-1]                  # последният елемент след split е '' заради крайния \n
+    n = len(lines)
+    header_period = None
+    needs_newline = False
+    for i, line in enumerate(lines):
+        if not line.strip():
+            continue
+        is_last = i == n - 1
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError as e:
+            if is_last and not ends_with_newline:
+                _truncate_torn_tail(path, lines[:i])
+                log("  недовършен запис в края на cells.jsonl (прекъснато пускане) — изтрит, точката ще се пресметне пак")
+                break
+            raise _CorruptCheckpoint(f"повреден запис на ред {i + 1} в cells.jsonl: {e}") from e
+        else:
+            if is_last and not ends_with_newline:
+                needs_newline = True
+            if i == 0 and "period" in rec:
+                header_period = tuple(rec["period"])
+            else:
+                done[(rec["lat"], rec["lon"])] = rec
+    if needs_newline:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write("\n")
+    if header_period is not None and header_period != tuple(expected_period):
+        raise _PeriodMismatch(
+            f"cells.jsonl е за {header_period[0]}–{header_period[1]}, поискано "
+            f"{expected_period[0]}–{expected_period[1]} — изтрий го или пусни с --today за стария период")
     return done
+
+
+def _is_rate_limited(err: fe.FrostFetchError) -> bool:
+    cause = err.__cause__
+    return isinstance(cause, urllib.error.HTTPError) and cause.code == 429
+
+
+def _retry_after_seconds(err: fe.FrostFetchError) -> Optional[int]:
+    cause = err.__cause__
+    if not (isinstance(cause, urllib.error.HTTPError) and cause.headers):
+        return None
+    value = cause.headers.get("Retry-After")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 def _fetch_with_retries(lat: float, lon: float, start: date, end: date, pause: float, log):
@@ -112,9 +196,20 @@ def _fetch_with_retries(lat: float, lon: float, start: date, end: date, pause: f
         try:
             return fe.fetch_daily_tmin(lat, lon, start, end)
         except fe.FrostFetchError as e:
-            log(f"  ({lat}, {lon}) опит {attempt}/{ATTEMPTS} падна: {e}")
-            if attempt < ATTEMPTS:
-                time.sleep(pause * attempt)
+            if _is_rate_limited(e):
+                if attempt >= ATTEMPTS:
+                    raise QuotaExhausted(
+                        "квотата на Open-Meteo е изчерпана — пусни пак по-късно (обикновено на следващия ден)"
+                    ) from e
+                wait = _retry_after_seconds(e)
+                if wait is None:
+                    wait = 60 if attempt == 1 else 120
+                log(f"  ({lat}, {lon}) опит {attempt}/{ATTEMPTS}: 429, изчаквам {wait} s")
+                SLEEP(wait)
+            else:
+                log(f"  ({lat}, {lon}) опит {attempt}/{ATTEMPTS} падна: {e}")
+                if attempt < ATTEMPTS:
+                    SLEEP(pause * attempt)
     return None
 
 
@@ -124,7 +219,8 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--out", default=os.path.dirname(os.path.abspath(__file__)))
     p.add_argument("--pause", type=float, default=1.0)
-    p.add_argument("--limit", type=int, default=None, help="най-много толкова нови точки (за тест)")
+    p.add_argument("--limit", type=int, default=None,
+                    help="общ лимит: вече готови + новоопитани точки (за тест)")
     p.add_argument("--today", default=None, help="YYYY-MM-DD, за периода (по подразбиране днес)")
     p.add_argument("--synthetic", action="store_true")
     p.add_argument("--finish", action="store_true", help="само сглоби grid.json от cells.jsonl")
@@ -142,16 +238,32 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
         _write_grid(grid_path, build_grid(cells, start.year, end.year, synthetic=True), log)
         return 0
 
-    done = _load_done(cells_path)
+    try:
+        done = _load_done(cells_path, (start.year, end.year), log)
+    except _CorruptCheckpoint as e:
+        log(str(e))
+        return 1
+    except _PeriodMismatch as e:
+        log(str(e))
+        return 2
+
     if not a.finish:
         skipped, new = [], 0
+        needs_header = not os.path.exists(cells_path) or os.path.getsize(cells_path) == 0
         with open(cells_path, "a", encoding="utf-8") as f:
+            if needs_header:
+                f.write(json.dumps({"period": [start.year, end.year]}, ensure_ascii=False) + "\n")
+                f.flush()
             for lat, lon in points:
                 if (lat, lon) in done:
                     continue
                 if a.limit is not None and len(done) + len(skipped) >= a.limit:
                     break
-                tmin = _fetch_with_retries(lat, lon, start, end, a.pause, log)
+                try:
+                    tmin = _fetch_with_retries(lat, lon, start, end, a.pause, log)
+                except QuotaExhausted as e:
+                    log(str(e))
+                    return 1
                 if tmin is None:
                     skipped.append((lat, lon))
                     continue
