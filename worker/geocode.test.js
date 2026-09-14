@@ -227,6 +227,15 @@ test("google: запис с координати извън ±90/±180 се из
   const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
   assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
 });
+test("google: запис без locality и без formatted_address (празно име) се изхвърля", async () => {
+  const f = fakeFetch(() => okJson({ status: "OK", results: [
+    { geometry: { location: { lat: 42.1, lng: 24.1 } }, address_components: [] },
+    { formatted_address: "  ,Bulgaria", geometry: { location: { lat: 42.1, lng: 24.1 } }, address_components: [] },
+    { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] },
+  ] }));
+  const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
+  assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+});
 test("limit само от интервали -> подразбиращите се 5, не 1 (Number('  ') е 0)", async () => {
   assert.equal(clampLimit("  "), 5);
   assert.equal(clampLimit(""), 5);

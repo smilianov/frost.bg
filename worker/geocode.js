@@ -94,15 +94,18 @@ function normalizeGoogle(body, limit) {
     }
     if (!Array.isArray(body.results)) throw new GeocodeError("upstream returned malformed data");
     const comp = (r, type) => (r.address_components || []).find((c) => (c.types || []).includes(type))?.long_name;
+    // Името се извлича, после се филтрира (без locality и без адрес -> празно),
+    // и чак тогава таванът — както при Open-Meteo, негодните не заемат места.
     return body.results
       .filter((r) => r && typeof r === "object" && r.geometry && r.geometry.location
         && validLatLon(r.geometry.location.lat, r.geometry.location.lng))
-      .slice(0, limit)
       .map((r) => ({
         name: comp(r, "locality") || String(r.formatted_address || "").split(",")[0].trim(),
         admin: comp(r, "administrative_area_level_1") || "",
         lat: round3(r.geometry.location.lat), lon: round3(r.geometry.location.lng),
-      }));
+      }))
+      .filter((r) => nonEmptyName(r.name))
+      .slice(0, limit);
   } catch (e) {
     if (e instanceof GeocodeError) throw e;
     throw new GeocodeError("upstream returned malformed data");
