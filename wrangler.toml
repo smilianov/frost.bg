@@ -10,4 +10,4 @@ binding = "ASSETS"
 GEOCODER = "openmeteo"      # openmeteo | google
 MAP = "osm"                 # osm | google
 GOOGLE_MAPS_KEY = ""        # ключ за Google Maps JS (в браузъра; ограничен по домейн)
-# GOOGLE_KEY (Geocoding) е ТАЙНА: локално в .dev.vars, в продукция с `wrangler secret put GOOGLE_KEY`
+# Тайните не са тук: локално в .dev.vars, в продукция с `wrangler secret put` — виж README.

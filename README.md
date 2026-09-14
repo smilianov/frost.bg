@@ -6,8 +6,8 @@
 (медиана) и сигурната (90-и/10-и персентил от 30 години) дата на последната
 пролетна и първата есенна слана.
 
-Сметката е copy от [Garden Planner](https://github.com/smilianov/GardenPlanner)
-(`backend/app/frost_estimate.py`) — виж `grid/frost_estimate.py`.
+Сметката е копие от Garden Planner (`backend/app/frost_estimate.py`) — виж
+[`grid/frost_estimate.py`](grid/frost_estimate.py).
 
 ## Как се пуска локално
 
@@ -17,6 +17,10 @@ npm run dev
 ```
 
 Отваря на [http://localhost:8787](http://localhost:8787).
+
+Ключът за Google Geocoding (ако някога се ползва) е тайна, не променлива:
+локално се задава като `GOOGLE_KEY=…` в `.dev.vars`, в продукция — с
+`wrangler secret put GOOGLE_KEY`. Без него всичко работи с Open-Meteo.
 
 ## Как се тества
 
@@ -30,6 +34,7 @@ npm test
 
 ## Източник на данните
 
-[Open-Meteo](https://open-meteo.com/) Historical Weather API, което сервира
-дневни минимуми от реанализа [ERA5](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
+[Open-Meteo](https://open-meteo.com/) Historical Weather API, чрез който се
+получават дневните минимални температури от реанализа
+[ERA5](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
 (ECMWF) — мрежа от 9–25 км.

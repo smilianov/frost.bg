@@ -6,8 +6,8 @@ Frost dates for Bulgarian coordinates: for a given point on the map — the
 typical (median) and safe (90th/10th percentile of 30 years) date of the
 last spring and first autumn frost.
 
-The calculation is a copy from [Garden Planner](https://github.com/smilianov/GardenPlanner)
-(`backend/app/frost_estimate.py`) — see `grid/frost_estimate.py`.
+The calculation is a copy from Garden Planner (`backend/app/frost_estimate.py`)
+— see [`grid/frost_estimate.py`](grid/frost_estimate.py).
 
 ## Running locally
 
@@ -17,6 +17,11 @@ npm run dev
 ```
 
 Opens at [http://localhost:8787](http://localhost:8787).
+
+The Google Geocoding key (if ever used) is a secret, not a variable: set it
+locally as `GOOGLE_KEY=…` in `.dev.vars`, and in production with
+`wrangler secret put GOOGLE_KEY`. Everything works without it, via
+Open-Meteo.
 
 ## Testing
 
