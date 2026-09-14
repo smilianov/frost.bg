@@ -138,7 +138,12 @@ test("/api/v1/config: osm без ключ", async () => {
   assert.equal(r.headers.get("cache-control"), "public, max-age=86400");
   const b = await r.json();
   assert.deepEqual(b, { map: "osm", google_maps_key: null, languages: ["bg", "en"],
-    grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true }, version: "1" });
+    grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true },
+    version: "1", app_version: "0.1.0" });
+});
+test("/api/v1/config носи app_version", async () => {
+  const b = await (await get("/api/v1/config")).json();
+  assert.match(b.app_version, /^\d+\.\d+\.\d+$/);
 });
 test("/api/v1/config: google с ключ", async () => {
   const r = await get("/api/v1/config", env({ MAP: "google", GOOGLE_MAPS_KEY: "AIzaTEST" }));

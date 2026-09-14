@@ -29,6 +29,16 @@ Open-Meteo.
 npm test
 ```
 
+## Documentation
+
+| Page | Contents |
+|---|---|
+| [`docs/en/README.md`](docs/en/README.md) | what frost.bg is, where the data comes from, what "typical"/"safe" mean |
+| [`docs/en/api.md`](docs/en/api.md) | API v1 — the three endpoints, parameters, example responses, errors, caching and CORS |
+| [`docs/en/operations.md`](docs/en/operations.md) | how the grid is computed and refreshed, running locally, testing, what's missing for deploy |
+
+Their Bulgarian twins: [`docs/bg/`](docs/bg/README.md).
+
 ## Spec
 
 `docs/superpowers/specs/2026-09-14-frost-bg-design.md`

@@ -11,6 +11,10 @@ const CORS = {
 };
 const DAY = "public, max-age=86400";
 const WEEK = "public, max-age=604800";
+// Локален const, НЕ export: workerd разгръща export-ите на входния модул
+// като handler обекти или функции/класове конструктори — низ не отговаря на
+// нито едното и чупи `wrangler dev` (виж бележката накрая на файла).
+const APP_VERSION = "0.1.0";
 
 export function json(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
@@ -62,6 +66,7 @@ async function handleConfig(env, url, ctx) {
     languages: ["bg", "en"],
     grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true },
     version: "1",
+    app_version: APP_VERSION,
   }, 200, { "cache-control": DAY });
   if (cache) ctx?.waitUntil?.(cache.put(key, res.clone()));
   return res;

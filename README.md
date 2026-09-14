@@ -28,6 +28,16 @@ npm run dev
 npm test
 ```
 
+## Документация
+
+| Страница | Съдържание |
+|---|---|
+| [`docs/bg/README.md`](docs/bg/README.md) | какво е frost.bg, откъде са данните, какво значи „типична“/„сигурна“ дата |
+| [`docs/bg/api.md`](docs/bg/api.md) | API v1 — трите адреса, параметри, примерни отговори, грешки, кеш и CORS |
+| [`docs/bg/operations.md`](docs/bg/operations.md) | как се смята и подновява мрежата, локален пуск, тестове, какво липсва за deploy |
+
+Английските им близнаци: [`docs/en/`](docs/en/README.md).
+
 ## Спецификация
 
 `docs/superpowers/specs/2026-09-14-frost-bg-design.md`
