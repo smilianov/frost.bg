@@ -1,7 +1,7 @@
 // Един Worker: /api/v1/* тук, всичко друго — статичните файлове от site/.
 import grid from "../grid/grid.json" with { type: "json" };
 import { parseCoords, frostResponse } from "./frost.js";
-import { geocode, GeocodeError } from "./geocode.js";
+import { geocode, GeocodeError, clampLimit } from "./geocode.js";
 import { TEXTS } from "./texts.js";
 
 const CORS = {
@@ -67,21 +67,29 @@ async function handleConfig(env, url, ctx) {
   return res;
 }
 
-// Без Cache API тук за разлика от /frost и /config — Cloudflare вече кешира
-// по edge на браузъра/прокситата чрез Cache-Control сам по себе си достатъчно
-// добре за седмичен TTL на място→координати; ако трасето покаже нужда от
-// удар в edge кеша (Р2), ключът ще е нормализираният
-// `…/api/v1/geocode?q=<trimmed q>&lang=<bg|en>&limit=<n>`, както при /frost.
-async function handleGeocode(url, env) {
+async function handleGeocode(url, env, ctx) {
   const q = (url.searchParams.get("q") || "").trim();
-  if (q.length < 2) return error("bad_request", 400);
+  if (q.length < 2) return error("bad_query", 400);
+  const lang = url.searchParams.get("lang") || "bg";
+  const langKey = lang === "en" ? "en" : "bg";
+  const limit = url.searchParams.get("limit") || 5;
+  const cache = cacheOf();
+  const key = cache
+    ? new Request(`${url.origin}/api/v1/geocode?q=${encodeURIComponent(q)}&lang=${langKey}&limit=${clampLimit(limit)}`)
+    : null;
+  if (cache) {
+    const hit = await cache.match(key);
+    if (hit) return hit;
+  }
   try {
     const body = await geocode({
-      q, lang: url.searchParams.get("lang") || "bg", limit: url.searchParams.get("limit") || 5,
+      q, lang, limit,
       provider: env.GEOCODER || "openmeteo", googleKey: env.GOOGLE_KEY || "",
       fetchImpl: env.FETCH ?? fetch,
     });
-    return json(body, 200, { "cache-control": WEEK });
+    const res = json(body, 200, { "cache-control": WEEK });
+    if (cache) ctx?.waitUntil?.(cache.put(key, res.clone()));
+    return res;
   } catch (e) {
     if (e instanceof GeocodeError) return error("geocoder_failed", 502);
     throw e;
@@ -99,7 +107,7 @@ export default {
     switch (url.pathname) {
       case "/api/v1/frost": return handleFrost(url, ctx);
       case "/api/v1/config": return handleConfig(env, url, ctx);
-      case "/api/v1/geocode": return handleGeocode(url, env);
+      case "/api/v1/geocode": return handleGeocode(url, env, ctx);
       default: return error("not_found", 404);
     }
   },

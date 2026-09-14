@@ -17,6 +17,7 @@ export const TEXTS = {
     outside_bulgaria: { bg: "Засега само за България.", en: "Bulgaria only for now." },
     geocoder_failed: { bg: "Услугата за търсене на места не отговори. Опитай пак след малко.",
                        en: "The place search did not respond. Try again shortly." },
+    bad_query: { bg: "Търсенето иска поне 2 знака.", en: "The search needs at least 2 characters." },
     not_found: { bg: "Няма такъв адрес в API-то.", en: "No such API endpoint." },
   },
 };

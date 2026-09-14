@@ -143,7 +143,7 @@ test("note: непразни, различни на двата езика, en с
   assert.ok(TEXTS.note.en.includes("frost"));
 });
 test("TEXTS: всяка грешка и бележката са на двата езика и не съдържат „мраз“", () => {
-  for (const k of ["bad_request", "outside_bulgaria", "geocoder_failed", "not_found"]) {
+  for (const k of ["bad_request", "outside_bulgaria", "geocoder_failed", "not_found", "bad_query"]) {
     assert.ok(TEXTS.errors[k].bg.length > 5 && TEXTS.errors[k].en.length > 5, k);
     assert.ok(!TEXTS.errors[k].bg.includes("мраз"), k);
   }

@@ -326,9 +326,17 @@ test("/api/v1/config: без globalThis.caches всичко пак работи"
   assert.equal(b.map, "osm");
 });
 
-test("/api/v1/geocode: q под 2 знака -> 400", async () => {
-  assert.equal((await get("/api/v1/geocode?q=М")).status, 400);
-  assert.equal((await get("/api/v1/geocode")).status, 400);
+test("/api/v1/geocode: q под 2 знака -> 400 bad_query", async () => {
+  const r1 = await get("/api/v1/geocode?q=М");
+  assert.equal(r1.status, 400);
+  assert.equal((await r1.json()).error.code, "bad_query");
+  const r2 = await get("/api/v1/geocode");
+  assert.equal(r2.status, 400);
+  assert.equal((await r2.json()).error.code, "bad_query");
+  // подрязана до единична буква -> пак под 2 знака
+  const r3 = await get(`/api/v1/geocode?q=${encodeURIComponent(" М ")}`);
+  assert.equal(r3.status, 400);
+  assert.equal((await r3.json()).error.code, "bad_query");
 });
 test("/api/v1/geocode: минава през доставчика с подменен fetch; кеш седмица", async () => {
   const e = env({ FETCH: async () => new Response(JSON.stringify({ results: [
@@ -345,4 +353,73 @@ test("/api/v1/geocode: доставчикът пада -> 502 geocoder_failed, n
   const r = await get("/api/v1/geocode?q=Маноле", e);
   assert.equal(r.status, 502); assert.equal((await r.json()).error.code, "geocoder_failed");
   assert.equal(r.headers.get("cache-control"), "no-store");
+});
+test("/api/v1/geocode: грешка от доставчика не пренася Google ключа в 502 тялото", async () => {
+  const e = env({ GEOCODER: "google", GOOGLE_KEY: "SECRET123",
+    FETCH: async (url) => { throw new Error("boom " + url); } });
+  const r = await get("/api/v1/geocode?q=Manole", e);
+  assert.equal(r.status, 502);
+  const text = await r.text();
+  assert.ok(!text.includes("SECRET123"), text);
+});
+test("/api/v1/geocode: кешът се пълни под нормализиран ключ (q кодиран, lang, limit)", async () => {
+  const store = stubCache();
+  try {
+    const e = env({ FETCH: async () => new Response(JSON.stringify({ results: [
+      { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }), { status: 200 }) });
+    const r1 = await getSettled("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(store.puts, 1);
+    assert.ok(store.has("https://frost.bg/api/v1/geocode?q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5"));
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/geocode: попадение връща каквото е в кеша, без нова заявка към доставчика", async () => {
+  const store = stubCache();
+  try {
+    let calls = 0;
+    const e = env({ FETCH: async () => { calls++; return new Response(JSON.stringify({ results: [
+      { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }), { status: 200 }); } });
+    const r1 = await getSettled("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(calls, 1);
+    store.set("https://frost.bg/api/v1/geocode?q=%D0%9C%D0%B0%D0%BD%D0%BE%D0%BB%D0%B5&lang=bg&limit=5",
+      cachedEntry({ sentinel: true }, "public, max-age=604800"));
+    const r2 = await get("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
+    assert.equal(r2.status, 200);
+    assertSharedHeaders(r2);
+    assert.deepEqual(await r2.json(), { sentinel: true });
+    assert.equal(calls, 1, "попадение не бива да вика доставчика повторно");
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/geocode: различно записани, но нормализирано еднакви заявки удрят същия ключ", async () => {
+  const store = stubCache();
+  try {
+    let calls = 0;
+    const e = env({ FETCH: async () => { calls++; return new Response(JSON.stringify({ results: [
+      { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }), { status: 200 }); } });
+    const r1 = await getSettled(`/api/v1/geocode?q=${encodeURIComponent(" Маноле ")}&lang=bg&limit=5`, e, makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(calls, 1);
+    const r2 = await getSettled("/api/v1/geocode?q=Маноле&lang=bg", e, makeCtx());
+    assert.equal(r2.status, 200);
+    assert.equal(calls, 1, "нормализираният ключ трябва да съвпадне — без нов провайдър извикване");
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/geocode: 502 никога не влиза в кеша", async () => {
+  const store = stubCache();
+  try {
+    const e = env({ FETCH: async () => new Response("x", { status: 503 }) });
+    const r1 = await getSettled("/api/v1/geocode?q=Маноле", e, makeCtx());
+    assert.equal(r1.status, 502);
+    assert.equal(store.puts, 0);
+    assert.equal(store.size, 0);
+  } finally {
+    clearCacheStub();
+  }
 });
