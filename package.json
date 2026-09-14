@@ -6,8 +6,9 @@
   "description": "Сланите по български координати — frost.bg",
   "scripts": {
     "dev": "wrangler dev",
-    "test": "npm run test:worker && npm run test:py",
+    "test": "npm run test:worker && npm run test:site && npm run test:py",
     "test:worker": "node --test worker/",
+    "test:site": "node --test site/js/",
     "test:py": "cd grid && python3 tests_frost.py && python3 tests_grid.py"
   },
   "devDependencies": {
