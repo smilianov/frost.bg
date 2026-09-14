@@ -35,8 +35,8 @@ Google has **two different keys**, if it is used at all:
 npm test
 ```
 
-Runs, in order: the Worker's tests (`node --test worker/`), the site's
-(`node --test site/js/`), the grid's Python tests
+Runs, in order: the Worker's tests (`node --test "worker/*.test.js"`), the site's
+(`node --test "site/js/*.test.js"`), the grid's Python tests
 (`cd grid && python3 tests_frost.py && python3 tests_grid.py`), and the CDS
 tools' tests (`tests_cds.py` — through the `grid/.venv-cds` venv if it
 exists, otherwise the system `python3`). `grid/grid.json` is checked on

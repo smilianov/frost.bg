@@ -7,8 +7,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "test": "npm run test:worker && npm run test:site && npm run test:py && npm run test:cds",
-    "test:worker": "node --test worker/",
-    "test:site": "node --test site/js/",
+    "test:worker": "node --test \"worker/*.test.js\"",
+    "test:site": "node --test \"site/js/*.test.js\"",
     "test:py": "cd grid && python3 tests_frost.py && python3 tests_grid.py",
     "test:cds": "cd grid && sh -c 'if [ -x .venv-cds/bin/python ]; then .venv-cds/bin/python tests_cds.py; else python3 tests_cds.py; fi'"
   },
