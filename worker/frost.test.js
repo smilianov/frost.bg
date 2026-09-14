@@ -78,6 +78,7 @@ test("haversine: 0.1° ширина ≈ 11.1 км", () => {
 test("frostResponse: тялото по спецификацията", () => {
   const r = frostResponse(grid, 42.184, 24.929);
   assert.deepEqual(r.query, { lat: 42.184, lon: 24.929 });
+  assert.deepEqual(Object.keys(r.cell).sort(), ["distance_m", "elev_m", "lat", "lon"]);
   assert.deepEqual({ lat: r.cell.lat, lon: r.cell.lon, elev_m: r.cell.elev_m }, { lat: 42.2, lon: 24.9, elev_m: 152 });
   assert.ok(Number.isInteger(r.cell.distance_m), String(r.cell.distance_m));
   assert.ok(Math.abs(r.cell.distance_m - 2979) <= 5, String(r.cell.distance_m));
