@@ -38,3 +38,51 @@ npm test
 получават дневните минимални температури от реанализа
 [ERA5](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
 (ECMWF) — мрежа от 9–25 км.
+
+## Мрежата
+
+Показваната на сайта мрежа (`grid/grid.json`, 2 080 точки на 0,1°) се смята
+офлайн, не при всяка заявка. Има два начина да се напълни:
+
+- `grid/compute_grid.py` — през Open-Meteo, точка по точка (виж по-долу);
+- `grid/fetch_cds.py` + `grid/compute_grid.py --from-cds` — директно от
+  [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/), с
+  ERA5-Land (по-фина мрежа, ~9 км, и собствен геопотенциал за височината на
+  клетката вместо тази на Open-Meteo).
+
+И двата инструмента са само за поддръжка на мрежата — не се пускат от Worker-а
+и не влизат в продукционния bundle.
+
+### През Copernicus CDS
+
+`cdsapi` и `netCDF4` не са зависимости на проекта — живеят в отделна venv:
+
+```bash
+cd grid
+python3 -m venv .venv-cds
+.venv-cds/bin/pip install -r requirements-cds.txt
+```
+
+Иска се безплатна регистрация в CDS и приемане на лицензите на наборите
+[`derived-era5-land-daily-statistics`](https://cds.climate.copernicus.eu/datasets/derived-era5-land-daily-statistics)
+и [`reanalysis-era5-land`](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land)
+от страницата на всеки набор; ключът се записва в `~/.cdsapirc` (по
+инструкциите на CDS).
+
+```bash
+# теглене: 30 години дневен минимум + геопотенциал (часове; продължава при прекъсване)
+.venv-cds/bin/python fetch_cds.py --out cds
+
+# смятане на grid.json от изтегленото, със сравнение спрямо старата Open-Meteo мрежа
+.venv-cds/bin/python compute_grid.py --from-cds grid/cds --cross-check grid/cells.jsonl
+```
+
+Препоръчително: веднъж годишно, през януари (когато предната календарна
+година вече е пълна в ERA5-Land).
+
+### През Open-Meteo (без venv, без регистрация)
+
+```bash
+python3 grid/compute_grid.py                  # истинският пробег (часове; продължава след прекъсване)
+python3 grid/compute_grid.py --synthetic       # правдоподобна мрежа без мрежа, за разработка
+```

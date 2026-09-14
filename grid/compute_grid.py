@@ -30,6 +30,7 @@ LON_MIN, LON_MAX = 22.3, 28.7
 STEP = 0.1
 ATTEMPTS = 3
 SOURCE = "ERA5 през Open-Meteo, дневен минимум на 2 м"
+SOURCE_CDS = "ERA5-Land през Copernicus CDS, дневен минимум на 2 м"
 SLEEP = time.sleep         # ниво на модула, за да могат тестовете да го подменят
 
 
@@ -255,6 +256,10 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
     p.add_argument("--today", default=None, help="YYYY-MM-DD, за периода (по подразбиране днес)")
     p.add_argument("--synthetic", action="store_true")
     p.add_argument("--finish", action="store_true", help="само сглоби grid.json от cells.jsonl")
+    p.add_argument("--from-cds", dest="from_cds", default=None,
+                    help="папка с t2m_daily_min_<YYYY>.nc и geopotential.nc от Copernicus CDS (fetch_cds.py)")
+    p.add_argument("--cross-check", dest="cross_check", default=None,
+                    help="cells.jsonl от Open-Meteo — сравнява годините на клетка с изчислените от CDS")
     a = p.parse_args(argv)
 
     today = date.fromisoformat(a.today) if a.today else date.today()
@@ -262,6 +267,38 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
     cells_path = os.path.join(a.out, "cells.jsonl")
     grid_path = os.path.join(a.out, "grid.json")
     points = lattice()
+
+    if a.from_cds:
+        import cds_reader                      # lazy: netCDF4 не е нужен за Open-Meteo/синтетика
+        years = list(range(start.year, end.year + 1))
+        missing = [y for y in years if not os.path.exists(os.path.join(a.from_cds, f"t2m_daily_min_{y}.nc"))]
+        if missing:
+            log(f"липсват файлове за години: {', '.join(map(str, missing))} — пусни fetch_cds.py")
+            return 1
+        geo_path = os.path.join(a.from_cds, "geopotential.nc")
+        elev = cds_reader.read_elevation(geo_path) if os.path.exists(geo_path) else {}
+        if not elev:
+            log("няма geopotential.nc — височините ще са null")
+        days_by_cell: Dict[Tuple[float, float], list] = {}
+        for y in years:
+            for key, days in cds_reader.read_year(os.path.join(a.from_cds, f"t2m_daily_min_{y}.nc")).items():
+                days_by_cell.setdefault(key, []).extend(days)
+            log(f"  {y}: прочетена")
+        cells = []
+        for lat, lon in points:
+            days = days_by_cell.get((lat, lon))
+            if not days:
+                log(f"  ({lat}, {lon}) липсва във файловете — null клетка")
+                cells.append(cell_record(lat, lon, fe.DailyTmin(days=[], grid_elevation_m=elev.get((lat, lon))), start.year, end.year))
+                continue
+            cells.append(cell_record(lat, lon, fe.DailyTmin(days=days, grid_elevation_m=elev.get((lat, lon))), start.year, end.year))
+        grid = build_grid(cells, start.year, end.year)
+        grid["source"] = SOURCE_CDS
+        rc = 0
+        if a.cross_check:
+            rc = _cross_check(grid, a.cross_check, log)
+        _write_grid(grid_path, grid, log)
+        return rc
 
     if a.synthetic:
         cells = [cell_record(lat, lon, synthetic_tmin(lat, lon, start.year, end.year), start.year, end.year)
@@ -315,6 +352,61 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
 
     cells = [done[pt] for pt in points if pt in done]
     _write_grid(grid_path, build_grid(cells, start.year, end.year), log)
+    return 0
+
+
+def _mmdd_ordinal(mmdd: str) -> int:
+    """MM-DD -> пореден ден в невисокосна година (2001), за сравнение на разлики."""
+    month, day = int(mmdd[:2]), int(mmdd[3:5])
+    return date(2001, month, day).toordinal()
+
+
+def _day_delta(a: Optional[str], b: Optional[str]) -> Optional[int]:
+    """Разлика в дни между две MM-DD дати; None срещу стойност -> None (предупреждение);
+    и двете None -> 0."""
+    if a is None and b is None:
+        return 0
+    if a is None or b is None:
+        return None
+    return abs(_mmdd_ordinal(a) - _mmdd_ordinal(b))
+
+
+def _cross_check(grid: dict, path: str, log) -> int:
+    """Сравнява клетките на `grid` (от CDS) със записите в `path` (cells.jsonl от
+    Open-Meteo, с header ред). За всяка съвпадаща клетка печата разликата в дни за
+    typical/safe; разлика > 10 дни (или None срещу стойност) -> предупреждение и
+    крайният код е 1; иначе 0 с обобщение."""
+    by_key = {(c["lat"], c["lon"]): c for c in grid["cells"]}
+    fmt = lambda x: "n/a" if x is None else str(x)          # noqa: E731
+    n = 0
+    max_diff = 0
+    any_over = False
+    with open(path, encoding="utf-8") as f:
+        lines = f.readlines()
+    for line in lines[1:]:                                   # прескача header реда
+        line = line.strip()
+        if not line:
+            continue
+        rec = json.loads(line)
+        key = (rec["lat"], rec["lon"])
+        cell = by_key.get(key)
+        if cell is None:
+            continue
+        n += 1
+        d_typ = [_day_delta(cell["typical"][i], rec["typical"][i]) for i in (0, 1)]
+        d_safe = [_day_delta(cell["safe"][i], rec["safe"][i]) for i in (0, 1)]
+        deltas = d_typ + d_safe
+        log(f"  ({key[0]}, {key[1]}): типична Δ {fmt(d_typ[0])}/{fmt(d_typ[1])} дни, "
+            f"сигурна Δ {fmt(d_safe[0])}/{fmt(d_safe[1])} дни")
+        numeric = [x for x in deltas if x is not None]
+        if numeric:
+            max_diff = max(max_diff, max(numeric))
+        if any(x is None or x > 10 for x in deltas):
+            any_over = True
+            log(f"  ПРЕДУПРЕЖДЕНИЕ: ({key[0]}, {key[1]}) над 10 дни")
+    if any_over:
+        return 1
+    log(f"кръстосана проверка: {n} клетки, най-голяма разлика {max_diff} дни")
     return 0
 
 

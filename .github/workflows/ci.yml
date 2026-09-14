@@ -9,5 +9,6 @@ jobs:
         with: { node-version: 22 }
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
+      - run: pip install -r grid/requirements-cds.txt
       - run: npm ci
       - run: npm test
