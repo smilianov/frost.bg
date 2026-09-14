@@ -356,8 +356,12 @@ def main(argv: Optional[List[str]] = None, stdout=None) -> int:
 
 
 def _mmdd_ordinal(mmdd: str) -> int:
-    """MM-DD -> пореден ден в невисокосна година (2001), за сравнение на разлики."""
+    """MM-DD -> пореден ден в невисокосна година (2001), за сравнение на разлики;
+    29.02 -> 1.03, както `fe._key` — външно подадени (не от `cell_record`) дати
+    все пак може да носят литерален 29 февруари."""
     month, day = int(mmdd[:2]), int(mmdd[3:5])
+    if month == 2 and day == 29:
+        return date(2001, 3, 1).toordinal()
     return date(2001, month, day).toordinal()
 
 
@@ -401,13 +405,14 @@ def _cross_check(grid: dict, path: str, log) -> int:
         numeric = [x for x in deltas if x is not None]
         if numeric:
             max_diff = max(max_diff, max(numeric))
-        if any(x is None or x > 10 for x in deltas):
+        if any(x is None for x in deltas):
+            any_over = True
+            log(f"  ПРЕДУПРЕЖДЕНИЕ: ({key[0]}, {key[1]}) n/a — липсва стойност")
+        if any(x is not None and x > 10 for x in deltas):
             any_over = True
             log(f"  ПРЕДУПРЕЖДЕНИЕ: ({key[0]}, {key[1]}) над 10 дни")
-    if any_over:
-        return 1
     log(f"кръстосана проверка: {n} клетки, най-голяма разлика {max_diff} дни")
-    return 0
+    return 1 if any_over else 0
 
 
 def _write_grid(path: str, grid: dict, log) -> None:

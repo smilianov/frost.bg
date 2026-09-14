@@ -74,12 +74,18 @@ CDS's own instructions).
 # download: 30 years of daily minimum + geopotential (hours; resumes on interruption)
 .venv-cds/bin/python fetch_cds.py --out cds
 
-# compute grid.json from the download, cross-checked against the old Open-Meteo grid
-.venv-cds/bin/python compute_grid.py --from-cds grid/cds --cross-check grid/cells.jsonl
+# compute grid.json from the download (paths are relative to grid/, after cd grid above),
+# cross-checked against the old Open-Meteo grid
+.venv-cds/bin/python compute_grid.py --from-cds cds --cross-check cells.jsonl
 ```
 
 Recommended cadence: once a year, in January (once the previous calendar
 year is complete in ERA5-Land).
+
+Sea cells have no data: ERA5-Land only covers land, so cells over the Black
+Sea come back `None` from `read_year`/`read_elevation` (about 178 of the
+2,080 cells, all along the eastern edge of the bounding box) — expected, not
+a reading bug.
 
 ### Via Open-Meteo (no venv, no registration)
 

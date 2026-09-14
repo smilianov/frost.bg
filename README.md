@@ -73,12 +73,18 @@ python3 -m venv .venv-cds
 # теглене: 30 години дневен минимум + геопотенциал (часове; продължава при прекъсване)
 .venv-cds/bin/python fetch_cds.py --out cds
 
-# смятане на grid.json от изтегленото, със сравнение спрямо старата Open-Meteo мрежа
-.venv-cds/bin/python compute_grid.py --from-cds grid/cds --cross-check grid/cells.jsonl
+# смятане на grid.json от изтегленото (пътищата са относителни към grid/, след cd grid по-горе),
+# със сравнение спрямо старата Open-Meteo мрежа
+.venv-cds/bin/python compute_grid.py --from-cds cds --cross-check cells.jsonl
 ```
 
 Препоръчително: веднъж годишно, през януари (когато предната календарна
 година вече е пълна в ERA5-Land).
+
+Морските клетки нямат данни: ERA5-Land покрива само сушата, така че за
+клетките над Черно море `read_year`/`read_elevation` връщат `None` (около 178
+от 2 080 клетки, изцяло по източния ръб на правоъгълника) — очаквано, не
+грешка в четенето.
 
 ### През Open-Meteo (без venv, без регистрация)
 

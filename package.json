@@ -10,7 +10,7 @@
     "test:worker": "node --test worker/",
     "test:site": "node --test site/js/",
     "test:py": "cd grid && python3 tests_frost.py && python3 tests_grid.py",
-    "test:cds": "cd grid && (test -x .venv-cds/bin/python && .venv-cds/bin/python tests_cds.py || python3 tests_cds.py)"
+    "test:cds": "cd grid && sh -c 'if [ -x .venv-cds/bin/python ]; then .venv-cds/bin/python tests_cds.py; else python3 tests_cds.py; fi'"
   },
   "devDependencies": {
     "wrangler": "^4.131.2"

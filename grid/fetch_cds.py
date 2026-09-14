@@ -46,8 +46,15 @@ def _extract_nc(zip_or_nc: str, target: str) -> None:
             names = [n for n in z.namelist() if n.endswith(".nc")]
             if len(names) != 1:
                 raise SystemExit(f"очаквах един .nc в архива, има {names}")
-            with z.open(names[0]) as src, open(target, "wb") as dst:
-                dst.write(src.read())
+            partial = target + ".part2"                # никога директно в target — счупен CRC не бива да остави лъжовно „готов" файл
+            try:
+                with z.open(names[0]) as src, open(partial, "wb") as dst:
+                    dst.write(src.read())               # тук гърми zipfile.BadZipFile при лош CRC, преди target да е пипнат
+            except Exception:
+                if os.path.exists(partial):
+                    os.remove(partial)
+                raise
+            os.replace(partial, target)                 # само след успешно, изцяло прочетено съдържание
         os.remove(zip_or_nc)
     else:
         os.replace(zip_or_nc, target)
