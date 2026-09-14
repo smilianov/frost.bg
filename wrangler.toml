@@ -1,0 +1,13 @@
+name = "frost-bg"
+main = "worker/index.js"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./site"
+binding = "ASSETS"
+
+[vars]
+GEOCODER = "openmeteo"      # openmeteo | google
+MAP = "osm"                 # osm | google
+GOOGLE_MAPS_KEY = ""        # ключ за Google Maps JS (в браузъра; ограничен по домейн)
+# Тайните не са тук: локално в .dev.vars, в продукция с `wrangler secret put` — виж README.

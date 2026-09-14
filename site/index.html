@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>frost.bg — кога е сланата при теб</title>
+<meta name="description" content="Последна пролетна и първа есенна слана за всяко място в България — от 30 години данни на ERA5.">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body data-lang="bg">
+<header class="top">
+  <a class="brand" href="/">frost.bg</a>
+  <a class="lang" id="lang-switch" href="/en/">English</a>
+</header>
+<main class="wrap">
+  <p id="synthetic" class="banner" hidden></p>
+  <h1 id="title"></h1>
+  <p id="lead" class="lead"></p>
+
+  <section class="inputs">
+    <label for="q" id="search-label"></label>
+    <div class="search">
+      <input id="q" type="search" autocomplete="off">
+      <ul id="suggestions" class="suggestions" hidden></ul>
+    </div>
+
+    <p id="map-label" class="label"></p>
+    <div id="map" class="map"></div>
+
+    <p id="coords-label" class="label"></p>
+    <div class="coords">
+      <label><span id="lat-label"></span><input id="lat" inputmode="decimal" placeholder="42.184"></label>
+      <label><span id="lon-label"></span><input id="lon" inputmode="decimal" placeholder="24.929"></label>
+      <button id="locate" type="button" class="ghost"></button>
+      <button id="go" type="button"></button>
+    </div>
+  </section>
+
+  <p id="message" class="message" hidden aria-live="polite"></p>
+  <section id="result" class="result" hidden aria-live="polite"></section>
+</main>
+<footer class="foot">
+  <span id="source"></span> · <span id="geocoder-credit"><a href="https://open-meteo.com/" rel="noopener">Open-Meteo (имена на места)</a></span> · <a href="/api/v1/config">API</a>
+</footer>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>

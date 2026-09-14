@@ -1,0 +1,240 @@
+:root {
+  --paper: #fbfaf6;
+  --ink: #1f2a1c;
+  --line: #d9d6cc;
+  --accent: #3f7d2f;
+  /* Текст върху --accent (бутонът „Покажи“). Бяло на #3f7d2f: ~5.0:1. */
+  --on-accent: #fff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15191a;
+    --ink: #e7e5df;
+    --line: #2c3234;
+    --accent: #7cc46a;
+    /* Бяло на #7cc46a е само ~2.1:1 — тъмен текст върху светлия акцент
+       мери ~8.5:1 (над изисквания минимум 4.5:1). */
+    --on-accent: #0f1a0c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.45;
+}
+
+a { color: var(--accent); }
+
+[hidden] { display: none !important; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.lang { text-decoration: none; }
+
+.wrap {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.lead { color: var(--ink); opacity: 0.85; }
+
+.banner {
+  background: #f5e6a8;
+  color: #3a2e00;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 0 0 12px;
+}
+
+.inputs { margin: 20px 0; }
+
+.label {
+  margin: 16px 0 6px;
+  font-weight: 600;
+}
+
+.search { position: relative; }
+
+#q {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.suggestions {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+.suggestions li { margin: 0; }
+
+.suggestions button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.suggestions button:hover,
+.suggestions button:focus-visible { background: var(--line); }
+
+.suggestions .muted { padding: 8px 10px; opacity: 0.7; }
+
+.map {
+  height: 320px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.coords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.coords label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 4px;
+}
+
+.coords input {
+  width: 8rem;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+#go, #locate {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+#locate.ghost {
+  background: none;
+  color: var(--accent);
+}
+
+.message {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+.result { margin-top: 16px; }
+
+.pairs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .pairs { grid-template-columns: 1fr; }
+}
+
+.pair {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.pair.safe { border-color: var(--accent); }
+
+.pair h2 { margin: 0 0 4px; font-size: 1.05rem; }
+
+.pair .hint {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.pair dl { margin: 0; }
+
+.pair dt {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-top: 8px;
+}
+
+.pair dt:first-child { margin-top: 0; }
+
+.pair dd {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.cell, .note, .src {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.foot {
+  max-width: 44rem;
+  margin: 24px auto;
+  padding: 16px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  border-top: 1px solid var(--line);
+}

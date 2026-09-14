@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.dev.vars
+.superpowers/
+grid/cells.jsonl
+grid/compute.log
+grid/cds/
+grid/.venv-cds/
+__pycache__/
+.DS_Store
