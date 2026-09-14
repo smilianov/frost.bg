@@ -117,36 +117,54 @@ def synthetic_tmin(lat: float, lon: float, start_year: int, end_year: int) -> fe
 def _load_done(path: str, expected_period: Tuple[int, int], log) -> Dict[Tuple[float, float], dict]:
     """Чете cells.jsonl: първият ред е header {"period":[Y0,Y1]}, после по един запис на ред.
 
-    Скъсан последен ред (прекъснато пускане по средата на запис) се маха
-    тихо с едно `os.truncate` до края на последния пълен ред — никога
+    Хедър-проверката е върху суровия първи ред, преди каквото и да е
+    възстановяване на опашката: непразен файл (size > 0), чийто първи ред
+    не се парсва като `{"period":[Y0,Y1]}` — бил той стар формат без
+    header, бял ред или скъсан частичен първи ред — се отказва веднага.
+    Само нулев по байтове (или несъществуващ) файл е „нов“. Възстановяване
+    на скъсана опашка важи единствено за записите СЛЕД header-а: скъсан
+    последен ред (прекъснато пускане по средата на запис) се маха тихо с
+    едно `os.truncate` до края на последния пълен ред — никога
     пренаписване на целия файл, за да не изгуби валидния префикс, ако и
     самото възстановяване бъде прекъснато. Точката просто се пресмята пак
     при това пускане. Валиден последен запис без завършващ нов ред се
     доогражда с такъв. Повреда другаде във файла е фатална грешка — там
-    няма как записът да е просто „недовършен“. Първият ред трябва да е
-    header с периода — стар файл без такъв се отказва изрично, вместо да
-    се гадае периодът му. Периодът в header-а трябва да съвпада с
-    поискания, иначе годишното опресняване би написало нова година върху
-    стара мрежа.
+    няма как записът да е просто „недовършен“. Периодът в header-а трябва
+    да съвпада с поискания, иначе годишното опресняване би написало нова
+    година върху стара мрежа.
     """
     done: Dict[Tuple[float, float], dict] = {}
-    if not os.path.exists(path):
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
         return done
     with open(path, "rb") as f:
         raw = f.read()
-    if not raw:
-        return done
+    first_nl = raw.find(b"\n")
+    first_line = raw if first_nl == -1 else raw[:first_nl]
+    header_rec = None
+    try:
+        header_rec = json.loads(first_line.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        pass
+    if not (isinstance(header_rec, dict) and "period" in header_rec):
+        raise _PeriodMismatch("cells.jsonl е в стар формат без период — изтрий го и пусни пак")
+    header_period = tuple(header_rec["period"])
+    if header_period != tuple(expected_period):
+        raise _PeriodMismatch(
+            f"cells.jsonl е за {header_period[0]}–{header_period[1]}, поискано "
+            f"{expected_period[0]}–{expected_period[1]} — изтрий го или пусни с --today за стария период")
+
     ends_with_newline = raw.endswith(b"\n")
     byte_lines = raw.split(b"\n")
     if ends_with_newline:
         byte_lines = byte_lines[:-1]        # последният елемент след split е b'' заради крайния \n
     n = len(byte_lines)
-    header_period = None
     needs_newline = False
-    seen_first_record = False
     offset = 0                              # байтова позиция на началото на текущия ред
     for i, bline in enumerate(byte_lines):
         line_len = len(bline) + 1           # +1 за \n, който го е следвал (реален или предполагаем)
+        if i == 0:
+            offset += line_len
+            continue                        # header-ът вече е проверен по-горе
         line = bline.decode("utf-8")
         if not line.strip():
             offset += line_len
@@ -163,23 +181,11 @@ def _load_done(path: str, expected_period: Tuple[int, int], log) -> Dict[Tuple[f
         else:
             if is_last and not ends_with_newline:
                 needs_newline = True
-            if not seen_first_record:
-                seen_first_record = True
-                if "period" in rec:
-                    header_period = tuple(rec["period"])
-                else:
-                    raise _PeriodMismatch(
-                        "cells.jsonl е в стар формат без период — изтрий го и пусни пак")
-            else:
-                done[(rec["lat"], rec["lon"])] = rec
+            done[(rec["lat"], rec["lon"])] = rec
         offset += line_len
     if needs_newline:
         with open(path, "a", encoding="utf-8") as f:
             f.write("\n")
-    if header_period is not None and header_period != tuple(expected_period):
-        raise _PeriodMismatch(
-            f"cells.jsonl е за {header_period[0]}–{header_period[1]}, поискано "
-            f"{expected_period[0]}–{expected_period[1]} — изтрий го или пусни с --today за стария период")
     return done
 
 
@@ -198,7 +204,7 @@ def _retry_after_seconds(err: fe.FrostFetchError) -> Optional[float]:
         return None
     value = value.strip()
     try:
-        return int(value)
+        return max(0.0, min(3600.0, float(int(value))))    # никога отрицателна или прекалено дълга пауза
     except ValueError:
         pass
     try:

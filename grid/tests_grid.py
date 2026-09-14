@@ -301,6 +301,36 @@ try:
 finally:
     fe.fetch_daily_tmin = real
 
+# изроден първи ред: празен/бял ред вместо header -> отказ, не се плъзга покрай проверката
+tmp8d = tempfile.mkdtemp()
+cells_path8d = os.path.join(tmp8d, "cells.jsonl")
+with open(cells_path8d, "w", encoding="utf-8") as f:
+    f.write(" \n")
+fe.fetch_daily_tmin = _must_not_be_called
+try:
+    out8d = io.StringIO()
+    rc8d = cg.main(["--out", tmp8d, "--pause", "0", "--today", "2026-09-14"], stdout=out8d)
+    check("бял първи ред -> връща 2, без заявки", rc8d == 2, str(rc8d))
+    check("съобщението казва стар формат (бял ред)", "стар формат" in out8d.getvalue(), out8d.getvalue())
+    check("grid.json не се пише (бял ред)", not os.path.exists(os.path.join(tmp8d, "grid.json")))
+finally:
+    fe.fetch_daily_tmin = real
+
+# изроден първи ред: скъсан частичен първи ред -> отказ, не се третира като „ново“
+tmp8e = tempfile.mkdtemp()
+cells_path8e = os.path.join(tmp8e, "cells.jsonl")
+with open(cells_path8e, "w", encoding="utf-8") as f:
+    f.write('{"lat":')                     # без нов ред накрая, единствен ред във файла
+fe.fetch_daily_tmin = _must_not_be_called
+try:
+    out8e = io.StringIO()
+    rc8e = cg.main(["--out", tmp8e, "--pause", "0", "--today", "2026-09-14"], stdout=out8e)
+    check("скъсан първи ред -> връща 2, без заявки", rc8e == 2, str(rc8e))
+    check("съобщението казва стар формат (скъсан първи ред)", "стар формат" in out8e.getvalue(), out8e.getvalue())
+    check("grid.json не се пише (скъсан първи ред)", not os.path.exists(os.path.join(tmp8e, "grid.json")))
+finally:
+    fe.fetch_daily_tmin = real
+
 section("Годишното опресняване: cells.jsonl пази периода си, не се пише връз стар")
 tmp9 = tempfile.mkdtemp()
 calls9 = []
@@ -406,6 +436,31 @@ try:
     tmp14 = tempfile.mkdtemp()
     cg.main(["--out", tmp14, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
     check("негоден Retry-After -> връща се към подразбиращите се 60", waits == [60], str(waits))
+
+    # числов Retry-After също минава през ограничението [0, 3600] — никога отрицателна пауза
+    waits.clear()
+    attempts15 = {"n": 0}
+    def _retry_after_too_big(lat, lon, start, end):
+        attempts15["n"] += 1
+        if attempts15["n"] == 1:
+            raise _rate_limited(retry_after=7200)
+        return fe.DailyTmin(days=days, grid_elevation_m=100)
+    fe.fetch_daily_tmin = _retry_after_too_big
+    tmp15 = tempfile.mkdtemp()
+    cg.main(["--out", tmp15, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
+    check("Retry-After: 7200 се ограничава до 3600", waits == [3600], str(waits))
+
+    waits.clear()
+    attempts16 = {"n": 0}
+    def _retry_after_negative(lat, lon, start, end):
+        attempts16["n"] += 1
+        if attempts16["n"] == 1:
+            raise _rate_limited(retry_after=-1)
+        return fe.DailyTmin(days=days, grid_elevation_m=100)
+    fe.fetch_daily_tmin = _retry_after_negative
+    tmp16 = tempfile.mkdtemp()
+    cg.main(["--out", tmp16, "--pause", "0", "--limit", "1", "--today", "2026-09-14"], stdout=io.StringIO())
+    check("Retry-After: -1 се ограничава до 0 (никога отрицателна пауза)", waits == [0], str(waits))
 finally:
     fe.fetch_daily_tmin = real
     cg.SLEEP = real_sleep
