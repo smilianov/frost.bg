@@ -82,10 +82,11 @@ CDS's own instructions).
 Recommended cadence: once a year, in January (once the previous calendar
 year is complete in ERA5-Land).
 
-Sea cells have no data: ERA5-Land only covers land, so cells over the Black
-Sea come back `None` from `read_year`/`read_elevation` (about 178 of the
-2,080 cells, all along the eastern edge of the bounding box) — expected, not
-a reading bug.
+Sea cells have no temperatures: ERA5-Land only covers land, so for cells over
+the Black Sea `read_year` returns `None` for every day (about 178 of the
+2,080 cells, all along the eastern edge of the bounding box) and the grid
+stores them with `null` dates; `read_elevation` still returns a number for
+them (the geopotential is defined everywhere). Expected, not a reading bug.
 
 ### Via Open-Meteo (no venv, no registration)
 
