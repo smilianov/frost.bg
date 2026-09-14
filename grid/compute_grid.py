@@ -1,8 +1,9 @@
 """Мрежата за frost.bg: 2 080 точки на 0,1° върху България → grid.json.
 
-    python3 compute_grid.py                  # истинският пробег (часове; продължава след прекъсване)
+    python3 compute_grid.py                  # точка по точка: ~64 точки на час, ~128 на ден; продължава след прекъсване
     python3 compute_grid.py --synthetic      # правдоподобна мрежа без мрежа, за разработка
     python3 compute_grid.py --finish         # сглобява grid.json от cells.jsonl, каквото има
+    python3 compute_grid.py --from-cds cds --cross-check cells.jsonl   # истинската мрежа, от Copernicus CDS (виж fetch_cds.py)
 
 Всяка сметната точка се записва веднага в cells.jsonl; при ново пускане
 готовите се прескачат. Open-Meteo има дневни лимити — --pause (s) между

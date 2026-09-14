@@ -14,18 +14,28 @@
   близката клетка от решетката (закръгляне до 0,1°, без търсене),
   височината и разстоянието до нея, типичната (медиана) и сигурната (90-и/
   10-и персентил) двойка дати — последна пролетна, първа есенна слана —
-  от 30 години, плюс суровите дати по година. Извън правоъгълника на
-  страната → учтив отказ (`outside_bulgaria`), не приближение от съседна
-  клетка.
+  от 30 години, плюс суровите дати по година. Закръглената до 0,1° точка
+  извън решетката (правоъгълникът на страната с половин стъпка марж) →
+  учтив отказ (`outside_bulgaria`), не приближение от съседна клетка.
+- Източникът в отговора (`source`: етикет на два езика, връзка,
+  посочване) идва от `source_id` на мрежата — CDS, Open-Meteo или „пробни
+  данни“ за синтетичната — не от предположение.
 - **`GET /api/v1/geocode?q=&lang=&limit=`** — име на място → координати, с
   Open-Meteo/GeoNames по подразбиране или Google Geocoding с ключ; един и
   същ вид отговор от двата доставчика.
-- **`GET /api/v1/config`** — коя карта и кой геокодер е включен, версията
-  на API формата и версията на приложението (`app_version`), без нито една
-  тайна да излиза от Worker-а.
-- Общо за трите: CORS отворен, кеш през Cache API на Cloudflare (денонощие
-  за `/frost` и `/config`, седмица за `/geocode`), грешки на двата езика
-  с единна форма, версия в пътя (`/api/v1/`).
+- **`GET /api/v1/config`** — точно тези ключове: `map` и `google_maps_key`
+  (картата), `geocoder` (кой доставчик на имена, без ключа), `languages`,
+  `grid` (`computed`, `period`, `synthetic`, `source_id`), `version` (на
+  API формата) и `app_version` (на приложението) — без нито една тайна да
+  излиза от Worker-а.
+- Общо за трите: CORS отворен, `X-Content-Type-Options: nosniff`, кеш през
+  Cache API на Cloudflare (денонощие за `/frost` и `/config`, седмица за
+  `/geocode`) с ревизия в ключа — нова версия, нова мрежа или друга
+  карта/геокодер = нов кеш, старите записи изтичат по TTL; грешки на двата
+  езика с единна форма, версия в пътя (`/api/v1/`).
+- `/geocode`: най-много `limit` резултата от всеки доставчик; записи без
+  име или с координати извън ±90°/±180° се пропускат; `limit` от празни
+  интервали е „липсващо“ (5).
 
 #### Ново: мрежата
 
@@ -34,7 +44,10 @@
   продължаване след прекъсване) и, за истинския пробег без квотите на
   Open-Meteo, `fetch_cds.py` + `compute_grid.py --from-cds` — директно от
   Copernicus CDS (ERA5-Land), с кръстосана проверка срещу Open-Meteo.
-  Сметката е копие на `frost_estimate.py` от Garden Planner.
+  Сметката е копие на `frost_estimate.py` от Garden Planner. Мрежата
+  записва произхода си (`source_id`: `cds`, `openmeteo`, `synthetic`).
+- Кръстосаната проверка отказва (изходен код 1) файл без header, за друг
+  период или без нито една обща клетка — вместо тих „успех“.
 - Текущият `grid/grid.json` в репото е **синтетичен** (`synthetic: true`)
   — правдоподобни, не истински числа, за да върви разработката без
   дни чакане на мрежа. Истинският пробег от CDS е отделен, следващ commit.
@@ -63,18 +76,28 @@
   nearest grid cell (rounded to 0.1°, no search), its elevation and the
   distance to it, the typical (median) and safe (90th/10th percentile)
   date pairs — last spring frost, first autumn frost — from 30 years, plus
-  the raw per-year dates. Outside the country's bounding box → a polite
-  refusal (`outside_bulgaria`), not an approximation from a neighboring
-  cell.
+  the raw per-year dates. The point rounded to 0.1° outside the grid (the
+  country's bounding box with a half-step margin) → a polite refusal
+  (`outside_bulgaria`), not an approximation from a neighboring cell.
+- The source in the response (`source`: a bilingual label, link,
+  attribution) comes from the grid's `source_id` — CDS, Open-Meteo or
+  "sample data" for the synthetic one — not from an assumption.
 - **`GET /api/v1/geocode?q=&lang=&limit=`** — place name → coordinates,
   via Open-Meteo/GeoNames by default or Google Geocoding with a key; one
   response shape from either provider.
-- **`GET /api/v1/config`** — which map and which geocoder are enabled, the
-  API format version and the application version (`app_version`), with no
-  secret ever leaving the Worker.
-- Shared across all three: open CORS, caching via Cloudflare's Cache API
-  (a day for `/frost` and `/config`, a week for `/geocode`), bilingual
-  errors in one shape, a version in the path (`/api/v1/`).
+- **`GET /api/v1/config`** — exactly these keys: `map` and
+  `google_maps_key` (the map), `geocoder` (which place-name provider, no
+  key), `languages`, `grid` (`computed`, `period`, `synthetic`,
+  `source_id`), `version` (of the API format) and `app_version` (of the
+  application) — with no secret ever leaving the Worker.
+- Shared across all three: open CORS, `X-Content-Type-Options: nosniff`,
+  caching via Cloudflare's Cache API (a day for `/frost` and `/config`, a
+  week for `/geocode`) with a revision in the key — a new version, a new
+  grid or a different map/geocoder = a fresh cache, old entries expire by
+  TTL; bilingual errors in one shape, a version in the path (`/api/v1/`).
+- `/geocode`: at most `limit` results from either provider; records without
+  a name or with coordinates outside ±90°/±180° are dropped; a
+  whitespace-only `limit` counts as missing (5).
 
 #### New: the grid
 
@@ -83,7 +106,11 @@
   after interruption) and, for the real run without Open-Meteo's quotas,
   `fetch_cds.py` + `compute_grid.py --from-cds` — straight from Copernicus
   CDS (ERA5-Land), cross-checked against Open-Meteo. The math is a copy of
-  Garden Planner's `frost_estimate.py`.
+  Garden Planner's `frost_estimate.py`. The grid records its origin
+  (`source_id`: `cds`, `openmeteo`, `synthetic`).
+- The cross-check refuses (exit code 1) a file without a header, for a
+  different period, or with no cell in common — instead of a silent
+  "success".
 - The `grid/grid.json` currently in the repo is **synthetic**
   (`synthetic: true`) — plausible, not real numbers, so development
   doesn't wait days on a network run. The real CDS run is a separate,

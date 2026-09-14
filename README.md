@@ -20,7 +20,9 @@ npm run dev
 
 Ключът за Google Geocoding (ако някога се ползва) е тайна, не променлива:
 локално се задава като `GOOGLE_KEY=…` в `.dev.vars`, в продукция — с
-`wrangler secret put GOOGLE_KEY`. Без него всичко работи с Open-Meteo.
+`npx wrangler secret put GOOGLE_KEY` (`wrangler` идва с `npm install` като
+локална зависимост, не като глобална команда — затова `npx`). Без него
+всичко работи с Open-Meteo.
 
 ## Как се тества
 
@@ -34,7 +36,7 @@ npm test
 |---|---|
 | [`docs/bg/README.md`](docs/bg/README.md) | какво е frost.bg, откъде са данните, какво значи „типична“/„сигурна“ дата |
 | [`docs/bg/api.md`](docs/bg/api.md) | API v1 — трите адреса, параметри, примерни отговори, грешки, кеш и CORS |
-| [`docs/bg/operations.md`](docs/bg/operations.md) | как се смята и подновява мрежата, локален пуск, тестове, какво липсва за deploy |
+| [`docs/bg/operations.md`](docs/bg/operations.md) | как се смята и подновява мрежата, локален пуск, тестове, кешът, какво липсва за deploy |
 
 Английските им близнаци: [`docs/en/`](docs/en/README.md).
 
@@ -44,33 +46,37 @@ npm test
 
 ## Източник на данните
 
-[Open-Meteo](https://open-meteo.com/) Historical Weather API, чрез който се
-получават дневните минимални температури от реанализа
-[ERA5](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
-(ECMWF) — мрежа от 9–25 км.
+Дневният минимум на 2 м от реанализа
+[ERA5-Land](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
+(ECMWF), теглен от [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/)
+(наборът `derived-era5-land-daily-statistics`, мрежа 0,1° ≈ 9 км).
+[Open-Meteo](https://open-meteo.com/) остава в проекта за две неща: имената
+на местата (геокодерът по подразбиране) и кръстосаната проверка на мрежата.
 
 ## Мрежата
 
 Показваната на сайта мрежа (`grid/grid.json`, 2 080 точки на 0,1°) се смята
-офлайн, не при всяка заявка. Има два начина да се напълни:
+офлайн, не при всяка заявка. **Всички команди по-долу се пускат от корена на
+репото.** Има два начина да се напълни:
 
-- `grid/compute_grid.py` — през Open-Meteo, точка по точка (виж по-долу);
-- `grid/fetch_cds.py` + `grid/compute_grid.py --from-cds` — директно от
-  [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/), с
-  ERA5-Land (по-фина мрежа, ~9 км, и собствен геопотенциал за височината на
-  клетката вместо тази на Open-Meteo).
+- `grid/fetch_cds.py` + `grid/compute_grid.py --from-cds` — основният път:
+  директно от Copernicus CDS с ERA5-Land (~9 км, и собствен геопотенциал за
+  височината на клетката);
+- `grid/compute_grid.py` — през Open-Meteo, точка по точка: за проби на
+  отделни точки и за кръстосаната проверка (виж квотата по-долу).
 
 И двата инструмента са само за поддръжка на мрежата — не се пускат от Worker-а
-и не влизат в продукционния bundle.
+и не влизат в продукционния bundle. Мрежата записва откъде е (`source_id`:
+`cds`, `openmeteo` или `synthetic`) и API-то и страницата етикетират
+източника по това, не по предположение.
 
 ### През Copernicus CDS
 
 `cdsapi` и `netCDF4` не са зависимости на проекта — живеят в отделна venv:
 
 ```bash
-cd grid
-python3 -m venv .venv-cds
-.venv-cds/bin/pip install -r requirements-cds.txt
+python3 -m venv grid/.venv-cds
+grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
 ```
 
 Иска се безплатна регистрация в CDS и приемане на лицензите на наборите
@@ -80,13 +86,16 @@ python3 -m venv .venv-cds
 инструкциите на CDS).
 
 ```bash
-# теглене: 30 години дневен минимум + геопотенциал (часове; продължава при прекъсване)
-.venv-cds/bin/python fetch_cds.py --out cds
+# теглене: 30 години дневен минимум + геопотенциал (опашката на CDS е минути до часове; продължава при прекъсване)
+grid/.venv-cds/bin/python grid/fetch_cds.py --out grid/cds
 
-# смятане на grid.json от изтегленото (пътищата са относителни към grid/, след cd grid по-горе),
-# със сравнение спрямо старата Open-Meteo мрежа
-.venv-cds/bin/python compute_grid.py --from-cds cds --cross-check cells.jsonl
+# смятане на grid.json от изтегленото, със сравнение спрямо Open-Meteo пробата в grid/cells.jsonl
+grid/.venv-cds/bin/python grid/compute_grid.py --from-cds grid/cds --cross-check grid/cells.jsonl
 ```
+
+Изходен код 1 от кръстосаната проверка значи „спри и прегледай“ — коя
+разлика, или защо не е имало какво да се сравни, обяснява
+[`docs/bg/operations.md`](docs/bg/operations.md).
 
 Препоръчително: веднъж годишно, през януари (когато предната календарна
 година вече е пълна в ERA5-Land).
@@ -100,6 +109,9 @@ python3 -m venv .venv-cds
 ### През Open-Meteo (без venv, без регистрация)
 
 ```bash
-python3 grid/compute_grid.py                  # истинският пробег (часове; продължава след прекъсване)
+python3 grid/compute_grid.py                  # точка по точка: ~64 точки на час, ~128 на ден от един IP; продължава след прекъсване
 python3 grid/compute_grid.py --synthetic       # правдоподобна мрежа без мрежа, за разработка
 ```
+
+Цялата мрежа през Open-Meteo би отнела около 16 дни от един IP — затова този
+път е само за проби и за кръстосаната проверка, не за истинската мрежа.
