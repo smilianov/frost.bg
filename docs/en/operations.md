@@ -200,8 +200,10 @@ reports: `google` only with its key present, otherwise `osm` /
   keeps hitting the old entries until TTL — which is why every release bumps
   the version;
 - rotating `GOOGLE_MAPS_KEY` itself with `MAP = "google"` unchanged does
-  not change the key: the edge keeps the old `/config` for up to a day
-  (bump the version to replace it), browsers for up to 5 minutes.
+  not change the key: the edge keeps the old `/config` for up to a day, and
+  after its 5 minutes the browser gets that old copy from the edge again —
+  the new value reaches people only when the edge expires or you bump the
+  version.
 
 ## Map tiles
 
