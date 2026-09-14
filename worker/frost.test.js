@@ -78,7 +78,9 @@ test("haversine: 0.1° ширина ≈ 11.1 км", () => {
 test("frostResponse: тялото по спецификацията", () => {
   const r = frostResponse(grid, 42.184, 24.929);
   assert.deepEqual(r.query, { lat: 42.184, lon: 24.929 });
-  assert.deepEqual(r.cell, { lat: 42.2, lon: 24.9, elev_m: 152, distance_m: r.cell.distance_m });
+  assert.deepEqual({ lat: r.cell.lat, lon: r.cell.lon, elev_m: r.cell.elev_m }, { lat: 42.2, lon: 24.9, elev_m: 152 });
+  assert.ok(Number.isInteger(r.cell.distance_m), String(r.cell.distance_m));
+  assert.ok(Math.abs(r.cell.distance_m - 2979) <= 5, String(r.cell.distance_m));
   assert.deepEqual(r.typical, { last_spring: "03-27", first_autumn: "11-23" });
   assert.deepEqual(r.safe, { last_spring: "04-10", first_autumn: "10-30" });
   assert.equal(r.years_used, 30);
@@ -120,6 +122,18 @@ test("frostResponse: годината в source.attribution идва от grid.c
   };
   const r = frostResponse(gridLater, 42.2, 24.9);
   assert.ok(r.source.attribution.endsWith("2031"), r.source.attribution);
+});
+test("frostResponse: source.bg/en и period идват от grid.period, не са захардкоднати", () => {
+  const gridPeriod = {
+    ...grid, period: { start: 2000, end: 2029 }, computed: "2030-01-05",
+    cells: [{ lat: 42.2, lon: 24.9, elev: 152, typical: ["03-27", "11-23"], safe: ["04-10", "10-30"],
+              years_used: 30, years_with_spring: 30, years_with_autumn: 30, years: [] }],
+  };
+  const r = frostResponse(gridPeriod, 42.2, 24.9);
+  assert.equal(r.source.bg, "ERA5-Land през Copernicus CDS, 2000–2029");
+  assert.equal(r.source.en, "ERA5-Land via Copernicus CDS, 2000–2029");
+  assert.deepEqual(r.period, { start: 2000, end: 2029 });
+  assert.ok(r.source.attribution.endsWith("2030"), r.source.attribution);
 });
 test("note: непразни, различни на двата езика, en съдържа „frost“", () => {
   assert.ok(TEXTS.note.bg.length > 0);
