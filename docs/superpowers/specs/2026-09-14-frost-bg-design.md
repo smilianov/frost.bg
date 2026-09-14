@@ -202,7 +202,8 @@ rank, консервативно при четен брой), **сигурна**
 
 ```json
 {"map": "osm" | "google", "google_maps_key": null | "AIza…", "languages": ["bg", "en"],
- "grid": {"computed": "2026-09-14", "period": {"start": 1996, "end": 2025}}, "version": "1"}
+ "grid": {"computed": "2026-09-14", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
+ "geocoder": "openmeteo", "version": "1", "app_version": "0.1.0"}
 ```
 
 `google_maps_key` е **отделен** от `GOOGLE_KEY`: ключ за Google Maps JS,
@@ -212,10 +213,21 @@ Google Cloud. Дава се само когато `env.MAP == "google"`.
 ### Общо за API-то
 
 - **CORS** отворен (`Access-Control-Allow-Origin: *`) — публично API;
-- **кеш:** `Cache-Control: public, max-age=86400` за `/frost` и `/config`,
-  `max-age=604800` за `/geocode`; CDN-ът на Cloudflare кешира по URL;
+- **кеш** (уточнено след прегледите на 14 септември): Worker отговорите не
+  се кешират на ръба сами по себе си — Worker-ът ползва **Cache API**
+  (`caches.default`) с нормализиран ключ (закръглени координати, подрязан и
+  кодиран `q`, `lang`, цяло `limit`) и сегмент `rev=APP_VERSION|дата на
+  мрежата|ефективна карта|ефективен геокодер`, така че нов deploy или нова
+  конфигурация започва нов кеш на ръба веднага. Заглавки:
+  `Cache-Control: public, max-age=300, s-maxage=86400` за `/frost` и
+  `/config`, `public, max-age=300, s-maxage=604800` за `/geocode` — ръбът
+  пази ден/седмица (`s-maxage`), браузърите ревалидират до 5 минути
+  (`max-age`). Грешките са `no-store`. Нова мрежа в същия ден иска
+  вдигане на `APP_VERSION`.
 - **грешки:** JSON `{"error": {"code": "outside_bulgaria", "bg": "…", "en": "…"}}`;
-  кодове: `bad_request`, `outside_bulgaria`, `geocoder_failed`, `not_found`;
+  кодове: `bad_request`, `bad_query` (къс `q`), `outside_bulgaria`,
+  `geocoder_failed`, `not_found`; 405 носи `Allow: GET, OPTIONS`; всички
+  JSON отговори носят `X-Content-Type-Options: nosniff`;
 - **лимит на заявки** — правило в Cloudflare (WAF / rate limiting), не в код;
 - **версия в пътя** (`/api/v1/`): промяна на формата = `/api/v2/`;
 - `/api/*` без съвпадение → 404 JSON; всичко друго → статичните файлове.
