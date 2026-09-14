@@ -171,3 +171,21 @@ test("специални знаци в q стигат до доставчика 
   assert.equal(seen.searchParams.get("language"), "bg");
   assert.equal(seen.hash, "");
 });
+test("google: произволен status не изтича в съобщението или стека на грешката", async () => {
+  const f = fakeFetch(() => okJson({ status: "SECRET123", results: [] }));
+  await assert.rejects(
+    () => geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f }),
+    (e) => {
+      assert.ok(e instanceof GeocodeError);
+      assert.ok(!e.message.includes("SECRET123"), e.message);
+      assert.ok(!String(e.stack).includes("SECRET123"), e.stack);
+      return true;
+    },
+  );
+});
+test("openmeteo: тяло, което е масив на върха (не обект) -> GeocodeError", async () => {
+  const f1 = fakeFetch(() => okJson([]));
+  await assert.rejects(() => geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f1 }), GeocodeError);
+  const f2 = fakeFetch(() => okJson([1]));
+  await assert.rejects(() => geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f2 }), GeocodeError);
+});

@@ -423,3 +423,18 @@ test("/api/v1/geocode: 502 никога не влиза в кеша", async () =
     clearCacheStub();
   }
 });
+test("/api/v1/geocode: тяло масив на върха от Open-Meteo -> 502, не влиза в кеша", async () => {
+  const store = stubCache();
+  try {
+    const e1 = env({ FETCH: async () => new Response(JSON.stringify([]), { status: 200 }) });
+    const r1 = await getSettled("/api/v1/geocode?q=Маноле", e1, makeCtx());
+    assert.equal(r1.status, 502);
+    const e2 = env({ FETCH: async () => new Response(JSON.stringify([1]), { status: 200 }) });
+    const r2 = await getSettled("/api/v1/geocode?q=Маноле", e2, makeCtx());
+    assert.equal(r2.status, 502);
+    assert.equal(store.puts, 0);
+    assert.equal(store.size, 0);
+  } finally {
+    clearCacheStub();
+  }
+});

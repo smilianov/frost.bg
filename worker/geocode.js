@@ -5,6 +5,10 @@ const OPEN_METEO = "https://geocoding-api.open-meteo.com/v1/search";
 const GOOGLE = "https://maps.googleapis.com/maps/api/geocode/json";
 const round3 = (x) => Math.round(x * 1000) / 1000;
 const isFiniteNum = (x) => typeof x === "number" && Number.isFinite(x);
+// Само тези статуси на Google може да влязат в текста на GeocodeError —
+// произволна стойност на `status` не е доверен вход (виж коментара при
+// fetchJson) и никога не се прекопира сурова.
+const GOOGLE_ERROR_STATUSES = new Set(["OVER_QUERY_LIMIT", "REQUEST_DENIED", "INVALID_REQUEST", "UNKNOWN_ERROR"]);
 
 // `limit` минава и в ключа на кеша (index.js) — изнесена тук, за да няма две
 // копия на политиката. Изрична Number.isFinite проверка, не `Number(limit) ||
@@ -59,7 +63,7 @@ async function fetchJson(fetchImpl, url, timeoutMs) {
 // пропуска мълчаливо, не чупи целия отговор.
 function normalizeMeteo(body) {
   try {
-    if (body === null || typeof body !== "object") throw new GeocodeError("upstream returned malformed data");
+    if (body === null || typeof body !== "object" || Array.isArray(body)) throw new GeocodeError("upstream returned malformed data");
     if (body.results !== undefined && !Array.isArray(body.results)) throw new GeocodeError("upstream returned malformed data");
     const list = Array.isArray(body.results) ? body.results : [];
     return list
@@ -73,8 +77,13 @@ function normalizeMeteo(body) {
 
 function normalizeGoogle(body, limit) {
   try {
-    if (body === null || typeof body !== "object") throw new GeocodeError("upstream returned malformed data");
-    if (body.status !== "OK" && body.status !== "ZERO_RESULTS") throw new GeocodeError(`Google: ${body.status}`);
+    if (body === null || typeof body !== "object" || Array.isArray(body)) throw new GeocodeError("upstream returned malformed data");
+    if (body.status !== "OK" && body.status !== "ZERO_RESULTS") {
+      // body.status идва от доставчика необработен — никога да не се
+      // прекопира сурова стойност в грешката (виж коментара при fetchJson).
+      const status = GOOGLE_ERROR_STATUSES.has(body.status) ? `: ${body.status}` : "";
+      throw new GeocodeError(`upstream returned an error status${status}`);
+    }
     if (!Array.isArray(body.results)) throw new GeocodeError("upstream returned malformed data");
     const comp = (r, type) => (r.address_components || []).find((c) => (c.types || []).includes(type))?.long_name;
     return body.results
