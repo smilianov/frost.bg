@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "project_id": 89,
+  "profile": "node-python",
+  "runner_ids": [
+    1
+  ],
+  "required_jobs": [
+    "std_repository",
+    "validate_application"
+  ],
+  "allowed_pipeline_sources": [
+    "push",
+    "api"
+  ],
+  "ref": "main",
+  "verify_timeout_s": 1200,
+  "standard_sha": "dfdb4b71c7da5a3d87415e2b280b2b7386c1e208",
+  "runtime_image": "ubuntu:24.04",
+  "node_version": "24.21.0",
+  "python_version": "3.12"
+}

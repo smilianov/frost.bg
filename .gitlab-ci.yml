@@ -1,0 +1,33 @@
+include: {"project":"gun/ci-standards","ref":"dfdb4b71c7da5a3d87415e2b280b2b7386c1e208","file":"/ci/base.yml"}
+
+validate_application:
+  stage: test
+  image:
+    name: ubuntu:24.04
+    pull_policy: if-not-present
+  tags: [docker, ci]
+  script:
+    - |
+      set -eu
+      printf 'WORKSPACE project=%s runner=%s concurrent=%s project_slot=%s\n' "$CI_PROJECT_DIR" "$CI_RUNNER_ID" "$CI_CONCURRENT_ID" "$CI_CONCURRENT_PROJECT_ID"
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update
+      apt-get install -y --no-install-recommends python3.12 python3.12-venv curl ca-certificates xz-utils git passwd util-linux
+      curl --fail --show-error --location --max-time 120 -o /tmp/node24.tar.xz https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.xz
+      printf '%s  %s\n' fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6 /tmp/node24.tar.xz | sha256sum -c -
+      mkdir -p /opt/node24
+      tar -xJf /tmp/node24.tar.xz --strip-components=1 -C /opt/node24
+      export PATH="/opt/node24/bin:$PATH"
+      test "$(node --version)" = v24.21.0
+      python3.12 -c 'import sys; assert sys.version_info[:2] == (3, 12)'
+      node --version
+      python3.12 --version
+      useradd --create-home frost-ci
+      chown -R frost-ci:frost-ci "$CI_PROJECT_DIR"
+      runuser -u frost-ci -- env HOME=/home/frost-ci PATH="$PATH" sh -ec '
+        python3.12 -m venv .venv-ci
+        export PATH="$PWD/.venv-ci/bin:$PATH"
+        pip install -r grid/requirements-cds.txt
+        npm ci
+        npm test
+      '
