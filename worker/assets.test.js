@@ -30,8 +30,10 @@ function unsupported(patterns) {
 // За приетия subset това е точната семантика на Wrangler (.gitignore):
 // шаблон без наклонена черта се мачва срещу всяко звено на пътя — файл или
 // директория (тя спира всичко под себе си) — без разлика в регистъра.
+// Регистърът се сгъва само за A–Z: Wrangler компилира шаблона като regex
+// с флаг i без u, а toLowerCase() би изравнил и знаци като U+212A с „k".
 function ignored(rel, patterns) {
-  const segments = rel.toLowerCase().split("/");
+  const segments = rel.replace(/[A-Z]/g, (c) => c.toLowerCase()).split("/");
   return patterns.some((p) => {
     const suffix = p.slice(1); // "*.test.js" -> ".test.js"
     return segments.some((seg) => seg.endsWith(suffix));
@@ -65,6 +67,13 @@ test("ignored: *.test.js спира и директория с такова им
   assert.equal(ignored("js/APP.TEST.JS", ["*.test.js"]), true);
   assert.equal(ignored("js/app.js", ["*.test.js"]), false);
   assert.equal(ignored("js/test.js", ["*.test.js"]), false);
+});
+
+test("ignored: регистърът се сгъва само за A–Z, както при Wrangler (regex с i без u)", () => {
+  // U+212A (знакът за келвин) е „k" за toLowerCase(), но не и за Wrangler
+  assert.equal(ignored("js/example.\u212A.test.js", ["*.k.test.js"]), false);
+  assert.equal(ignored("fixtures.\u212A/app.test.js", ["*.k"]), false);
+  assert.equal(ignored("js/example.K.test.js", ["*.k.test.js"]), true);
 });
 
 test("site/.assetsignore ползва само прости шаблони", () => {
