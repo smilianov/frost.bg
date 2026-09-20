@@ -236,8 +236,7 @@ Edit` (правилото за rate limiting), ограничен до акау�
 ```bash
 export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"
 npx wrangler whoami     # вижда акаунта → token-ът работи
-npm test                # само зелено дърво се качва
-npx wrangler deploy
+npm test && npx wrangler deploy   # само зелено дърво се качва
 ```
 
 - `site/` се качва цялата като статични assets, освен изброеното в
@@ -263,7 +262,8 @@ npx wrangler deploy
 - **custom domain `frost.bg`** — чака зоната да стане active: при
   регистратора nameservers трябва да са `maciej.ns.cloudflare.com` и
   `ursula.ns.cloudflare.com` (зададени на 20 септември 2026; регистърът на
-  .bg ги публикува с часове закъснение). После в `wrangler.toml`:
+  .bg ги публикува с часове закъснение). После в `wrangler.toml`, на
+  най-горното ниво (преди `[assets]`, не под `[vars]`):
 
   ```toml
   workers_dev = false

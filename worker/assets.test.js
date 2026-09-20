@@ -25,6 +25,10 @@ function ignored(rel, patterns) {
   });
 }
 
+function unsupported(patterns) {
+  return patterns.filter((p) => !p.startsWith("#") && /[!\/?\[]|\*\*/.test(p));
+}
+
 function walk(dir, out = []) {
   for (const e of readdirSync(dir)) {
     const p = join(dir, e);
@@ -33,6 +37,21 @@ function walk(dir, out = []) {
   }
   return out;
 }
+
+// Матчерът горе е точен само за прости шаблони (име или *.разширение, без
+// път). Всичко друго от .gitignore синтаксиса — отрицания „!", пътища с „/",
+// „**", класове „[…]", „?" — Wrangler разбира, а матчерът не; такива
+// шаблони се отхвърлят, за да не мине тест, който Wrangler чете другояче.
+test("unsupported: връща шаблоните, които простият матчер не разбира", () => {
+  assert.deepEqual(
+    unsupported(["*.test.js", "!js/format.test.js", "js/", "**/x.js", "a[1].js", "b?.js", "# коментар"]),
+    ["!js/format.test.js", "js/", "**/x.js", "a[1].js", "b?.js"],
+  );
+});
+
+test("site/.assetsignore ползва само прости шаблони", () => {
+  assert.deepEqual(unsupported(ignorePatterns()), []);
+});
 
 test("site/.assetsignore спира всеки *.test.js в site/", () => {
   const patterns = ignorePatterns();

@@ -241,8 +241,7 @@ Tokens.
 ```bash
 export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"
 npx wrangler whoami     # shows the account → the token works
-npm test                # only a green tree gets deployed
-npx wrangler deploy
+npm test && npx wrangler deploy   # only a green tree gets deployed
 ```
 
 - All of `site/` is uploaded as static assets except what
@@ -269,7 +268,8 @@ npx wrangler deploy
 - **the custom domain `frost.bg`** — waits for the zone to become active:
   at the registrar the nameservers must be `maciej.ns.cloudflare.com` and
   `ursula.ns.cloudflare.com` (set on 20 September 2026; the .bg registry
-  publishes them hours later). Then in `wrangler.toml`:
+  publishes them hours later). Then in `wrangler.toml`, at the top level
+  (before `[assets]`, not under `[vars]`):
 
   ```toml
   workers_dev = false
