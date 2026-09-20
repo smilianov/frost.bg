@@ -212,35 +212,72 @@ OpenStreetMap (`tile.openstreetmap.org`). Той е за **умерена упо
 `openstreetmap.org/copyright`, вече в `map.js`) остава задължително при
 всеки OSM-базиран доставчик.
 
-## Какво още липсва за публичния deploy
+## Deploy
 
-Локалната работа не чака на нищо от това:
+Продукцията е един Worker `frost-bg` в Cloudflare акаунта на собственика.
+Първият deploy е от 20 септември 2026 (версия 0.2.0, истинската мрежа).
+Адресът засега е <https://frost-bg.frost-bg.workers.dev>; `frost.bg` се
+закача като custom domain, щом зоната стане active (виж „Какво още
+липсва“).
 
-- **истинската мрежа от CDS** вместо синтетичната в репото: тегленето и
-  смятането по-горе, **кръстосаната проверка с изходен код 0** (наистина
-  сравнени клетки, същият период, без разлика над 10 дни — или прегледана и
-  обяснена такава), `synthetic: false` и `source_id: "cds"` в
-  `grid/grid.json`, `npm test` зелен; после **нов deploy** — датата на
-  мрежата е в ключа на ръба, така че ръбът е свеж веднага при новия rev, а
-  браузърите — до 5 минути (виж „Кешът на API-то“); нищо не се чисти на
-  ръка. **Нова мрежа в същия ден → вдигни `APP_VERSION`**, иначе ръбът пази
-  старата до изтичане;
-- регистрация на домейна `frost.bg` и DNS в Cloudflare — стъпка на
-  собственика;
-- `npx wrangler login` (връзка с акаунта в Cloudflare) и
-  `npx wrangler deploy` (качва Worker-а и статичните файлове; засега само
-  локално с `npm run dev`); custom domain на `frost.bg` в настройките на
+### Достъпът
+
+Не `wrangler login`, а **API token** — `wrangler` го чете от променливата
+`CLOUDFLARE_API_TOKEN`. Token-ът `frost.bg wrangler (laptop)` е направен от
+шаблона „Edit Cloudflare Workers“ плюс `Zone → DNS → Edit` (custom
+domain-ът създава DNS запис), `Zone → Zone → Read` и `Zone → Zone WAF →
+Edit` (правилото за rate limiting), ограничен до акаунта и зоната
+`frost.bg`, без срок. Стои във файла `~/.cloudflare/frost.bg.token` (права
+600) — извън репото, никога в чат, командна история или `wrangler.toml`.
+Отнема се от dash.cloudflare.com → My Profile → API Tokens.
+
+### Как се качва
+
+```bash
+export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"
+npx wrangler whoami     # вижда акаунта → token-ът работи
+npm test && npx wrangler deploy   # само зелено дърво се качва
+```
+
+- `site/` се качва цялата като статични assets, освен изброеното в
+  `site/.assetsignore` (тестовете `*.test.js`; тест `worker/assets.test.js`
+  пази списъка).
+- Променливите `GEOCODER`, `MAP`, `GOOGLE_MAPS_KEY` в `[vars]` на
+  `wrangler.toml` са и продукционните — прегледано при първия deploy:
+  Open-Meteo и OSM, без ключ за Google.
+- При **първия** deploy на нов `workers.dev` адрес TLS сертификатът се
+  издава минута-две — дотогава `curl` дава „SSL handshake failure“; не е
+  грешка в Worker-а.
+- Проверка след всеки deploy: `/api/v1/config` (`app_version`,
+  `grid.computed`, `source_id`) и `/api/v1/frost?lat=42.18425&lon=24.92936`
+  — Маноле: типична `03-29` / `11-25`, сигурна `04-11` / `10-30`, 30 години
+  (при мрежата от 20 септември 2026).
+- Ако `wrangler` даде „fetch failed“, а `curl` към `api.cloudflare.com`
+  минава: нещо спира **`node`** (на лаптопа на собственика — Little Snitch;
+  `node` трябва да е пуснат към `api.cloudflare.com`). Симптомът е timeout,
+  не отказ.
+
+## Какво още липсва
+
+- **custom domain `frost.bg`** — чака зоната да стане active: при
+  регистратора nameservers трябва да са `maciej.ns.cloudflare.com` и
+  `ursula.ns.cloudflare.com` (зададени на 20 септември 2026; регистърът на
+  .bg ги публикува с часове закъснение). После в `wrangler.toml`, на
+  най-горното ниво (преди `[assets]`, не под `[vars]`):
+
+  ```toml
+  workers_dev = false
+  routes = [{ pattern = "frost.bg", custom_domain = true }]
+  ```
+
+  и нов deploy — `workers.dev` адресът се спира, за да няма два адреса на
+  един сайт;
+- **лимит на заявки към API-то** — правило в Cloudflare (WAF → Rate
+  limiting rules, на ниво зона, затова също след active), не код в
   Worker-а;
 - по избор, само ако Google геокодирането се включва (`GEOCODER =
   "google"`): тайната `GOOGLE_KEY` в продукция —
   `npx wrangler secret put GOOGLE_KEY` (никога във `wrangler.toml`); без нея
   геокодерът си остава Open-Meteo;
-- променливите `GEOCODER`, `MAP`, `GOOGLE_MAPS_KEY` за продукционната среда
-  (в момента са зададени само за локално `[vars]` в `wrangler.toml`; без
-  собствен `[env.production]` продукция ще ползва същите — прегледай ги
-  преди първия deploy; `GOOGLE_MAPS_KEY`, ако има, с ограничение по HTTP
-  referrer до `frost.bg` в Google Cloud);
-- лимит на заявки към API-то — правило в Cloudflare (WAF / rate limiting),
-  не код в Worker-а;
 - deploy от GitHub Actions при сливане в `main` — записано за по-късно
   (фаза 2 в спецификацията), CI засега само тества.
