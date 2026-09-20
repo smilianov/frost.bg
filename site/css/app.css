@@ -91,7 +91,7 @@ a { color: var(--accent); }
 
 .suggestions {
   position: absolute;
-  z-index: 1100; /* над Leaflet (плочки 400, контроли 1000) — иначе картата покрива списъка */
+  z-index: 10; /* картата под него е изолирана (.map), затова стига малка стойност */
   top: calc(100% + 4px);
   left: 0;
   right: 0;

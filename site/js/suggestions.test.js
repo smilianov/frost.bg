@@ -1,37 +1,29 @@
-// Списъкът с предложения (.suggestions) виси над картата. Leaflet рисува
-// плочките, маркерите и контролите си със собствени z-index стойности —
-// ако списъкът е под най-високата от тях, картата го покрива и се вижда
-// само първият ред, който попада в пролуката над нея (така „Марково“
-// показваше само варненското). Тестът чете и двата CSS файла, за да
-// хване и обновяване на Leaflet, което вдига стойностите.
+// Списъкът с предложения (.suggestions) виси над картата. Leaflet и Google
+// рисуват плочките, маркерите и контролите си със собствени z-index
+// стойности (Leaflet: до 1000) — ако картата не е отделен stacking context,
+// те се състезават със списъка на едно ниво и картата го покрива: виждаше
+// се само първият ред, който попада в пролуката над нея (така „Марково“
+// показваше само варненското). С isolation: isolate всичко в картата остава
+// под нейния собствен покрив, каквито и числа да ползва библиотеката.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const css = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
+const app = readFileSync(new URL("../css/app.css", import.meta.url), "utf8");
 
-function zIndexOf(rule, source) {
-  const m = source.match(new RegExp(rule.replace(/[.\-]/g, "\\$&") + "\\s*\\{([^}]*)\\}"));
-  assert.ok(m, `няма правило ${rule}`);
-  const z = m[1].match(/z-index\s*:\s*(-?\d+)/);
-  assert.ok(z, `${rule} няма z-index`);
-  return Number(z[1]);
-}
-
-function maxZIndex(source) {
-  return Math.max(...[...source.matchAll(/z-index\s*:\s*(-?\d+)/g)].map((m) => Number(m[1])));
+function rule(selector) {
+  const m = app.match(new RegExp(selector.replace(/[.\-]/g, "\\$&") + "\\s*\\{([^}]*)\\}"));
+  assert.ok(m, `няма правило ${selector}`);
+  return m[1];
 }
 
 test("картата е отделен stacking context — z-index стойностите на картната библиотека не излизат от нея", () => {
-  const app = css("../css/app.css");
-  const m = app.match(/\.map\s*\{([^}]*)\}/);
-  assert.ok(m, "няма правило .map");
-  assert.match(m[1], /isolation\s*:\s*isolate/, ".map няма isolation: isolate");
+  assert.match(rule(".map"), /isolation\s*:\s*isolate/, ".map няма isolation: isolate");
 });
 
-test("списъкът с предложения е над всичко, което Leaflet рисува", () => {
-  const ours = zIndexOf(".suggestions", css("../css/app.css"));
-  const leaflet = maxZIndex(css("../vendor/leaflet/leaflet.css"));
-  assert.ok(leaflet >= 1000, `очаквах Leaflet да стига поне 1000, а е ${leaflet}`);
-  assert.ok(ours > leaflet, `.suggestions z-index ${ours} не е над Leaflet (${leaflet})`);
+test("списъкът с предложения е позициониран със z-index над нулата", () => {
+  const r = rule(".suggestions");
+  assert.match(r, /position\s*:\s*absolute/);
+  const z = r.match(/z-index\s*:\s*(-?\d+)/);
+  assert.ok(z && Number(z[1]) > 0, ".suggestions трябва да е с положителен z-index");
 });
