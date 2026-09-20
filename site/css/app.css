@@ -91,7 +91,7 @@ a { color: var(--accent); }
 
 .suggestions {
   position: absolute;
-  z-index: 10;
+  z-index: 1100; /* над Leaflet (плочки 400, контроли 1000) — иначе картата покрива списъка */
   top: calc(100% + 4px);
   left: 0;
   right: 0;
@@ -129,6 +129,7 @@ a { color: var(--accent); }
   border-radius: 10px;
   border: 1px solid var(--line);
   overflow: hidden;
+  isolation: isolate; /* z-index стойностите на Leaflet/Google остават вътре в картата */
 }
 
 .coords {
