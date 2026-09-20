@@ -9,6 +9,9 @@
 Сметката е копие от Garden Planner (`backend/app/frost_estimate.py`) — виж
 [`grid/frost_estimate.py`](grid/frost_estimate.py).
 
+На живо: <https://frost-bg.frost-bg.workers.dev> (докато `frost.bg` се
+закачи — виж [`docs/bg/operations.md`](docs/bg/operations.md), „Deploy“).
+
 ## Как се пуска локално
 
 ```bash

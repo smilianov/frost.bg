@@ -11,8 +11,8 @@ Planner).
 - [`api.md`](api.md) — the three API endpoints, parameters, example
   responses, error codes, caching and CORS.
 - [`operations.md`](operations.md) — how the grid is computed and
-  refreshed, how to run and test the project locally, the cache, what is
-  still missing for the public deploy.
+  refreshed, how to run and test the project locally, the cache, how it is
+  deployed to Cloudflare and what is still missing.
 - [The spec](../superpowers/specs/2026-09-14-frost-bg-design.md) — the full
   design of the project (the decisions behind it, the grid file format,
   what phase 2 has planned).

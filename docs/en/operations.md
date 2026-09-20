@@ -216,36 +216,74 @@ or `MAP = "google"` with a key. The OpenStreetMap attribution (© linking to
 `openstreetmap.org/copyright`, already in `map.js`) stays mandatory with any
 OSM-based provider.
 
-## What's still missing for the public deploy
+## Deploy
 
-Local work isn't blocked on any of this:
+Production is a single Worker, `frost-bg`, in the owner's Cloudflare
+account. The first deploy was on 20 September 2026 (version 0.2.0, the real
+grid). For now the address is <https://frost-bg.frost-bg.workers.dev>;
+`frost.bg` gets attached as a custom domain once the zone is active (see
+"What's still missing").
 
-- **the real grid from CDS** in place of the synthetic one in the repo: the
-  download and compute above, **the cross-check with exit code 0** (cells
-  actually compared, same period, no difference over 10 days — or one that
-  was reviewed and explained), `synthetic: false` and `source_id: "cds"` in
-  `grid/grid.json`, `npm test` green; then **a new deploy** — the grid
-  date is in the edge key, so the edge is fresh immediately on the new rev
-  and browsers within 5 minutes (see "The API cache"); nothing is purged by
-  hand. **A new grid on the same day → bump `APP_VERSION`**, otherwise the
-  edge keeps the old one until it expires;
-- registering the `frost.bg` domain and its DNS in Cloudflare — an owner
-  step;
-- `npx wrangler login` (linking the Cloudflare account) and
-  `npx wrangler deploy` (uploads the Worker and static files; so far it's
-  only run locally with `npm run dev`); a custom domain for `frost.bg` in
-  the Worker's settings;
+### Access
+
+Not `wrangler login` but an **API token** — `wrangler` reads it from the
+`CLOUDFLARE_API_TOKEN` variable. The token `frost.bg wrangler (laptop)` is
+made from the "Edit Cloudflare Workers" template plus `Zone → DNS → Edit`
+(the custom domain creates a DNS record), `Zone → Zone → Read` and `Zone →
+Zone WAF → Edit` (the rate limiting rule), scoped to the account and the
+`frost.bg` zone, no expiry. It lives in `~/.cloudflare/frost.bg.token`
+(mode 600) — outside the repo, never in a chat, shell history or
+`wrangler.toml`. Revoke it at dash.cloudflare.com → My Profile → API
+Tokens.
+
+### How to deploy
+
+```bash
+export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"
+npx wrangler whoami     # shows the account → the token works
+npm test                # only a green tree gets deployed
+npx wrangler deploy
+```
+
+- All of `site/` is uploaded as static assets except what
+  `site/.assetsignore` lists (the `*.test.js` tests; the
+  `worker/assets.test.js` test guards the list).
+- The `GEOCODER`, `MAP`, `GOOGLE_MAPS_KEY` variables under `[vars]` in
+  `wrangler.toml` are the production ones too — reviewed at the first
+  deploy: Open-Meteo and OSM, no Google key.
+- On the **first** deploy to a new `workers.dev` address the TLS
+  certificate takes a minute or two — until then `curl` reports "SSL
+  handshake failure"; it is not a Worker error.
+- Check after every deploy: `/api/v1/config` (`app_version`,
+  `grid.computed`, `source_id`) and
+  `/api/v1/frost?lat=42.18425&lon=24.92936` — Manole: typical `03-29` /
+  `11-25`, safe `04-11` / `10-30`, 30 years (with the grid of 20 September
+  2026).
+- If `wrangler` says "fetch failed" while `curl` to `api.cloudflare.com`
+  works: something is blocking **`node`** (on the owner's laptop that is
+  Little Snitch; `node` must be allowed to reach `api.cloudflare.com`). The
+  symptom is a timeout, not a refusal.
+
+## What's still missing
+
+- **the custom domain `frost.bg`** — waits for the zone to become active:
+  at the registrar the nameservers must be `maciej.ns.cloudflare.com` and
+  `ursula.ns.cloudflare.com` (set on 20 September 2026; the .bg registry
+  publishes them hours later). Then in `wrangler.toml`:
+
+  ```toml
+  workers_dev = false
+  routes = [{ pattern = "frost.bg", custom_domain = true }]
+  ```
+
+  and a new deploy — the `workers.dev` address is switched off so one site
+  does not have two addresses;
+- **a request-rate limit on the API** — a Cloudflare rule (WAF → Rate
+  limiting rules, zone-level, hence also after active), not code in the
+  Worker;
 - optional, only if Google geocoding is enabled (`GEOCODER = "google"`):
   the `GOOGLE_KEY` secret in production —
   `npx wrangler secret put GOOGLE_KEY` (never in `wrangler.toml`); without
   it the geocoder stays Open-Meteo;
-- the `GEOCODER`, `MAP`, `GOOGLE_MAPS_KEY` variables for the production
-  environment (currently only set for local dev, under `[vars]` in
-  `wrangler.toml`; without its own `[env.production]`, production would
-  use the same ones — review them before the first deploy;
-  `GOOGLE_MAPS_KEY`, if any, with an HTTP referrer restriction to
-  `frost.bg` in Google Cloud);
-- a request-rate limit on the API — a Cloudflare rule (WAF / rate
-  limiting), not code in the Worker;
 - deploy from GitHub Actions on merge to `main` — noted for later (phase 2
   in the spec); CI only runs tests so far.
