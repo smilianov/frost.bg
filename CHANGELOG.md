@@ -4,6 +4,57 @@
 
 ---
 
+## [0.2.0] — 2026-09-20
+
+### 🇧🇬 Български
+
+#### Истинските данни
+
+- **Мрежата вече е истинска.** 2 080 точки, сметнати от **ERA5-Land през
+  Copernicus CDS**, 1996–2025 — по един файл на година (30 заявки, изтеглени
+  за шест дни на опашката на CDS) плюс геопотенциала за височината на всяка
+  клетка. Синтетичната мрежа си отива заедно с жълтата лента „пробни данни“.
+- `source_id` в мрежата е `cds`; API отговорът носи етикетите на
+  Copernicus и изискваното посочване; `grid.computed` е 20 септември 2026 —
+  с него се сменя и ключът на кеша, така че ръбът тръгва чист.
+- **179 клетки нямат дати** (`null`): 178 са над Черно море — ERA5-Land
+  покрива само сушата — и една без достатъчно години със слана.
+- **Кръстосана проверка** с 64-те клетки, изтеглени по-рано от Open-Meteo
+  (южната граница): 24 се разминават с над 10 дни, най-много 31. Причината
+  е различният модел на релефа — ERA5 на 25 км срещу ERA5-Land на 9 км: там,
+  където височината се различава със стотици метри, датите се местят в
+  правилната посока (по-високо → по-късна пролетна и по-ранна есенна слана).
+  Пример: (41.2, 23.7) — 994 м по CDS дава 16 април / 30 октомври, 1625 м по
+  Open-Meteo дава 9 май / 8 октомври. Точно заради това е избран ERA5-Land.
+- Маноле (клетка 42.2, 24.9, 99 м): типична **29 март / 25 ноември**,
+  сигурна **11 април / 30 октомври**, 30 години.
+
+### 🇬🇧 English
+
+#### The real data
+
+- **The grid is real now.** 2,080 points computed from **ERA5-Land via the
+  Copernicus CDS**, 1996–2025 — one file per year (30 requests, six days in
+  the CDS queue) plus the geopotential for each cell's elevation. The
+  synthetic grid and its yellow "sample data" banner are gone.
+- The grid's `source_id` is `cds`; the API response carries the Copernicus
+  labels and the required attribution; `grid.computed` is 20 September 2026,
+  which also changes the cache key, so the edge starts clean.
+- **179 cells have no dates** (`null`): 178 over the Black Sea — ERA5-Land
+  covers land only — and one without enough frost years.
+- **Cross-check** against the 64 cells fetched earlier from Open-Meteo (the
+  southern border): 24 differ by more than 10 days, at most 31. The cause is
+  the terrain model — ERA5 at 25 km versus ERA5-Land at 9 km: where the
+  elevations differ by hundreds of metres, the dates move in the right
+  direction (higher → later spring frost, earlier autumn frost). Example:
+  (41.2, 23.7) — 994 m in CDS gives 16 April / 30 October, 1,625 m in
+  Open-Meteo gives 9 May / 8 October. This is exactly why ERA5-Land was
+  chosen.
+- Manole (cell 42.2, 24.9, 99 m): typical **29 March / 25 November**, safe
+  **11 April / 30 October**, 30 years.
+
+---
+
 ## [0.1.0] — 2026-09-14
 
 ### 🇧🇬 Български
