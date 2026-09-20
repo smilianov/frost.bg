@@ -4,6 +4,50 @@
 
 ---
 
+## [0.2.1] — 2026-09-20
+
+### 🇧🇬 Български
+
+#### Първият deploy и еднаквите имена
+
+- **frost.bg е на живо** — засега на <https://frost-bg.frost-bg.workers.dev>;
+  `frost.bg` се закача, щом регистърът на .bg активира домейна. Runbook-ът
+  описва реалния deploy (API token във файл, `npm test && npx wrangler
+  deploy`, проверката по Маноле).
+- **Списъкът с предложения вече не се крие под картата** — картата е
+  отделен stacking context (`isolation: isolate`); при „Марково“ се
+  виждаше само варненското.
+- **Еднаквите имена се различават.** Резултатите на `/api/v1/geocode`
+  носят и общината — ново поле `admin2` (винаги низ, `""` при липса;
+  обратно съвместимо). Страницата иска 10 предложения вместо 5 и показва
+  „име, област, община“ — „Ново Село“ има поне десет и пловдивското
+  (Стамболийски) беше шесто, т.е. невидимо; двете в Кюстендилско бяха
+  неразличими.
+- Тестовете на страницата (`*.test.js`) не се качват като публични файлове
+  (`site/.assetsignore`).
+
+### 🇬🇧 English
+
+#### The first deploy and duplicate names
+
+- **frost.bg is live** — for now at <https://frost-bg.frost-bg.workers.dev>;
+  `frost.bg` gets attached once the .bg registry activates the domain. The
+  runbook describes the real deploy (API token in a file, `npm test && npx
+  wrangler deploy`, the Manole check).
+- **The suggestions list no longer hides under the map** — the map is its
+  own stacking context (`isolation: isolate`); "Марково" showed only the
+  Varna one.
+- **Duplicate names are told apart.** `/api/v1/geocode` results now carry
+  the municipality — a new `admin2` field (always a string, `""` when
+  unknown; backward compatible). The page asks for 10 suggestions instead of
+  5 and shows "name, province, municipality" — there are at least ten "Ново
+  Село" and the Plovdiv one (Stamboliyski) was sixth, i.e. invisible; the two
+  in Kyustendil province were indistinguishable.
+- The page's tests (`*.test.js`) are no longer uploaded as public files
+  (`site/.assetsignore`).
+
+---
+
 ## [0.2.0] — 2026-09-20
 
 ### 🇧🇬 Български

@@ -68,6 +68,11 @@ async function fetchJson(fetchImpl, url, timeoutMs) {
 // пропуска мълчаливо, не чупи целия отговор. `count` е само молба към
 // доставчика — таванът `limit` се налага и тук, след филтъра, за да не
 // стигнат 1 000 записа до клиента (и негодните да не заемат места).
+// `admin` е областта, `admin2` — общината (Open-Meteo: admin1/admin2; Google:
+// administrative_area_level_1/_2). Липсваща или нестрингова -> "" — винаги
+// низове, за да е еднаква формата.
+const text = (x) => (typeof x === "string" ? x : "");
+
 function normalizeMeteo(body, limit) {
   try {
     if (body === null || typeof body !== "object" || Array.isArray(body)) throw new GeocodeError("upstream returned malformed data");
@@ -76,7 +81,7 @@ function normalizeMeteo(body, limit) {
     return list
       .filter((r) => r && typeof r === "object" && nonEmptyName(r.name) && validLatLon(r.latitude, r.longitude))
       .slice(0, limit)
-      .map((r) => ({ name: r.name, admin: r.admin1 || "", lat: round3(r.latitude), lon: round3(r.longitude) }));
+      .map((r) => ({ name: r.name, admin: text(r.admin1), admin2: text(r.admin2), lat: round3(r.latitude), lon: round3(r.longitude) }));
   } catch (e) {
     if (e instanceof GeocodeError) throw e;
     throw new GeocodeError("upstream returned malformed data");
@@ -110,6 +115,7 @@ function normalizeGoogle(body, limit) {
       .map((r) => ({
         name: str(comp(r, "locality")) || str(r.formatted_address).split(",")[0].trim(),
         admin: str(comp(r, "administrative_area_level_1")),
+        admin2: str(comp(r, "administrative_area_level_2")),
         lat: round3(r.geometry.location.lat), lon: round3(r.geometry.location.lng),
       }))
       .filter((r) => nonEmptyName(r.name))

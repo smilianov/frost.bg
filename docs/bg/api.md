@@ -117,15 +117,19 @@ API-то“ в [`operations.md`](operations.md).
 
 ```json
 {
-  "results": [{"name": "Маноле", "admin": "Пловдив", "lat": 42.183, "lon": 24.933}],
+  "results": [{"name": "Маноле", "admin": "Пловдив", "admin2": "Марица", "lat": 42.183, "lon": 24.933}],
   "provider": "openmeteo"
 }
 ```
 
 Само тези два ключа: `results` и `provider` (`"openmeteo"` или `"google"`
 — кой реално е отговорил); `version` няма — този отговор не носи версия на
-формата. `lat`/`lon` в резултатите са закръглени до 3 знака. Празен списък
-`"results": []` (не грешка) означава, че доставчикът просто не намери нищо.
+формата. Всеки резултат има `name`, `admin` (областта), `admin2` (общината;
+от 0.2.1) и `lat`/`lon`, закръглени до 3 знака; `admin` и `admin2` са
+винаги низове — `""`, когато доставчикът не ги знае. Еднаквите имена са
+много („Ново Село“ има поне десет), затова страницата иска `limit=10` и
+показва областта и общината. Празен списък `"results": []` (не грешка)
+означава, че доставчикът просто не намери нищо.
 
 Кеш: `Cache-Control: public, max-age=300, s-maxage=604800` — браузърът 5
 минути, ръбът седмица: имената на местата не се местят, но смяна на
@@ -143,9 +147,9 @@ API-то“ в [`operations.md`](operations.md).
   "google_maps_key": null,
   "geocoder": "openmeteo",
   "languages": ["bg", "en"],
-  "grid": {"computed": "2026-09-14", "period": {"start": 1996, "end": 2025}, "synthetic": true, "source_id": "synthetic"},
+  "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.1.0"
+  "app_version": "0.2.1"
 }
 ```
 

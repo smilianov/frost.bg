@@ -117,16 +117,20 @@ Example — `GET /api/v1/geocode?q=Маноле&lang=bg`:
 
 ```json
 {
-  "results": [{"name": "Маноле", "admin": "Пловдив", "lat": 42.183, "lon": 24.933}],
+  "results": [{"name": "Маноле", "admin": "Пловдив", "admin2": "Марица", "lat": 42.183, "lon": 24.933}],
   "provider": "openmeteo"
 }
 ```
 
 Only these two keys: `results` and `provider` (`"openmeteo"` or `"google"`
 — whichever actually answered); there is no `version` — this response
-carries no format version. `lat`/`lon` in the results are rounded to 3
-decimals. An empty `"results": []` (not an error) just means the provider
-found nothing.
+carries no format version. Each result has `name`, `admin` (the province),
+`admin2` (the municipality; since 0.2.1) and `lat`/`lon` rounded to 3
+decimals; `admin` and `admin2` are always strings — `""` when the provider
+does not know them. Duplicate names are common (there are at least ten
+"Ново Село"), so the page asks for `limit=10` and shows the province and
+the municipality. An empty `"results": []` (not an error) just means the
+provider found nothing.
 
 Caching: `Cache-Control: public, max-age=300, s-maxage=604800` — the
 browser 5 minutes, the edge a week: place names don't move, but a geocoder
@@ -144,9 +148,9 @@ secret. Exactly these keys:
   "google_maps_key": null,
   "geocoder": "openmeteo",
   "languages": ["bg", "en"],
-  "grid": {"computed": "2026-09-14", "period": {"start": 1996, "end": 2025}, "synthetic": true, "source_id": "synthetic"},
+  "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.1.0"
+  "app_version": "0.2.1"
 }
 ```
 

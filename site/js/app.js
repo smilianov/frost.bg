@@ -1,5 +1,5 @@
 import { T } from "./texts.js";
-import { formatMMDD, readQuery, shareUrl, parseDecimal } from "./format.js";
+import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl } from "./format.js";
 import { createMap } from "./map.js";
 
 const lang = document.body.dataset.lang === "en" ? "en" : "bg";
@@ -143,7 +143,7 @@ $("q").addEventListener("input", () => {
   timer = setTimeout(async () => {
     ul.innerHTML = `<li class="muted">${t.searching}</li>`; ul.hidden = false;
     let res;
-    try { res = await fetch(`/api/v1/geocode?q=${encodeURIComponent(q)}&lang=${lang}`); }
+    try { res = await fetch(geocodeUrl(q, lang)); }
     catch (_) {
       if (mySeq !== searchSeq) return;
       ul.innerHTML = `<li class="muted">${t.network_error}</li>`;
@@ -167,10 +167,10 @@ $("q").addEventListener("input", () => {
     if (mySeq !== searchSeq) return;
     const rs = data.results || [];
     if (!rs.length) { ul.innerHTML = `<li class="muted">${t.no_results}</li>`; return; }
-    ul.innerHTML = rs.map((x, i) => `<li><button type="button" data-i="${i}">${esc(x.name)}${x.admin ? `, ${esc(x.admin)}` : ""}</button></li>`).join("");
+    ul.innerHTML = rs.map((x, i) => `<li><button type="button" data-i="${i}">${esc(placeLabel(x))}</button></li>`).join("");
     ul.querySelectorAll("button").forEach((b) => b.onclick = () => {
       const x = rs[Number(b.dataset.i)];
-      $("q").value = x.admin ? `${x.name}, ${x.admin}` : x.name; ul.hidden = true;
+      $("q").value = placeLabel(x); ul.hidden = true;
       lookup(x.lat, x.lon);
     });
   }, 250);

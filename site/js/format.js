@@ -38,3 +38,30 @@ export function shareUrl(base, lat, lon) {
   const r = (x) => String(Math.round(x * 1000) / 1000);
   return `${base}?lat=${r(lat)}&lon=${r(lon)}`;
 }
+
+// Етикет на място от геокодера: „име, област, община“ — каквото има.
+// Общината се пропуска, когато е същата като областта без „Област“/„Община“
+// отпред (български) или „Province“/„Municipality“ отзад (английските имена
+// от Google): „Област Стара Загора, Стара Загора“ не казва нищо ново.
+const clean = (s) => String(s || "").trim();
+const bare = (s) => clean(s)
+  .replace(/^(област|община|province|municipality)\s+/i, "")
+  .replace(/\s+(province|municipality)$/i, "")
+  .toLowerCase();
+
+export function placeLabel(x) {
+  const parts = [clean(x.name)];
+  const admin = clean(x.admin), admin2 = clean(x.admin2);
+  if (admin) parts.push(admin);
+  if (admin2 && bare(admin2) !== bare(admin)) parts.push(admin2);
+  return parts.join(", ");
+}
+
+// Заявка към геокодера: винаги максимума предложения (10 — таванът на
+// API-то). С подразбирането 5 еднаквите имена не се побират — „Ново Село“
+// има поне десет и пловдивското е шесто.
+export const GEOCODE_LIMIT = 10;
+
+export function geocodeUrl(q, lang) {
+  return `/api/v1/geocode?q=${encodeURIComponent(q)}&lang=${encodeURIComponent(lang)}&limit=${GEOCODE_LIMIT}`;
+}

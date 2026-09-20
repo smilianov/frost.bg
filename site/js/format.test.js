@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatMMDD, readQuery, shareUrl, parseDecimal } from "./format.js";
+import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl } from "./format.js";
 
 test("formatMMDD bg", () => {
   assert.equal(formatMMDD("03-27", "bg"), "27 март");
@@ -39,4 +39,29 @@ test("parseDecimal: само чисти десетични в диапазона
   assert.equal(parseDecimal("0x2a", 180), null);
   assert.equal(parseDecimal("", 90), null);
   assert.equal(parseDecimal("   ", 90), null);
+});
+
+test("placeLabel: име, област и община", () => {
+  assert.equal(placeLabel({ name: "Ново Село", admin: "Пловдив", admin2: "Стамболийски" }), "Ново Село, Пловдив, Стамболийски");
+  assert.equal(placeLabel({ name: "Ново Село", admin: "Област Кюстендил", admin2: "Община Невестино" }), "Ново Село, Област Кюстендил, Община Невестино");
+});
+test("placeLabel: без област/община — само каквото има", () => {
+  assert.equal(placeLabel({ name: "Маноле", admin: "Пловдив", admin2: "" }), "Маноле, Пловдив");
+  assert.equal(placeLabel({ name: "Маноле", admin: "", admin2: "Марица" }), "Маноле, Марица");
+  assert.equal(placeLabel({ name: "Маноле", admin: "", admin2: "" }), "Маноле");
+  assert.equal(placeLabel({ name: "Manole" }), "Manole");
+});
+test("placeLabel: общината не се повтаря, когато е същата като областта", () => {
+  assert.equal(placeLabel({ name: "Ново Село", admin: "Област Стара Загора", admin2: "Стара Загора" }), "Ново Село, Област Стара Загора");
+  assert.equal(placeLabel({ name: "Ново Село", admin: "Област Видин", admin2: "Община Ново Село" }), "Ново Село, Област Видин, Община Ново Село");
+  assert.equal(placeLabel({ name: "Маноле", admin: "Пловдив", admin2: "Пловдив" }), "Маноле, Пловдив");
+  // английските имена от Google носят наставка вместо представка
+  assert.equal(placeLabel({ name: "Novo Selo", admin: "Stara Zagora Province", admin2: "Stara Zagora" }), "Novo Selo, Stara Zagora Province");
+  assert.equal(placeLabel({ name: "Novo Selo", admin: "Stara Zagora Province", admin2: "Stara Zagora Municipality" }), "Novo Selo, Stara Zagora Province");
+  assert.equal(placeLabel({ name: "Ново Село", admin: " Област Стара Загора", admin2: "Стара Загора " }), "Ново Село, Област Стара Загора");
+});
+
+test("geocodeUrl: кодира заявката и иска максимума предложения (10), за да излязат всички еднакви имена", () => {
+  assert.equal(geocodeUrl("Ново село", "bg"), "/api/v1/geocode?q=%D0%9D%D0%BE%D0%B2%D0%BE%20%D1%81%D0%B5%D0%BB%D0%BE&lang=bg&limit=10");
+  assert.equal(geocodeUrl("a&b=c", "en"), "/api/v1/geocode?q=a%26b%3Dc&lang=en&limit=10");
 });
