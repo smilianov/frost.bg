@@ -55,6 +55,10 @@ test("placeLabel: общината не се повтаря, когато е с�
   assert.equal(placeLabel({ name: "Ново Село", admin: "Област Стара Загора", admin2: "Стара Загора" }), "Ново Село, Област Стара Загора");
   assert.equal(placeLabel({ name: "Ново Село", admin: "Област Видин", admin2: "Община Ново Село" }), "Ново Село, Област Видин, Община Ново Село");
   assert.equal(placeLabel({ name: "Маноле", admin: "Пловдив", admin2: "Пловдив" }), "Маноле, Пловдив");
+  // английските имена от Google носят наставка вместо представка
+  assert.equal(placeLabel({ name: "Novo Selo", admin: "Stara Zagora Province", admin2: "Stara Zagora" }), "Novo Selo, Stara Zagora Province");
+  assert.equal(placeLabel({ name: "Novo Selo", admin: "Stara Zagora Province", admin2: "Stara Zagora Municipality" }), "Novo Selo, Stara Zagora Province");
+  assert.equal(placeLabel({ name: "Ново Село", admin: " Област Стара Загора", admin2: "Стара Загора " }), "Ново Село, Област Стара Загора");
 });
 
 test("geocodeUrl: кодира заявката и иска максимума предложения (10), за да излязат всички еднакви имена", () => {

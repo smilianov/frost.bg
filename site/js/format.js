@@ -40,14 +40,20 @@ export function shareUrl(base, lat, lon) {
 }
 
 // Етикет на място от геокодера: „име, област, община“ — каквото има.
-// Общината се пропуска, когато е същата като областта (без „Област“/
-// „Община“ отпред): „Област Стара Загора, Стара Загора“ не казва нищо ново.
-const bare = (s) => String(s || "").replace(/^(област|община|province|municipality)\s+/i, "").trim().toLowerCase();
+// Общината се пропуска, когато е същата като областта без „Област“/„Община“
+// отпред (български) или „Province“/„Municipality“ отзад (английските имена
+// от Google): „Област Стара Загора, Стара Загора“ не казва нищо ново.
+const clean = (s) => String(s || "").trim();
+const bare = (s) => clean(s)
+  .replace(/^(област|община|province|municipality)\s+/i, "")
+  .replace(/\s+(province|municipality)$/i, "")
+  .toLowerCase();
 
 export function placeLabel(x) {
-  const parts = [x.name];
-  if (x.admin) parts.push(x.admin);
-  if (x.admin2 && bare(x.admin2) !== bare(x.admin)) parts.push(x.admin2);
+  const parts = [clean(x.name)];
+  const admin = clean(x.admin), admin2 = clean(x.admin2);
+  if (admin) parts.push(admin);
+  if (admin2 && bare(admin2) !== bare(admin)) parts.push(admin2);
   return parts.join(", ");
 }
 

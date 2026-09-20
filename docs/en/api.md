@@ -148,9 +148,9 @@ secret. Exactly these keys:
   "google_maps_key": null,
   "geocoder": "openmeteo",
   "languages": ["bg", "en"],
-  "grid": {"computed": "2026-09-14", "period": {"start": 1996, "end": 2025}, "synthetic": true, "source_id": "synthetic"},
+  "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.1.0"
+  "app_version": "0.2.1"
 }
 ```
 
