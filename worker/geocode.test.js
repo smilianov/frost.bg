@@ -15,12 +15,23 @@ test("openmeteo: заявката носи name, count, language, countryCode=BG
   assert.equal(seen.searchParams.get("language"), "bg");
   assert.equal(seen.searchParams.get("countryCode"), "BG");
 });
-test("openmeteo: нормализация — name, admin1, lat, lon", async () => {
+test("openmeteo: нормализация — name, admin1, admin2, lat, lon", async () => {
   const f = fakeFetch(() => okJson({ results: [
     { name: "Маноле", latitude: 42.18333, longitude: 24.93333, elevation: 151, admin1: "Пловдив", admin2: "Марица", country_code: "BG" },
   ] }));
   const r = await geocode({ q: "Маноле", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
-  assert.deepEqual(r, { results: [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }], provider: "openmeteo" });
+  assert.deepEqual(r, { results: [{ name: "Маноле", admin: "Пловдив", admin2: "Марица", lat: 42.183, lon: 24.933 }], provider: "openmeteo" });
+});
+test("openmeteo: без admin1/admin2 или с нестрингови -> празни низове", async () => {
+  const f = fakeFetch(() => okJson({ results: [
+    { name: "Х", latitude: 42, longitude: 24 },
+    { name: "У", latitude: 42, longitude: 24, admin1: 7, admin2: null },
+  ] }));
+  const r = await geocode({ q: "Х", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
+  assert.deepEqual(r.results, [
+    { name: "Х", admin: "", admin2: "", lat: 42, lon: 24 },
+    { name: "У", admin: "", admin2: "", lat: 42, lon: 24 },
+  ]);
 });
 test("openmeteo: без results -> празен списък", async () => {
   const r = await geocode({ q: "xyzzyqq", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: fakeFetch(() => okJson({ generationtime_ms: 0.1 })) });
@@ -44,17 +55,18 @@ test("google: заявката носи address, components=country:BG, language
   assert.equal(seen.searchParams.get("language"), "en");
   assert.equal(seen.searchParams.get("key"), "SECRET");
 });
-test("google: нормализация — locality и administrative_area_level_1", async () => {
+test("google: нормализация — locality, administrative_area_level_1 и _2", async () => {
   const f = fakeFetch(() => okJson({ status: "OK", results: [{
     formatted_address: "Manole, Bulgaria",
     geometry: { location: { lat: 42.18425, lng: 24.92936 } },
     address_components: [
       { long_name: "Manole", types: ["locality", "political"] },
       { long_name: "Plovdiv Province", types: ["administrative_area_level_1", "political"] },
+      { long_name: "Maritsa", types: ["administrative_area_level_2", "political"] },
       { long_name: "Bulgaria", types: ["country", "political"] },
     ] }] }));
   const r = await geocode({ q: "Manole", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
-  assert.deepEqual(r, { results: [{ name: "Manole", admin: "Plovdiv Province", lat: 42.184, lon: 24.929 }], provider: "google" });
+  assert.deepEqual(r, { results: [{ name: "Manole", admin: "Plovdiv Province", admin2: "Maritsa", lat: 42.184, lon: 24.929 }], provider: "google" });
 });
 test("google: без locality взима formatted_address до първата запетая", async () => {
   const f = fakeFetch(() => okJson({ status: "OK", results: [{ formatted_address: "Rhodope Mountains, Bulgaria",
@@ -139,7 +151,7 @@ test("openmeteo: невалиден елемент (null) в results се про
   const f = fakeFetch(() => okJson({ results: [null,
     { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" }] }));
   const r = await geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
-  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", admin2: "", lat: 42.183, lon: 24.933 }]);
 });
 test("openmeteo: резултат без latitude/longitude се пропуска", async () => {
   const f = fakeFetch(() => okJson({ results: [{ name: "Без координати", admin1: "X" }] }));
@@ -197,7 +209,7 @@ test("openmeteo: таванът е след филтъра — негоднит�
     { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" },
   ] }));
   const r = await geocode({ q: "Ма", lang: "bg", limit: 1, provider: "openmeteo", fetchImpl: f });
-  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", admin2: "", lat: 42.183, lon: 24.933 }]);
 });
 test("openmeteo: запис с координати извън ±90/±180 (999/999) се изхвърля", async () => {
   const f = fakeFetch(() => okJson({ results: [
@@ -217,7 +229,7 @@ test("openmeteo: запис без непразно име (липсва, пра
     { name: "Маноле", latitude: 42.18333, longitude: 24.93333, admin1: "Пловдив" },
   ] }));
   const r = await geocode({ q: "Ма", lang: "bg", limit: 5, provider: "openmeteo", fetchImpl: f });
-  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", lat: 42.183, lon: 24.933 }]);
+  assert.deepEqual(r.results, [{ name: "Маноле", admin: "Пловдив", admin2: "", lat: 42.183, lon: 24.933 }]);
 });
 test("google: запис с координати извън ±90/±180 се изхвърля", async () => {
   const f = fakeFetch(() => okJson({ status: "OK", results: [
@@ -225,7 +237,7 @@ test("google: запис с координати извън ±90/±180 се из
     { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] },
   ] }));
   const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
-  assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+  assert.deepEqual(r.results, [{ name: "Manole", admin: "", admin2: "", lat: 42.184, lon: 24.929 }]);
 });
 test("google: запис без locality и без formatted_address (празно име) се изхвърля", async () => {
   const f = fakeFetch(() => okJson({ status: "OK", results: [
@@ -234,7 +246,7 @@ test("google: запис без locality и без formatted_address (празн
     { formatted_address: "Manole, Bulgaria", geometry: { location: { lat: 42.18425, lng: 24.92936 } }, address_components: [] },
   ] }));
   const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
-  assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+  assert.deepEqual(r.results, [{ name: "Manole", admin: "", admin2: "", lat: 42.184, lon: 24.929 }]);
 });
 // Негоден запис се изхвърля сам, не проваля цялото търсене — дори когато е
 // извън първите `limit` валидни (таванът е след филтъра).
@@ -244,7 +256,7 @@ test("google: негоден запис (address_components: {}) след вал
     { formatted_address: "Broken, Bulgaria", geometry: { location: { lat: 42.1, lng: 24.1 } }, address_components: {} },
   ] }));
   const r = await geocode({ q: "Manole", lang: "en", limit: 1, provider: "google", googleKey: "k", fetchImpl: f });
-  assert.deepEqual(r.results, [{ name: "Manole", admin: "", lat: 42.184, lon: 24.929 }]);
+  assert.deepEqual(r.results, [{ name: "Manole", admin: "", admin2: "", lat: 42.184, lon: 24.929 }]);
 });
 test("google: негодни записи по отделно — components не масив, component без types масив, location не числа — само негодният отпада", async () => {
   const f = fakeFetch(() => okJson({ status: "OK", results: [
@@ -256,8 +268,8 @@ test("google: негодни записи по отделно — components н�
   ] }));
   const r = await geocode({ q: "x", lang: "en", limit: 5, provider: "google", googleKey: "k", fetchImpl: f });
   assert.deepEqual(r.results, [
-    { name: "Rhodope", admin: "Smolyan Province", lat: 41.7, lon: 24.7 },
-    { name: "Manole", admin: "", lat: 42.184, lon: 24.929 },
+    { name: "Rhodope", admin: "Smolyan Province", admin2: "", lat: 41.7, lon: 24.7 },
+    { name: "Manole", admin: "", admin2: "", lat: 42.184, lon: 24.929 },
   ]);
 });
 test("limit само от интервали -> подразбиращите се 5, не 1 (Number('  ') е 0)", async () => {
