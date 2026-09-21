@@ -280,7 +280,7 @@ one geocode request per pause in typing (250 ms) plus one frost request —
 ten people behind one NAT (an office, a mobile carrier) make 60–70 in 10 s,
 so 60 would have blocked them; 300 gives fivefold headroom and still stops
 a flood. Tune it on observed traffic and 429s. Verified with 400 parallel
-requests: ~300 × 200, ~100 × 429, 200 again after 10 s. The Free plan allows
+requests: 320 × 200, 80 × 429, 200 again after 12 s. The Free plan allows
 one such rule with a 10 s period. It is not code in the Worker — the Worker
 never sees the blocked requests.
 
