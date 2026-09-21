@@ -4,6 +4,29 @@
 
 ---
 
+## [Unreleased]
+
+### 🇧🇬 Български
+
+- **<https://frost.bg> е адресът** (21 септември 2026): домейнът е активен в
+  регистъра и закачен като custom domain на Worker-а; `workers.dev`
+  адресът остава включен, докато Garden Planner мине на `https://frost.bg`.
+- **Лимит на заявките към API-то**: 60 за 10 секунди от един IP по `/api/*`,
+  над това 429 за 10 секунди — правило в Cloudflare, не код (виж
+  `docs/bg/operations.md`).
+
+### 🇬🇧 English
+
+- **<https://frost.bg> is the address** (21 September 2026): the domain is
+  active at the registry and attached to the Worker as a custom domain; the
+  `workers.dev` address stays on until Garden Planner switches to
+  `https://frost.bg`.
+- **Request-rate limit on the API**: 60 per 10 seconds per IP on `/api/*`,
+  above that 429 for 10 seconds — a Cloudflare rule, not code (see
+  `docs/en/operations.md`).
+
+---
+
 ## [0.2.1] — 2026-09-20
 
 ### 🇧🇬 Български

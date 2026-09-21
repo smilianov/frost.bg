@@ -215,10 +215,13 @@ OpenStreetMap (`tile.openstreetmap.org`). Той е за **умерена упо
 ## Deploy
 
 Продукцията е един Worker `frost-bg` в Cloudflare акаунта на собственика.
-Първият deploy е от 20 септември 2026 (версия 0.2.0, истинската мрежа).
-Адресът засега е <https://frost-bg.frost-bg.workers.dev>; `frost.bg` се
-закача като custom domain, щом зоната стане active (виж „Какво още
-липсва“).
+Първият deploy е от 20 септември 2026 (версия 0.2.0, истинската мрежа);
+от 21 септември адресът е <https://frost.bg> (custom domain в
+`wrangler.toml`: `routes = [{ pattern = "frost.bg", custom_domain = true }]`
+— DNS записът и сертификатът се създават сами при deploy). Старият
+<https://frost-bg.frost-bg.workers.dev> е изрично оставен включен
+(`workers_dev = true`), докато Garden Planner мине на `https://frost.bg`;
+после става `workers_dev = false`, за да няма два адреса на един сайт.
 
 ### Достъпът
 
@@ -257,24 +260,21 @@ npm test && npx wrangler deploy   # само зелено дърво се кач
   `node` трябва да е пуснат към `api.cloudflare.com`). Симптомът е timeout,
   не отказ.
 
+### Лимитът на заявките
+
+Правило за rate limiting на ниво зона (Cloudflare → Security → WAF → Rate
+limiting rules; направено през API-то на 21 септември 2026 с token-а —
+`PUT /zones/{zone}/rulesets/phases/http_ratelimit/entrypoint`): пътища
+`/api/*`, **60 заявки за 10 секунди от един IP** (`ip.src` + `cf.colo.id`),
+над това — **429** за 10 секунди; страницата и статичните файлове не се
+броят. Проверено с 120 паралелни заявки: 60 × 200, 60 × 429, след 10 s пак
+200. Free планът позволява едно такова правило с период 10 s. Не е код в
+Worker-а — Worker-ът изобщо не вижда спрените заявки.
+
 ## Какво още липсва
 
-- **custom domain `frost.bg`** — чака зоната да стане active: при
-  регистратора nameservers трябва да са `maciej.ns.cloudflare.com` и
-  `ursula.ns.cloudflare.com` (зададени на 20 септември 2026; регистърът на
-  .bg ги публикува с часове закъснение). После в `wrangler.toml`, на
-  най-горното ниво (преди `[assets]`, не под `[vars]`):
-
-  ```toml
-  workers_dev = false
-  routes = [{ pattern = "frost.bg", custom_domain = true }]
-  ```
-
-  и нов deploy — `workers.dev` адресът се спира, за да няма два адреса на
-  един сайт;
-- **лимит на заявки към API-то** — правило в Cloudflare (WAF → Rate
-  limiting rules, на ниво зона, затова също след active), не код в
-  Worker-а;
+- **`workers_dev = false`** в `wrangler.toml` + deploy, щом Garden Planner
+  ползва `https://frost.bg` (виж „Deploy“);
 - по избор, само ако Google геокодирането се включва (`GEOCODER =
   "google"`): тайната `GOOGLE_KEY` в продукция —
   `npx wrangler secret put GOOGLE_KEY` (никога във `wrangler.toml`); без нея

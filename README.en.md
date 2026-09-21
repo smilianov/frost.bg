@@ -9,8 +9,8 @@ last spring and first autumn frost.
 The calculation is a copy from Garden Planner (`backend/app/frost_estimate.py`)
 — see [`grid/frost_estimate.py`](grid/frost_estimate.py).
 
-Live: <https://frost-bg.frost-bg.workers.dev> (until `frost.bg` is attached —
-see [`docs/en/operations.md`](docs/en/operations.md), "Deploy").
+Live: <https://frost.bg> (see [`docs/en/operations.md`](docs/en/operations.md),
+"Deploy").
 
 ## Running locally
 
