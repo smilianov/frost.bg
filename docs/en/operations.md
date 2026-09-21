@@ -272,11 +272,23 @@ npm test && npx wrangler deploy   # only a green tree gets deployed
 A zone-level rate limiting rule (Cloudflare → Security → WAF → Rate
 limiting rules; created through the API on 21 September 2026 with the token
 — `PUT /zones/{zone}/rulesets/phases/http_ratelimit/entrypoint`): paths
-`/api/*`, **60 requests per 10 seconds per IP** (`ip.src` + `cf.colo.id`),
-above that **429** for 10 seconds; the page and static files are not
-counted. Verified with 120 parallel requests: 60 × 200, 60 × 429, 200 again
-after 10 s. The Free plan allows one such rule with a 10 s period. It is not
-code in the Worker — the Worker never sees the blocked requests.
+`/api/*`, **300 requests per 10 seconds per IP** (the counter is per IP
+*and* per Cloudflare data centre — `ip.src` + `cf.colo.id`; the latter is
+mandatory for a rule created through the API), above that **429** for 10
+seconds; the page and static files are not counted. Why 300: the page makes
+one geocode request per pause in typing (250 ms) plus one frost request —
+ten people behind one NAT (an office, a mobile carrier) make 60–70 in 10 s,
+so 60 would have blocked them; 300 gives fivefold headroom and still stops
+a flood. Tune it on observed traffic and 429s. Verified with 400 parallel
+requests: ~300 × 200, ~100 × 429, 200 again after 10 s. The Free plan allows
+one such rule with a 10 s period. It is not code in the Worker — the Worker
+never sees the blocked requests.
+
+The rule protects traffic through **`frost.bg`**. The old
+`frost-bg.frost-bg.workers.dev` is outside the zone and outside the rule —
+while it is on (see above), requests straight to it are not counted. This
+is temporary: it goes away with `workers_dev = false` once Garden Planner
+switches to `https://frost.bg`.
 
 ## What's still missing
 
