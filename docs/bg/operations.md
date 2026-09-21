@@ -219,9 +219,9 @@ OpenStreetMap (`tile.openstreetmap.org`). Той е за **умерена упо
 от 21 септември адресът е <https://frost.bg> (custom domain в
 `wrangler.toml`: `routes = [{ pattern = "frost.bg", custom_domain = true }]`
 — DNS записът и сертификатът се създават сами при deploy). Старият
-<https://frost-bg.frost-bg.workers.dev> е изрично оставен включен
-(`workers_dev = true`), докато Garden Planner мине на `https://frost.bg`;
-после става `workers_dev = false`, за да няма два адреса на един сайт.
+`frost-bg.frost-bg.workers.dev` е спрян (`workers_dev = false`, 21 септември
+2026, след като Garden Planner 0.4.1 мина на `https://frost.bg`) — един
+сайт, един адрес.
 
 ### Достъпът
 
@@ -277,16 +277,17 @@ limiting rules; направено през API-то на 21 септември 
 позволява едно такова правило с период 10 s. Не е код в Worker-а —
 Worker-ът изобщо не вижда спрените заявки.
 
-Правилото пази трафика през **`frost.bg`**. Старият
-`frost-bg.frost-bg.workers.dev` е извън зоната и извън правилото — докато
-е включен (виж по-горе), заявки направо към него не се броят. Това е
-временно: спира се с `workers_dev = false`, щом Garden Planner мине на
-`https://frost.bg`.
+Правилото пази трафика през **`frost.bg`** — единствения адрес, откакто
+`workers.dev` е спрян.
+
+Browser Integrity Check на зоната е **изключен** (21 септември 2026): по
+подразбиране Cloudflare връща 403 (грешка 1010) на клиенти с „бот-подобен“
+User-Agent като `Python-urllib/3.12` или без User-Agent, а frost.bg е
+публично API и такива клиенти са нормални. Garden Planner праща
+`GardenPlanner/{версия}` и минаваше и преди.
 
 ## Какво още липсва
 
-- **`workers_dev = false`** в `wrangler.toml` + deploy, щом Garden Planner
-  ползва `https://frost.bg` (виж „Deploy“);
 - по избор, само ако Google геокодирането се включва (`GEOCODER =
   "google"`): тайната `GOOGLE_KEY` в продукция —
   `npx wrangler secret put GOOGLE_KEY` (никога във `wrangler.toml`); без нея
