@@ -223,10 +223,9 @@ account. The first deploy was on 20 September 2026 (version 0.2.0, the real
 grid); since 21 September the address is <https://frost.bg> (a custom
 domain in `wrangler.toml`: `routes = [{ pattern = "frost.bg", custom_domain
 = true }]` — the DNS record and the certificate are created on deploy). The
-old <https://frost-bg.frost-bg.workers.dev> is explicitly kept on
-(`workers_dev = true`) until Garden Planner switches to `https://frost.bg`;
-then it becomes `workers_dev = false` so one site does not have two
-addresses.
+old `frost-bg.frost-bg.workers.dev` is switched off (`workers_dev = false`,
+21 September 2026, after Garden Planner 0.4.1 moved to `https://frost.bg`)
+— one site, one address.
 
 ### Access
 
@@ -284,16 +283,17 @@ requests: 320 × 200, 80 × 429, 200 again after 12 s. The Free plan allows
 one such rule with a 10 s period. It is not code in the Worker — the Worker
 never sees the blocked requests.
 
-The rule protects traffic through **`frost.bg`**. The old
-`frost-bg.frost-bg.workers.dev` is outside the zone and outside the rule —
-while it is on (see above), requests straight to it are not counted. This
-is temporary: it goes away with `workers_dev = false` once Garden Planner
-switches to `https://frost.bg`.
+The rule protects traffic through **`frost.bg`** — the only address since
+`workers.dev` was switched off.
+
+The zone's Browser Integrity Check is **off** (21 September 2026): by
+default Cloudflare returns 403 (error 1010) to clients with a "bot-like"
+User-Agent such as `Python-urllib/3.12` or none at all, and frost.bg is a
+public API where such clients are normal. Garden Planner sends
+`GardenPlanner/{version}` and passed even before.
 
 ## What's still missing
 
-- **`workers_dev = false`** in `wrangler.toml` + a deploy once Garden
-  Planner uses `https://frost.bg` (see "Deploy");
 - optional, only if Google geocoding is enabled (`GEOCODER = "google"`):
   the `GOOGLE_KEY` secret in production —
   `npx wrangler secret put GOOGLE_KEY` (never in `wrangler.toml`); without
