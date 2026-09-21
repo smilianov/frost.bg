@@ -220,9 +220,13 @@ OSM-based provider.
 
 Production is a single Worker, `frost-bg`, in the owner's Cloudflare
 account. The first deploy was on 20 September 2026 (version 0.2.0, the real
-grid). For now the address is <https://frost-bg.frost-bg.workers.dev>;
-`frost.bg` gets attached as a custom domain once the zone is active (see
-"What's still missing").
+grid); since 21 September the address is <https://frost.bg> (a custom
+domain in `wrangler.toml`: `routes = [{ pattern = "frost.bg", custom_domain
+= true }]` — the DNS record and the certificate are created on deploy). The
+old <https://frost-bg.frost-bg.workers.dev> is explicitly kept on
+(`workers_dev = true`) until Garden Planner switches to `https://frost.bg`;
+then it becomes `workers_dev = false` so one site does not have two
+addresses.
 
 ### Access
 
@@ -263,24 +267,33 @@ npm test && npx wrangler deploy   # only a green tree gets deployed
   Little Snitch; `node` must be allowed to reach `api.cloudflare.com`). The
   symptom is a timeout, not a refusal.
 
+### The request-rate limit
+
+A zone-level rate limiting rule (Cloudflare → Security → WAF → Rate
+limiting rules; created through the API on 21 September 2026 with the token
+— `PUT /zones/{zone}/rulesets/phases/http_ratelimit/entrypoint`): paths
+`/api/*`, **300 requests per 10 seconds per IP** (the counter is per IP
+*and* per Cloudflare data centre — `ip.src` + `cf.colo.id`; the latter is
+mandatory for a rule created through the API), above that **429** for 10
+seconds; the page and static files are not counted. Why 300: the page makes
+one geocode request per pause in typing (250 ms) plus one frost request —
+ten people behind one NAT (an office, a mobile carrier) make 60–70 in 10 s,
+so 60 would have blocked them; 300 gives fivefold headroom and still stops
+a flood. Tune it on observed traffic and 429s. Verified with 400 parallel
+requests: 320 × 200, 80 × 429, 200 again after 12 s. The Free plan allows
+one such rule with a 10 s period. It is not code in the Worker — the Worker
+never sees the blocked requests.
+
+The rule protects traffic through **`frost.bg`**. The old
+`frost-bg.frost-bg.workers.dev` is outside the zone and outside the rule —
+while it is on (see above), requests straight to it are not counted. This
+is temporary: it goes away with `workers_dev = false` once Garden Planner
+switches to `https://frost.bg`.
+
 ## What's still missing
 
-- **the custom domain `frost.bg`** — waits for the zone to become active:
-  at the registrar the nameservers must be `maciej.ns.cloudflare.com` and
-  `ursula.ns.cloudflare.com` (set on 20 September 2026; the .bg registry
-  publishes them hours later). Then in `wrangler.toml`, at the top level
-  (before `[assets]`, not under `[vars]`):
-
-  ```toml
-  workers_dev = false
-  routes = [{ pattern = "frost.bg", custom_domain = true }]
-  ```
-
-  and a new deploy — the `workers.dev` address is switched off so one site
-  does not have two addresses;
-- **a request-rate limit on the API** — a Cloudflare rule (WAF → Rate
-  limiting rules, zone-level, hence also after active), not code in the
-  Worker;
+- **`workers_dev = false`** in `wrangler.toml` + a deploy once Garden
+  Planner uses `https://frost.bg` (see "Deploy");
 - optional, only if Google geocoding is enabled (`GEOCODER = "google"`):
   the `GOOGLE_KEY` secret in production —
   `npx wrangler secret put GOOGLE_KEY` (never in `wrangler.toml`); without

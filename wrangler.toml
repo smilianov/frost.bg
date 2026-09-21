@@ -2,6 +2,13 @@ name = "frost-bg"
 main = "worker/index.js"
 compatibility_date = "2026-09-01"
 
+# Публичният адрес. Custom domain-ът създава DNS записа и сертификата сам
+# (token-ът има Zone DNS Edit). Щом има routes, Wrangler спира workers.dev
+# по подразбиране — оставяме го изрично включен, докато Garden Planner мине
+# на https://frost.bg; после workers_dev = false.
+routes = [{ pattern = "frost.bg", custom_domain = true }]
+workers_dev = true
+
 [assets]
 directory = "./site"
 binding = "ASSETS"
