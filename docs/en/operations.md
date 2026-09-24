@@ -247,17 +247,26 @@ endpoint keeps its own, stricter safeguard:
   centre (colo)** — the Cache API isn't global — it doesn't stop requests
   originating at a different data centre elsewhere in the world. This is
   not a global pause of the Worker, but a wider, still per-data-centre,
-  safeguard.
+  safeguard. **And even for that centre — best effort, not a guarantee:**
+  the marker is written asynchronously (`ctx.waitUntil`, it doesn't delay
+  the response to the client) and the write to the Cache API itself carries
+  no guarantee; concurrent requests that land in the exact window before
+  the marker becomes visible can slip through and still ask the provider.
+  This is coordination that reduces upstream load, not a guaranteed pause
+  for the whole data centre.
 - **The `ELEVATION` switch** under `[vars]` in `wrangler.toml`: `"on"` by
   default, `"off"` disables the endpoint entirely (returns `404`) and the
   page's row. It is part of `/config`'s `rev` (`configRev()`, see "The key
   carries a revision" above) — flipping it reaches the edge immediately.
   `/api/v1/elevation` itself carries its own, separate `rev` (below) — in
   neither `cacheRev()` nor `configRev()`. **Honest about the browser:** the
-  edge stops new requests right away, but a browser that already has an
-  answer from `/config` or `/api/v1/elevation` (`max-age=300`) keeps
-  showing it for up to 5 minutes — the page's row disappears immediately
-  only after a hard reload, otherwise it waits out its 5 minutes.
+  edge stops new requests right away; requests made **after** the
+  browser's cached copies of `/config` and `/api/v1/elevation` expire (up
+  to 5 minutes, `max-age=300`) see the change. But an already **open**
+  page doesn't check this on its own — `/config` is read once, at load,
+  and nothing re-checks it afterward — so the page's row stays until the
+  page is reloaded (regular or hard); it does not disappear on its own
+  after those 5 minutes.
 - The endpoint accepts only points in Bulgaria — the same rule as `/frost`
   (`outside_bulgaria` on 400) — there is no way through this API to ask
   the provider about an arbitrary point anywhere in the world.

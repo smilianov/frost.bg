@@ -1,9 +1,10 @@
 import { T } from "./texts.js";
-import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW } from "./format.js";
+import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW, num, safeHttpUrl } from "./format.js";
 import { createMap } from "./map.js";
 import { renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
 import { historyView, inWindow, langSwitchQuery } from "./history.js";
 import { paintPairs } from "./paint.js";
+import { elevationView } from "./elevation.js";
 
 const lang = document.body.dataset.lang === "en" ? "en" : "bg";
 const t = T[lang];
@@ -56,18 +57,7 @@ function el(tag, attrs = {}) {
   return node;
 }
 function text(s) { return document.createTextNode(String(s)); }
-function num(x) {
-  if (x === null || x === undefined || x === "") return null; // Number(null)===0, Number("")===0 — не бива да минават за истински 0
-  const n = Number(x);
-  return Number.isFinite(n) ? n : null;
-}
-function safeHttpUrl(u) {
-  if (typeof u !== "string" || !u) return null;
-  try {
-    const parsed = new URL(u);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
-  } catch (_) { return null; }
-}
+// num()/safeHttpUrl() живеят в format.js (тествани там, без DOM) — тук само внесени.
 
 // dd-тата на last_spring/first_autumn носят id-та, за да могат paintPairs()
 // да ги пренапише при смяна на прозореца, без да строи картите наново.
@@ -112,10 +102,15 @@ function render(d) {
     class: "cell",
     text: `${t.cell}: ${cellLat ?? "—"}, ${cellLon ?? "—"} · ${t.elev} ${elevM ?? "—"} m · ${t.distance} ${km} ${t.km}`,
   });
-  // Задача 7: празен, скрит слот — fetchElevation() го попълва после, ако и
-  // само ако височината на точката пристигне успешно (никога предварително).
+  // Задача 7: празни, скрити слотове — fetchElevation() ги попълва после,
+  // ако и само ако височината на точката пристигне успешно (никога
+  // предварително). #elev-source носи посочването (Open-Meteo/Copernicus) —
+  // изисквано от лиценза им, точно както #src по-долу за мрежата на /frost;
+  // не зависи от geocoder/MAP конфигурацията.
   const elevNoteP = el("p", { id: "elev-note", class: "hint" });
   elevNoteP.hidden = true;
+  const elevSrcP = el("p", { id: "elev-source", class: "src" });
+  elevSrcP.hidden = true;
 
   const noteP = el("p", { class: "note" });
   noteP.append(el("strong", { text: `${t.note_title}:` }), text(` ${d?.note?.[lang] ?? ""}`));
@@ -134,7 +129,7 @@ function render(d) {
       : text(t.api),
   );
 
-  $("result").replaceChildren(pairs, pairsNote, cellP, elevNoteP, noteP, srcP);
+  $("result").replaceChildren(pairs, pairsNote, cellP, elevNoteP, elevSrcP, noteP, srcP);
   $("result").hidden = false;
   $("synthetic").hidden = !d?.synthetic;
   if (qLat !== null) $("lat").value = qLat;
@@ -292,8 +287,10 @@ window.addEventListener("afterprint", () => { $("table-wrap").open = tableWasOpe
 // реда на клетката СЛЕД резултата за сланата — никога не го чака. Носи
 // собствения mySeq на заявката (Ф7): забавен или негоден отговор от по-стар
 // lookup() не бива да пипа DOM-а на по-новия. Грешка или elevation_m===null
-// -> редът просто липсва (num() вече връща null и за двете); никога 0,
-// никога височината на клетката вместо нея.
+// -> elevationView() връща null, редът просто липсва; никога 0, никога
+// височината на клетката вместо нея. Посочването (#elev-source) идва
+// заедно с реда — не се показва самичка стойност без нейния източник
+// (лицензите на Open-Meteo/Copernicus го изискват, review fix wave).
 async function fetchElevation(mySeq, lat, lon) {
   let r;
   try { r = await fetch(`/api/v1/elevation?lat=${lat}&lon=${lon}`); }
@@ -303,12 +300,19 @@ async function fetchElevation(mySeq, lat, lon) {
   try { body = await r.json(); }
   catch (_) { return; }
   if (mySeq !== lookupSeq) return;
-  const m = num(body?.elevation_m);
-  if (m === null) return;
+  const view = elevationView(body, { lang, t });
+  if (!view) return;
   const cell = $("cell");
-  if (cell) cell.append(text(` · ${t.point_elev(m)}`));
+  if (cell) cell.append(text(` · ${view.pointElevText}`));
   const note = $("elev-note");
-  if (note) { note.textContent = t.elev_note; note.hidden = false; }
+  if (note) { note.textContent = view.elevNoteText; note.hidden = false; }
+  const src = $("elev-source");
+  if (src) {
+    src.replaceChildren(text(`${t.source}: `));
+    src.append(view.sourceUrl ? el("a", { href: view.sourceUrl, rel: "noopener", text: view.sourceText }) : text(view.sourceText));
+    if (view.sourceAttribution) src.append(text(` · ${view.sourceAttribution}`));
+    src.hidden = false;
+  }
 }
 
 // Всяко ново търсене/lookup обезсилва предишните недовършени — забавен

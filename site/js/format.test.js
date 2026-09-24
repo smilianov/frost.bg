@@ -1,6 +1,30 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow } from "./format.js";
+import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, num, safeHttpUrl } from "./format.js";
+
+test("num: null/undefined/празен низ -> null, не 0 (Number(null)===0 не бива да минава)", () => {
+  assert.equal(num(null), null); assert.equal(num(undefined), null); assert.equal(num(""), null);
+});
+test("num: 0 е истинска стойност, не липсваща", () => {
+  assert.equal(num(0), 0); assert.equal(num("0"), 0);
+});
+test("num: негодно -> null", () => {
+  assert.equal(num("abc"), null); assert.equal(num(NaN), null); assert.equal(num(Infinity), null);
+});
+test("num: низ с число се парсва", () => {
+  assert.equal(num("152"), 152); assert.equal(num(-3.2), -3.2);
+});
+
+test("safeHttpUrl: http/https минават непроменени по protocol+href", () => {
+  assert.equal(safeHttpUrl("https://open-meteo.com/en/docs/elevation-api"), "https://open-meteo.com/en/docs/elevation-api");
+  assert.equal(safeHttpUrl("http://example.com/"), "http://example.com/");
+});
+test("safeHttpUrl: javascript:/data: и невалидни низове -> null", () => {
+  assert.equal(safeHttpUrl("javascript:alert(1)"), null);
+  assert.equal(safeHttpUrl("data:text/html,<script>1</script>"), null);
+  assert.equal(safeHttpUrl(""), null); assert.equal(safeHttpUrl(null), null); assert.equal(safeHttpUrl(undefined), null);
+  assert.equal(safeHttpUrl("не е url"), null);
+});
 
 test("formatMMDD bg", () => {
   assert.equal(formatMMDD("03-27", "bg"), "27 март");
