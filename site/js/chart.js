@@ -42,12 +42,22 @@ const svgEl = (tag, attrs = {}) => {
 
 const W = 720, H = 260, PAD_L = 44, PAD_R = 12, PAD_T = 12, PAD_B = 28;
 
-export function renderChart(model, { lang, title }) {
+// Един локализиран текст за точка — година, сезон, дата — ползва се и за
+// aria-label, и за <title>, за да не се разминават (Ф5: „Tooltip казва
+// година, сезон и дата“).
+function pointLabel(p, lang, t) {
+  const seasonWord = p.season === "spring" ? t.spring_word : t.autumn_word;
+  return `${p.year} · ${seasonWord} · ${formatMMDD(p.mmdd, lang)}`;
+}
+
+export function renderChart(model, { lang, title, t }) {
   const svg = svgEl("svg", {
     viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
     "aria-label": title, preserveAspectRatio: "xMidYMid meet",
   });
-  svg.append(svgEl("title")).lastChild.textContent = title;
+  const svgTitle = svgEl("title");
+  svgTitle.textContent = title;
+  svg.append(svgTitle);
   const years = Math.max(1, model.years.to - model.years.from);
   const x = (year) => PAD_L + ((year - model.years.from) / years) * (W - PAD_L - PAD_R);
   const y = (day) => PAD_T + ((day - 1) / 364) * (H - PAD_T - PAD_B);
@@ -69,18 +79,23 @@ export function renderChart(model, { lang, title }) {
     const node = p.season === "spring"
       ? svgEl("circle", { cx, cy, r: 4, class: "pt spring" })
       : svgEl("rect", { x: cx - 3.5, y: cy - 3.5, width: 7, height: 7, class: "pt autumn", transform: `rotate(45 ${cx} ${cy})` });
+    const label = pointLabel(p, lang, t);
     node.setAttribute("tabindex", "0");
     node.setAttribute("role", "img");
-    node.setAttribute("aria-label", `${p.year}: ${formatMMDD(p.mmdd, lang)}`);
-    node.append(svgEl("title")).lastChild.textContent = `${p.year}: ${formatMMDD(p.mmdd, lang)}`;
+    node.setAttribute("aria-label", label);
+    const pointTitle = svgEl("title");
+    pointTitle.textContent = label;
+    node.append(pointTitle);
     svg.append(node);
   }
   return svg;
 }
 
 // Видимата таблица — не „алтернатива за четци“, а самите данни: и с пръст,
-// и с клавиатура, и при печат.
-export function renderTable(rows, { lang, t }) {
+// и с клавиатура, и при печат. Всяка година от прозореца има ред, дори тази,
+// за която мрежата няма запис (Ф5: липсваща година е различна от липсваща
+// сезонна дата — "няма достатъчно данни" срещу "няма записана слана").
+export function renderTable(rows, { lang, t, from, to }) {
   const table = document.createElement("table");
   table.className = "years";
   const caption = document.createElement("caption");
@@ -95,16 +110,18 @@ export function renderTable(rows, { lang, t }) {
   }
   const thead = document.createElement("thead");
   thead.append(head);
+  const byYear = new Map((Array.isArray(rows) ? rows : []).map((r) => [r[0], r]));
   const tbody = document.createElement("tbody");
-  for (const r of rows) {
+  for (let year = from; year <= to; year++) {
+    const r = byYear.get(year);
     const tr = document.createElement("tr");
     const th = document.createElement("th");
     th.scope = "row";
-    th.textContent = String(r[0]);
+    th.textContent = String(year);
     tr.append(th);
     for (const i of [1, 2]) {
       const td = document.createElement("td");
-      td.textContent = r[i] ? formatMMDD(r[i], lang) : t.no_frost_recorded;
+      td.textContent = r ? (r[i] ? formatMMDD(r[i], lang) : t.no_frost_recorded) : t.no_data_year;
       tr.append(td);
     }
     tbody.append(tr);
