@@ -94,7 +94,7 @@ function render(d) {
   // подразбиращо се съдържание на калкулатора за риск (виж paintPairs).
   safeCard.append(el("p", { id: "safe-means", class: "hint" }));
 
-  const pairs = el("div", { class: "pairs" });
+  const pairs = el("div", { id: "pairs", class: "pairs" });
   pairs.append(
     pairCard(t.typical, t.typical_hint, "", "", false, { spring: "typical-spring", autumn: "typical-autumn" }),
     safeCard,
@@ -168,15 +168,19 @@ function markSelection(nodes, yearOf, chart) {
   nodes.forEach((node, i) => { if (!inWindow(yearOf(i), w)) node.classList.add("out-of-window"); });
 }
 
+// Ф2/преглед кръг 4: клетка без нито един ред няма view.pairs изобщо — за
+// нея картите за типична/сигурна дата не се строят, обяснението стои само.
 function paintPairs(view) {
-  const shown = view.visible && !view.empty ? view.pairs : null;
-  $("typical-spring").textContent = shown ? shown.typicalSpring : "—";
-  $("typical-autumn").textContent = shown ? shown.typicalAutumn : "—";
-  $("safe-spring").textContent = shown ? shown.safeSpring : "—";
-  $("safe-autumn").textContent = shown ? shown.safeAutumn : "—";
-  $("pairs-note").textContent = shown?.tooFewYearsMessage || "";
+  const shown = view.pairs; // undefined и когато !visible, и когато empty
+  $("pairs").hidden = !shown;
   $("pairs-note").hidden = !shown?.tooFewYears;
-  $("safe-means").textContent = view.visible && !view.empty ? view.safeMeans : "";
+  if (!shown) return;
+  $("typical-spring").textContent = shown.typicalSpring;
+  $("typical-autumn").textContent = shown.typicalAutumn;
+  $("safe-spring").textContent = shown.safeSpring;
+  $("safe-autumn").textContent = shown.safeAutumn;
+  $("pairs-note").textContent = shown.tooFewYearsMessage || "";
+  $("safe-means").textContent = view.safeMeans;
 }
 
 // Ф2: "клетка без нито един ред" показва секцията с обяснение (не я крие);

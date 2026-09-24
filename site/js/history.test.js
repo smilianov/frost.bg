@@ -112,6 +112,20 @@ test("historyView: клетка без нито един ред (years: []) -> �
   assert.equal(view.message, T.bg.no_history);
 });
 
+// Преглед кръг 4, J: клетка без нито един ред не строи празни карти с тирета
+// — view.pairs изобщо липсва, обяснението стои само (app.js крие #pairs по
+// липсата на полето, не по отделен флаг — виж paintPairs).
+test("historyView: клетка без нито един ред -> view.pairs липсва (не се строят празни карти с тирета)", () => {
+  const empty = historyView({
+    data: { years: [], period: { start: 1996, end: 2025 }, cell: { lat: 42, lon: 25 } },
+    window: 30, lang: "bg", t: T.bg, riskInput: null,
+  });
+  assert.equal(empty.pairs, undefined);
+
+  const noPeriod = historyView({ data: { years: [[2020, "04-01", "10-01"]], period: {} }, window: 30, lang: "bg", t: T.bg, riskInput: null });
+  assert.equal(noPeriod.pairs, undefined);
+});
+
 test("historyView: редовете ги има, но никъде не е записана слана -> различно съобщение от \"няма данни\"", () => {
   const rows = makeYears(1996, 2025, null, null);
   const view = historyView({
@@ -134,6 +148,18 @@ test("historyView: под 10 години със записана слана -> 
   assert.equal(view.pairs.tooFewYears, true);
   assert.equal(view.pairs.tooFewYearsMessage, T.bg.too_few_years);
   assert.equal(view.pairs.typicalSpring, "—");
+});
+
+// Полир: "най-къс: години: 2020" повтаряше етикета — една фраза на година.
+test("historyView: сезонният ред не удвоява \"години:\" пред годините на най-късия/най-дългия сезон", () => {
+  const rows = makeYears(1996, 2025, "04-01", "10-01");
+  const view = historyView({
+    data: { years: rows, period: { start: 1996, end: 2025 }, cell: { lat: 42, lon: 25 } },
+    window: 30, lang: "bg", t: T.bg, riskInput: null,
+  });
+  assert.ok(!view.season.includes("години:"), view.season); // "години:" вече не се появява изобщо
+  assert.match(view.season, /най-къс: \d{4}/);
+  assert.match(view.season, /най-дълъг: \d{4}/);
 });
 
 // Тестът трябва да провери каквото app.js реално консумира — chart.model

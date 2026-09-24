@@ -120,10 +120,12 @@ export function historyView({ data, window, lang, t, riskInput, explicitRisk }) 
     ));
   }
 
+  // Преглед/полир: "най-къс: години: 2020" повтаряше етикета — една фраза
+  // на година, без отделен "години:" отпред.
   const seasonText = !seasonData ? t.no_history : [
     t.season_summary(seasonData.typical, seasonData.shortest.days, seasonData.longest.days),
-    `${t.season_shortest_label} ${t.season_years(seasonData.shortest.years)}`,
-    `${t.season_longest_label} ${t.season_years(seasonData.longest.years)}`,
+    t.season_shortest_years(seasonData.shortest.years),
+    t.season_longest_years(seasonData.longest.years),
     ...(seasonData.clipped > 0 ? [t.season_clipped] : []),
   ].join(" · ");
 

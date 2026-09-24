@@ -174,7 +174,7 @@ button {
   cursor: pointer;
 }
 
-#go, #locate {
+#go, #locate, #csv {
   padding: 9px 16px;
   border-radius: 8px;
   border: 1px solid var(--accent);
@@ -288,17 +288,25 @@ button {
 
 .compare { margin: 8px 0; }
 
-.chart-wrap { margin: 12px 0; }
+/* Графиката е inline SVG с фиксиран viewBox (720×260) — CSS font-size вътре
+   е в нейните собствени "user units" и се смалява заедно с целия SVG, щом
+   рендираната ширина падне под viewBox-а (320 CSS пиксела вместо ~700 прави
+   9px четимия текст на тиковете ~4px). За да "оцелее" текстът, графиката не
+   се смалява под min-width — вместо това превърта хоризонтално вътре в
+   собствената си рамка (.chart-wrap), както таблицата (#table-slot) вече
+   прави; страницата като цяло не прелива на 320 пиксела.
+   Месечните етикети (x=4) стоят на левия ръб и си остават видими веднага. */
+.chart-wrap { margin: 12px 0; overflow-x: auto; }
 
 .chart {
   display: block;
   width: 100%;
+  min-width: 640px;
   height: auto;
-  max-width: 100%;
 }
 
 .chart .grid { stroke: var(--line); stroke-width: 1; }
-.chart .tick { fill: var(--ink); font-size: 9px; opacity: 0.75; }
+.chart .tick { fill: var(--ink); font-size: 11px; opacity: 0.75; }
 
 /* Двата реда се различават и по форма (кръг/ромб в chart.js), и по цвят тук. */
 .chart .pt.spring { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
@@ -306,7 +314,9 @@ button {
 .chart .pt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Ф5: графиката/таблицата пазят пълния обхват; избраният прозорец само се
-   откроява — извън него точките/редовете само избледняват, не изчезват. */
+   откроява — извън него точките/редовете само избледняват, не изчезват.
+   В тъмна тема нисък alpha на тъмен фон изчезва съвсем — прегледът в
+   @media (prefers-color-scheme: dark) по-долу вдига пода, без анимация. */
 .chart .pt.out-of-window { opacity: 0.35; }
 .years tr.out-of-window { opacity: 0.6; }
 
@@ -356,6 +366,18 @@ button {
 }
 
 .risk-result { margin-top: 8px; }
+
+/* Преглед, кръг 3: #risk-result получава фокуса програмно след изрично
+   "Сметни" (tabindex="-1" — не е в Tab реда, мишка не го фокусира сама).
+   :focus-visible не улавя скриптово .focus(), затова тук е обикновен
+   :focus — безопасно точно защото елементът не е достижим по друг начин. */
+#risk-result:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (prefers-color-scheme: dark) {
+  /* На тъмен фон нисък alpha изчезва напълно — открояването пада, но
+     точките извън прозореца трябва да останат видими (Ф5). Без анимация. */
+  .chart .pt.out-of-window { opacity: 0.65; }
+}
 
 @media print {
   .chart-wrap, .years { background: #fff; color: #000; }
