@@ -1,7 +1,7 @@
 import { T } from "./texts.js";
 import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW, num, safeHttpUrl } from "./format.js";
 import { createMap } from "./map.js";
-import { renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
+import { renderChart, renderChartAxis, renderTable, selectYear, yearReadoutText } from "./chart.js";
 import { historyView, inWindow, langSwitchQuery } from "./history.js";
 import { paintPairs } from "./paint.js";
 import { elevationView } from "./elevation.js";
@@ -193,8 +193,15 @@ function paintHistory(view) {
   // (нова SVG, ново затваряне вътре в renderChart, старият избор не важи).
   $("chart-readout").textContent = "";
   if (view.chart.message) {
+    // Няма графика -> няма и с какво да съвпадне неподвижната ос до нея.
+    $("chart-axis").replaceChildren();
     $("chart").replaceChildren(el("p", { class: "hint", text: view.chart.message }));
   } else {
+    // Полиране: месечната скала е неподвижна колона до превъртащия се SVG
+    // (renderChartAxis, chart.js) — не изчезва при скрол надясно. Общата
+    // viewBox височина и dayY() (chart.js) я държат подравнена ред по ред
+    // с плота; app.css (.chart-row) ги изравнява по височина без JS.
+    $("chart-axis").replaceChildren(renderChartAxis());
     const svg = renderChart(view.chart.model, {
       lang, title: view.chart.title, t,
       // Ф5: "избор на година... Tooltip казва година, сезон и дата" — видимо
