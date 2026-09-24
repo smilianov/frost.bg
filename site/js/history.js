@@ -122,7 +122,13 @@ export function historyView({ data, window, lang, t, riskInput, explicitRisk }) 
 
   // Преглед/полир: "най-къс: години: 2020" повтаряше етикета — една фраза
   // на година, без отделен "години:" отпред.
-  const seasonText = !seasonData ? t.no_history : [
+  //
+  // Преглед (последна вълна): "няма данни за тази клетка" (t.no_history) е
+  // вярно само когато цялата клетка е без ред (клонът по-горе). Ред извън
+  // избрания прозорец дава w.rows == [] тук, но клетката НЕ е без данни —
+  // графиката/таблицата/CSV-то (от `full`) си ги показват; текстът трябва
+  // да казва точно това: празен е избраният период, не клетката.
+  const seasonText = !seasonData ? t.no_data_in_window : [
     t.season_summary(seasonData.typical, seasonData.shortest.days, seasonData.longest.days),
     t.season_shortest_years(seasonData.shortest.years),
     t.season_longest_years(seasonData.longest.years),

@@ -50,16 +50,40 @@ function pointLabel(p, lang, t) {
   return `${p.year} · ${seasonWord} · ${formatMMDD(p.mmdd, lang)}`;
 }
 
-export function renderChart(model, { lang, title, t }) {
+// Преглед: изборът на година — чист израз на (model, year), без DOM. Връща
+// точките на тази година (или null за сезон без записана слана/без ред —
+// графиката не разграничава двете, за разлика от таблицата, която има
+// суровите редове). Ползва се и от renderChart (клавиатура/клик), и от
+// извикващия (app.js) за видимия readout — едно и също изчисление.
+export function selectYear(model, year) {
+  const spring = model.points.find((p) => p.year === year && p.season === "spring") ?? null;
+  const autumn = model.points.find((p) => p.year === year && p.season === "autumn") ?? null;
+  return { year, spring, autumn };
+}
+
+// Текстът на readout-а — видимо (app.js го пише в #chart-readout) и обявено
+// (app.js го праща и на #status, едно и също изречение, никаква втора live
+// област). t.no_frost_recorded покрива и "няма ред" и "ред без тази
+// сезонна дата" — графиката не разграничава двете (виж бележката горе);
+// таблицата под нея пази пълната разлика.
+export function yearReadoutText(readout, lang, t) {
+  const springText = readout.spring ? formatMMDD(readout.spring.mmdd, lang) : t.no_frost_recorded;
+  const autumnText = readout.autumn ? formatMMDD(readout.autumn.mmdd, lang) : t.no_frost_recorded;
+  return `${readout.year} · ${t.spring_word}: ${springText} · ${t.autumn_word}: ${autumnText}`;
+}
+
+export function renderChart(model, { lang, title, t, onSelectYear }) {
   const svg = svgEl("svg", {
-    viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img",
-    "aria-label": title, preserveAspectRatio: "xMidYMid meet",
+    viewBox: `0 0 ${W} ${H}`, class: "chart",
+    role: "application", tabindex: "0",
+    "aria-label": `${title} — ${t.chart_nav_hint}`,
+    preserveAspectRatio: "xMidYMid meet",
   });
   const svgTitle = svgEl("title");
   svgTitle.textContent = title;
   svg.append(svgTitle);
-  const years = Math.max(1, model.years.to - model.years.from);
-  const x = (year) => PAD_L + ((year - model.years.from) / years) * (W - PAD_L - PAD_R);
+  const yearsSpan = Math.max(1, model.years.to - model.years.from);
+  const x = (year) => PAD_L + ((year - model.years.from) / yearsSpan) * (W - PAD_L - PAD_R);
   const y = (day) => PAD_T + ((day - 1) / 364) * (H - PAD_T - PAD_B);
 
   for (const m of model.months) {
@@ -70,24 +94,90 @@ export function renderChart(model, { lang, title, t }) {
     svg.append(label);
   }
   for (const year of [model.years.from, model.years.to]) {
-    const t = svgEl("text", { x: x(year), y: H - 8, class: "tick", "text-anchor": year === model.years.from ? "start" : "end" });
-    t.textContent = String(year);
-    svg.append(t);
+    const edgeLabel = svgEl("text", { x: x(year), y: H - 8, class: "tick", "text-anchor": year === model.years.from ? "start" : "end" });
+    edgeLabel.textContent = String(year);
+    svg.append(edgeLabel);
   }
+
+  // Преглед (Ф5): "не 60 невидими мишени в тесен екран" — вместо да разчита
+  // само на 4px точки, цялата колона на всяка година е кликваема/допираема,
+  // дори когато годината няма нито една точка (година без данни може пак да
+  // се избере — readout-ът ще каже, че няма записана слана). Рисуват се
+  // ПРЕДИ точките, за да останат точките отгоре (и си остават кликваеми
+  // поотделно).
+  let selected = null;
+  const pointEntries = [];
+  const bandWidth = (W - PAD_L - PAD_R) / yearsSpan;
+  const cursor = svgEl("line", { x1: -1000, x2: -1000, y1: PAD_T, y2: H - PAD_B, class: "year-cursor", visibility: "hidden" });
+
+  // classList.toggle, не презаписване на целия "class" низ — app.js слага
+  // отделно "out-of-window" на същите възли (markSelection); презаписването
+  // би го изтрило мълчаливо при всяка смяна на избраната година.
+  function paintSelection() {
+    for (const entry of pointEntries) {
+      entry.node.classList.toggle("year-selected", entry.year === selected);
+    }
+    if (selected === null) {
+      cursor.setAttribute("visibility", "hidden");
+    } else {
+      const cx = x(selected);
+      cursor.setAttribute("x1", cx); cursor.setAttribute("x2", cx);
+      cursor.setAttribute("visibility", "visible");
+    }
+  }
+  function selectYearAndNotify(year) {
+    selected = year === null ? null : Math.max(model.years.from, Math.min(model.years.to, year));
+    paintSelection();
+    if (onSelectYear) onSelectYear(selected);
+  }
+
+  for (let year = model.years.from; year <= model.years.to; year++) {
+    const band = svgEl("rect", {
+      x: x(year) - bandWidth / 2, y: PAD_T, width: bandWidth, height: H - PAD_T - PAD_B,
+      class: "year-band", fill: "transparent",
+    });
+    band.addEventListener("click", () => selectYearAndNotify(year));
+    svg.append(band);
+  }
+
   for (const p of model.points) {
     const cx = x(p.year), cy = y(p.day);
+    const baseClass = p.season === "spring" ? "pt spring" : "pt autumn";
     const node = p.season === "spring"
-      ? svgEl("circle", { cx, cy, r: 4, class: "pt spring" })
-      : svgEl("rect", { x: cx - 3.5, y: cy - 3.5, width: 7, height: 7, class: "pt autumn", transform: `rotate(45 ${cx} ${cy})` });
+      ? svgEl("circle", { cx, cy, r: 4, class: baseClass })
+      : svgEl("rect", { x: cx - 3.5, y: cy - 3.5, width: 7, height: 7, class: baseClass, transform: `rotate(45 ${cx} ${cy})` });
     const label = pointLabel(p, lang, t);
-    node.setAttribute("tabindex", "0");
+    // Ф5: „запазват имената си“ — aria-label/<title> остават на точката;
+    // само индивидуалният tabindex пада (не е повече отделна tab спирка —
+    // цялата графика е една, виж svg по-горе).
     node.setAttribute("role", "img");
     node.setAttribute("aria-label", label);
     const pointTitle = svgEl("title");
     pointTitle.textContent = label;
     node.append(pointTitle);
+    node.addEventListener("click", () => selectYearAndNotify(p.year));
     svg.append(node);
+    pointEntries.push({ node, year: p.year });
   }
+
+  svg.append(cursor);
+
+  // Клавиатура: ← / → крачка с една година, Home/End до края на обхвата,
+  // Escape изчиства. Графиката е една tab спирка (tabindex по-горе) —
+  // никаква анимация; #status (app.js) обявява резултата, не втора live
+  // област тук.
+  svg.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { selectYearAndNotify(null); return; }
+    let year;
+    if (e.key === "ArrowRight") year = (selected ?? model.years.from - 1) + 1;
+    else if (e.key === "ArrowLeft") year = (selected ?? model.years.to + 1) - 1;
+    else if (e.key === "Home") year = model.years.from;
+    else if (e.key === "End") year = model.years.to;
+    else return;
+    e.preventDefault?.();
+    selectYearAndNotify(year);
+  });
+
   return svg;
 }
 

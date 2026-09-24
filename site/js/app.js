@@ -1,7 +1,7 @@
 import { T } from "./texts.js";
 import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW } from "./format.js";
 import { createMap } from "./map.js";
-import { renderChart, renderTable } from "./chart.js";
+import { renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
 import { historyView, inWindow, langSwitchQuery } from "./history.js";
 import { paintPairs } from "./paint.js";
 
@@ -185,10 +185,23 @@ function paintHistory(view) {
   $("compare").textContent = view.compare;
   $("season").textContent = view.season;
 
+  // Всяка нова графика тръгва без избрана година — readout-ът се изчиства
+  // (нова SVG, ново затваряне вътре в renderChart, старият избор не важи).
+  $("chart-readout").textContent = "";
   if (view.chart.message) {
     $("chart").replaceChildren(el("p", { class: "hint", text: view.chart.message }));
   } else {
-    const svg = renderChart(view.chart.model, { lang, title: view.chart.title, t });
+    const svg = renderChart(view.chart.model, {
+      lang, title: view.chart.title, t,
+      // Ф5: "избор на година... Tooltip казва година, сезон и дата" — видимо
+      // в #chart-readout И обявено политично през #status (единствената
+      // live област; никаква втора тук).
+      onSelectYear: (year) => {
+        const text = year === null ? "" : yearReadoutText(selectYear(view.chart.model, year), lang, t);
+        $("chart-readout").textContent = text;
+        $("status").textContent = text;
+      },
+    });
     markSelection(svg.querySelectorAll(".pt"), (i) => view.chart.model.points[i].year, view.chart);
     $("chart").replaceChildren(svg);
   }

@@ -51,9 +51,11 @@ export const T = {
     table_caption: "Последна пролетна и първа есенна слана по години",
     year: "Година", no_frost_recorded: "няма записана слана",
     chart_title: (lat, lon, from, to) => `История на клетката ${lat}, ${lon} по ERA5-Land, ${from}–${to}, праг 0 °C`,
+    chart_nav_hint: "стрелки — преглед по година, Home/End — първата/последната, Escape — изчистване",
     csv_download: "Свали CSV",
     no_history: "За тази клетка няма години с данни.",
     no_frost_any: "В наличните данни за тази клетка не е записана слана — нито напролет, нито наесен.",
+    no_data_in_window: "Няма години с данни в избрания период — по-широк прозорец може да има.",
     // за chart.js: renderChart/renderTable (не са в списъка от sdd-документа)
     spring_word: "пролетна", autumn_word: "есенна",
     no_data_year: "няма достатъчно данни",
@@ -112,9 +114,11 @@ export const T = {
     table_caption: "Last spring and first autumn frost by year",
     year: "Year", no_frost_recorded: "no frost recorded",
     chart_title: (lat, lon, from, to) => `History of cell ${lat}, ${lon} from ERA5-Land, ${from}–${to}, 0 °C threshold`,
+    chart_nav_hint: "arrow keys browse by year, Home/End for first/last, Escape clears",
     csv_download: "Download CSV",
     no_history: "No years with data for this cell.",
     no_frost_any: "No frost was recorded in the available data for this cell — neither in spring nor in autumn.",
+    no_data_in_window: "No years with data in the selected period — a wider window might have some.",
     // for chart.js: renderChart/renderTable (not in the sdd document's list)
     spring_word: "spring", autumn_word: "autumn",
     no_data_year: "not enough data",

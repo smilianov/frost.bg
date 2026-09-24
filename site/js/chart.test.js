@@ -3,7 +3,7 @@
 // (без DOM библиотека) стига да хване хвърлящ бъг и грешна структура тук.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chartModel, toCsv, renderChart, renderTable } from "./chart.js";
+import { chartModel, toCsv, renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
 
 const rows = [[2023, "04-01", "10-01"], [2024, null, "10-05"], [2025, "03-20", null]];
 
@@ -36,6 +36,34 @@ test("chartModel: етикетите на месеците са на истин�
   assert.deepEqual(m.months[11], { day: 335, label: 12 });
 });
 
+// Преглед: selectYear() е решението зад readout-а на графиката (Ф5:
+// "избор на година... Tooltip казва година, сезон и дата") — чист израз на
+// (model, year), тества се директно, без DOM.
+test("selectYear: връща точките на годината, или null за сезон без точка", () => {
+  const m = chartModel(rows, { from: 2023, to: 2025 });
+  assert.deepEqual(selectYear(m, 2023), {
+    year: 2023,
+    spring: { year: 2023, day: 91, season: "spring", mmdd: "04-01" },
+    autumn: { year: 2023, day: 274, season: "autumn", mmdd: "10-01" },
+  });
+  assert.equal(selectYear(m, 2024).spring, null, "2024 няма пролетна дата");
+  assert.equal(selectYear(m, 2024).autumn.mmdd, "10-05");
+  assert.equal(selectYear(m, 2025).autumn, null, "2025 няма есенна дата");
+});
+
+test("selectYear: година без нито една точка -> и двата сезона null (не хвърля)", () => {
+  const m = chartModel(rows, { from: 2023, to: 2025 });
+  assert.deepEqual(selectYear(m, 2026), { year: 2026, spring: null, autumn: null });
+});
+
+test("yearReadoutText: годината и двата сезона, с t.no_frost_recorded за липсваща сезонна точка", () => {
+  const t = { spring_word: "пролетна", autumn_word: "есенна", no_frost_recorded: "няма записана слана" };
+  const m = chartModel(rows, { from: 2023, to: 2025 });
+  assert.equal(yearReadoutText(selectYear(m, 2023), "bg", t), "2023 · пролетна: 1 април · есенна: 1 октомври");
+  assert.equal(yearReadoutText(selectYear(m, 2024), "bg", t), "2024 · пролетна: няма записана слана · есенна: 5 октомври");
+  assert.equal(yearReadoutText(selectYear(m, 2026), "bg", t), "2026 · пролетна: няма записана слана · есенна: няма записана слана");
+});
+
 test("toCsv: заглавен коментар, колони, празно за липсваща дата", () => {
   const csv = toCsv(rows, { lat: 42.2, lon: 24.9, period: { start: 1996, end: 2025 }, source: "ERA5-Land през Copernicus CDS" });
   const lines = csv.trimEnd().split("\n");
@@ -54,17 +82,40 @@ test("toCsv: нов ред в източника се сгъва до интер
 //
 // Не е DOM библиотека — само толкова, колкото svgEl/document.createElement
 // реално викат: createElementNS/createElement, setAttribute, append,
-// textContent. Достатъчно е да хване хвърлящ бъг и грешна структура, без
-// да добавя зависимост.
+// textContent, addEventListener. Достатъчно е да хване хвърлящ бъг и грешна
+// структура, без да добавя зависимост. fire() симулира събитие (клик,
+// keydown) — реалната клавиатура/мишка се проверява в браузър (Р6).
 function fakeNode(tag) {
-  return {
+  const classSet = new Set();
+  const node = {
     tag,
     attrs: {},
     children: [],
     textContent: "",
-    setAttribute(k, v) { this.attrs[k] = v; },
+    _listeners: {},
+    setAttribute(k, v) {
+      this.attrs[k] = v;
+      if (k === "class") { classSet.clear(); for (const c of String(v).split(/\s+/).filter(Boolean)) classSet.add(c); }
+    },
     append(...nodes) { this.children.push(...nodes); },
+    addEventListener(type, handler) { (this._listeners[type] ??= []).push(handler); },
+    fire(type, event = {}) { for (const h of this._listeners[type] || []) h(event); },
+    // classList.toggle/add — app.js (markSelection) и renderChart (избраната
+    // година) слагат/махат класове независимо на СЪЩИТЕ възли; трябва да се
+    // допълват, не да се изтриват при пълен презапис на "class".
+    classList: {
+      add: (c) => { classSet.add(c); node.attrs.class = [...classSet].join(" "); },
+      remove: (c) => { classSet.delete(c); node.attrs.class = [...classSet].join(" "); },
+      contains: (c) => classSet.has(c),
+      toggle: (c, force) => {
+        const on = force !== undefined ? force : !classSet.has(c);
+        if (on) classSet.add(c); else classSet.delete(c);
+        node.attrs.class = [...classSet].join(" ");
+        return on;
+      },
+    },
   };
+  return node;
 }
 function fakeDocument() {
   return { createElementNS: (_ns, tag) => fakeNode(tag), createElement: (tag) => fakeNode(tag) };
@@ -90,7 +141,7 @@ function withFakeDocument(fn) {
 test("renderChart: не хвърля, рисува и двете редици, етикетът носи година, сезон и дата", () => {
   withFakeDocument(() => {
     const model = chartModel(rows, { from: 2023, to: 2025 });
-    const t = { spring_word: "пролетна", autumn_word: "есенна" };
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки за година" };
     const svg = renderChart(model, { lang: "bg", title: "история на клетката", t });
 
     const spring = findNode(svg, "circle", "pt spring");
@@ -108,6 +159,89 @@ test("renderChart: не хвърля, рисува и двете редици, �
 
     const svgTitle = svg.children.find((c) => c.tag === "title");
     assert.equal(svgTitle.textContent, "история на клетката", "заглавието на svg се пише, не хвърля");
+  });
+});
+
+// Преглед (Ф5): "всяка стойност е достижима с пръст и клавиатура... избор
+// на година (не 60 невидими мишени)". Точките остават именувани, но вече
+// не са отделни tab спирки — графиката е една.
+test("renderChart: цялата графика е ЕДНА tab спирка — точките вече не са отделни", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const svg = renderChart(model, { lang: "bg", title: "т", t });
+    assert.equal(svg.attrs.tabindex, "0", "графиката е фокусируема");
+    const spring = findNode(svg, "circle", "pt spring");
+    assert.equal(spring.attrs.tabindex, undefined, "точката вече не е отделна tab спирка");
+    assert.ok(spring.attrs["aria-label"].includes("2023"), "но името ѝ си остава (Ф5: точките пазят имената си)");
+  });
+});
+
+test("renderChart: стрелките местят избраната година; Home/End до краищата; Escape изчиства", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const selections = [];
+    const svg = renderChart(model, { lang: "bg", title: "т", t, onSelectYear: (y) => selections.push(y) });
+
+    svg.fire("keydown", { key: "ArrowRight" });
+    assert.equal(selections.at(-1), 2023, "първо дясно от нищо избрано -> първата година");
+    svg.fire("keydown", { key: "ArrowRight" });
+    assert.equal(selections.at(-1), 2024);
+    svg.fire("keydown", { key: "End" });
+    assert.equal(selections.at(-1), 2025);
+    svg.fire("keydown", { key: "ArrowRight" });
+    assert.equal(selections.at(-1), 2025, "не пада извън обхвата");
+    svg.fire("keydown", { key: "Home" });
+    assert.equal(selections.at(-1), 2023);
+    svg.fire("keydown", { key: "Escape" });
+    assert.equal(selections.at(-1), null, "Escape изчиства избора");
+  });
+});
+
+test("renderChart: клик върху точка избира годината ѝ", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const selections = [];
+    const svg = renderChart(model, { lang: "bg", title: "т", t, onSelectYear: (y) => selections.push(y) });
+    findNode(svg, "rect", "pt autumn").fire("click"); // 2023 или 2024 — първата есенна точка (2023)
+    assert.equal(selections.at(-1), 2023);
+  });
+});
+
+// app.js слага "out-of-window" на същите точки отделно (markSelection); ако
+// избирането на година презапише целия клас на възела, "out-of-window"
+// изчезва мълчаливо. classList.toggle("year-selected", …) вместо
+// setAttribute("class", …) пази двата класа независими.
+test("renderChart: избирането на година добавя \"year-selected\", без да маха вече сложен \"out-of-window\"", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const svg = renderChart(model, { lang: "bg", title: "т", t });
+    const spring = findNode(svg, "circle", "pt spring"); // 2023
+    spring.classList.add("out-of-window"); // както app.js's markSelection() би направил
+
+    spring.fire("click"); // избира 2023 — самата точка
+    assert.ok(spring.classList.contains("year-selected"), "точката получава year-selected");
+    assert.ok(spring.classList.contains("out-of-window"), "и пази out-of-window — не се презаписва");
+  });
+});
+
+// Преглед (Ф5): по-широки цели за пипване вместо 60 мънички точки — цялата
+// колона на всяка година е кликваема/допираема, дори когато годината няма
+// нито една точка (различно от клика върху самата точка, тестван по-горе).
+test("renderChart: клик върху \"лентата\" на годината избира годината, дори без нито една точка в нея", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2026 }); // 2026 няма точки изобщо
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const selections = [];
+    const svg = renderChart(model, { lang: "bg", title: "т", t, onSelectYear: (y) => selections.push(y) });
+
+    const bands = svg.children.filter((c) => c.tag === "rect" && c.attrs.class === "year-band");
+    assert.equal(bands.length, 4, "по една лента на година в обхвата, включително 2026 без точки");
+    bands[3].fire("click"); // последната лента = 2026
+    assert.equal(selections.at(-1), 2026, "годината без точки пак се избира");
   });
 });
 

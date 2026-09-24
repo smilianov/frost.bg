@@ -150,6 +150,25 @@ test("historyView: под 10 години със записана слана -> 
   assert.equal(view.pairs.typicalSpring, "—");
 });
 
+// Преглед (последна вълна): ред за 2000, но избраният прозорец (10 г. до
+// 2025) не го покрива — w.rows == [] тук, докато full.rows (30 г.) го носи.
+// Сезонният текст не бива да казва "няма данни за тази клетка" (невярно —
+// графиката/таблицата/CSV-то показват 2000), а че избраният ПЕРИОД е празен.
+test("historyView: ред извън избрания прозорец -> сезонът казва \"няма данни в периода\", не \"няма данни за клетката\" (графиката/CSV-то пак показват реда)", () => {
+  const rows = [[2000, "04-01", "10-01"]];
+  const view = historyView({
+    data: { years: rows, period: { start: 1996, end: 2025 }, cell: { lat: 42, lon: 25 } },
+    window: 10, lang: "bg", t: T.bg, riskInput: null,
+  });
+  assert.equal(view.empty, false, "клетката не е без данни изобщо");
+  assert.equal(view.season, T.bg.no_data_in_window);
+  assert.notEqual(view.season, T.bg.no_history);
+  // графиката/таблицата/CSV-то си пазят реда (пълният 30-годишен обхват)
+  assert.equal(view.chart.empty, false);
+  assert.deepEqual(view.chart.rows.map((r) => r[0]), [2000]);
+  assert.ok(view.csv.includes("2000,04-01,10-01"), view.csv);
+});
+
 // Полир: "най-къс: години: 2020" повтаряше етикета — една фраза на година.
 test("historyView: сезонният ред не удвоява \"години:\" пред годините на най-късия/най-дългия сезон", () => {
   const rows = makeYears(1996, 2025, "04-01", "10-01");
