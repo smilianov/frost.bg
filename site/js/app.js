@@ -1,6 +1,9 @@
 import { T } from "./texts.js";
-import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl } from "./format.js";
+import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW } from "./format.js";
 import { createMap } from "./map.js";
+import { renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
+import { historyView, inWindow, langSwitchQuery } from "./history.js";
+import { paintPairs } from "./paint.js";
 
 const lang = document.body.dataset.lang === "en" ? "en" : "bg";
 const t = T[lang];
@@ -16,7 +19,23 @@ $("locate").textContent = t.locate; $("go").textContent = t.go;
 $("lang-switch").textContent = t.lang_switch; $("lang-switch").href = t.lang_switch_href;
 $("synthetic").textContent = t.synthetic_banner;
 
+// фаза 2 — историята: статичните етикети (изчисленото се пълни в redraw())
+$("history-title").textContent = t.history;
+$("season-title").textContent = t.season;
+$("risk-title").textContent = t.risk_label;
+$("risk-day-label").textContent = t.risk_day;
+$("risk-month-label").textContent = t.risk_month;
+$("risk-go").textContent = t.risk_go;
+$("csv").textContent = t.csv_download;
+$("table-summary").textContent = t.table_caption;
+
 let map = null;
+// Началният прозорец идва от адреса, преди първата заявка (Стъпка 7, правило 4).
+let currentWindow = readWindow(location.search);
+let lastData = null;   // последният отговор на /frost, за прерисуване без заявка
+let lastView = null;   // последният изглед от historyView() — CSV чете от него, не смята наново
+let lastLat = null, lastLon = null; // за updateUrl() при смяна на прозореца, без нова заявка
+updateLangSwitch(); // Ф7: window се пази в #lang-switch дори преди първата успешна заявка
 
 function say(msg) { const m = $("message"); m.textContent = msg; m.hidden = !msg; }
 
@@ -46,19 +65,24 @@ function safeHttpUrl(u) {
   } catch (_) { return null; }
 }
 
-function pairCard(title, hint, pair, safeClass) {
+// dd-тата на last_spring/first_autumn носят id-та, за да могат paintPairs()
+// да ги пренапише при смяна на прозореца, без да строи картите наново.
+// Текстовете идват вече форматирани (от historyView(), през paintPairs) —
+// pairCard() само строи структурата, нищо не решава.
+function pairCard(title, hint, springText, autumnText, safeClass, ids) {
   const card = el("div", { class: safeClass ? "pair safe" : "pair" });
   card.append(el("h2", { text: title }), el("p", { class: "hint", text: hint }));
   const dl = el("dl");
   dl.append(
-    el("dt", { text: t.last_spring }), el("dd", { text: formatMMDD(pair?.last_spring, lang) }),
-    el("dt", { text: t.first_autumn }), el("dd", { text: formatMMDD(pair?.first_autumn, lang) }),
+    el("dt", { text: t.last_spring }), el("dd", { id: ids.spring, text: springText }),
+    el("dt", { text: t.first_autumn }), el("dd", { id: ids.autumn, text: autumnText }),
   );
   card.append(dl);
   return card;
 }
 
 function render(d) {
+  lastData = d;
   const cellLat = num(d?.cell?.lat), cellLon = num(d?.cell?.lon);
   const elevM = num(d?.cell?.elev_m);
   const distanceM = num(d?.cell?.distance_m);
@@ -66,11 +90,18 @@ function render(d) {
   const qLat = num(d?.query?.lat), qLon = num(d?.query?.lon);
   const km = distanceM !== null ? (distanceM / 1000).toFixed(1) : "—";
 
-  const pairs = el("div", { class: "pairs" });
+  const safeCard = pairCard(t.safe, t.safe_hint, "", "", true, { spring: "safe-spring", autumn: "safe-autumn" });
+  // Ф4: изречението до сигурната дата живее трайно до нея, не като
+  // подразбиращо се съдържание на калкулатора за риск (виж paintPairs).
+  safeCard.append(el("p", { id: "safe-means", class: "hint" }));
+
+  const pairs = el("div", { id: "pairs", class: "pairs" });
   pairs.append(
-    pairCard(t.typical, t.typical_hint, d?.typical, false),
-    pairCard(t.safe, t.safe_hint, d?.safe, true),
+    pairCard(t.typical, t.typical_hint, "", "", false, { spring: "typical-spring", autumn: "typical-autumn" }),
+    safeCard,
   );
+  const pairsNote = el("p", { id: "pairs-note", class: "hint" });
+  pairsNote.hidden = true;
 
   const cellP = el("p", {
     class: "cell",
@@ -94,16 +125,159 @@ function render(d) {
       : text(t.api),
   );
 
-  $("result").replaceChildren(pairs, cellP, noteP, srcP);
+  $("result").replaceChildren(pairs, pairsNote, cellP, noteP, srcP);
   $("result").hidden = false;
   $("synthetic").hidden = !d?.synthetic;
   if (qLat !== null) $("lat").value = qLat;
   if (qLon !== null) $("lon").value = qLon;
   if (qLat !== null && qLon !== null) {
-    history.replaceState(null, "", shareUrl(location.origin + location.pathname, qLat, qLon));
-    $("lang-switch").href = `${t.lang_switch_href}?lat=${qLat}&lon=${qLon}`;
+    lastLat = qLat; lastLon = qLon;
+    updateUrl();
+    // Ф5/преглед: единствената обява за ново търсене — #status, не #result.
+    $("status").textContent = t.status_result_ready(qLat, qLon);
+  } else {
+    lastLat = null; lastLon = null;
   }
+  redraw(); // Стъпка 7, правило 1: render(d) рисува историята накрая
 }
+
+// updateUrl()/updateLangSwitch(): адресът и #lang-switch носят и текущия
+// прозорец (Стъпка 7, правило 3; Ф7: "чете се независимо от това дали има
+// годни координати"). langSwitchQuery() (site/js/history.js) решава дали
+// има смисъл от shareUrl("", …) или само "?window=" — тествано там, не тук.
+function updateLangSwitch() {
+  $("lang-switch").href = `${t.lang_switch_href}${langSwitchQuery(lastLat, lastLon, currentWindow)}`;
+}
+
+function updateUrl() {
+  if (lastLat !== null && lastLon !== null) {
+    history.replaceState(null, "", shareUrl(location.origin + location.pathname, lastLat, lastLon, currentWindow));
+  }
+  updateLangSwitch();
+}
+
+// --- фаза 2: рисуване на историята от historyView() — никакво решение тук ---
+
+function readRiskInput() {
+  return { day: $("risk-day").value, month: $("risk-month").value };
+}
+
+// Ф5: мащабът и пълният обхват години на графиката/таблицата НЕ се
+// променят при смяна на прозореца — само се откроява коя част е избрана.
+function markSelection(nodes, yearOf, chart) {
+  const w = { from: chart.selectedFrom, to: chart.selectedTo };
+  nodes.forEach((node, i) => { if (!inWindow(yearOf(i), w)) node.classList.add("out-of-window"); });
+}
+
+// Ф2: "клетка без нито един ред" показва секцията с обяснение (не я крие);
+// само липсващ period.end (нямаме календар изобщо) крие цялата секция.
+function paintHistory(view) {
+  const section = $("history");
+  if (!view.visible) { section.hidden = true; return; }
+  section.hidden = false;
+
+  $("history-empty").hidden = !view.empty;
+  $("history-empty").textContent = view.empty ? view.message : "";
+  $("history-body").hidden = view.empty;
+  if (view.empty) return;
+
+  $("window-note").textContent = view.windowNote;
+  $("compare").textContent = view.compare;
+  $("season").textContent = view.season;
+
+  // Всяка нова графика тръгва без избрана година — readout-ът се изчиства
+  // (нова SVG, ново затваряне вътре в renderChart, старият избор не важи).
+  $("chart-readout").textContent = "";
+  if (view.chart.message) {
+    $("chart").replaceChildren(el("p", { class: "hint", text: view.chart.message }));
+  } else {
+    const svg = renderChart(view.chart.model, {
+      lang, title: view.chart.title, t,
+      // Ф5: "избор на година... Tooltip казва година, сезон и дата" — видимо
+      // в #chart-readout И обявено политично през #status (единствената
+      // live област; никаква втора тук). readoutId свързва графиката с
+      // #chart-readout през aria-describedby (преглед, последна вълна —
+      // role="application" отпадна, замества го role="img" + описание).
+      readoutId: "chart-readout",
+      onSelectYear: (year) => {
+        const text = year === null ? "" : yearReadoutText(selectYear(view.chart.model, year), lang, t);
+        $("chart-readout").textContent = text;
+        $("status").textContent = text;
+      },
+    });
+    markSelection(svg.querySelectorAll(".pt"), (i) => view.chart.model.points[i].year, view.chart);
+    $("chart").replaceChildren(svg);
+  }
+  const table = renderTable(view.chart.rows, { lang, t, from: view.chart.from, to: view.chart.to });
+  markSelection(table.querySelectorAll("tbody tr"), (i) => view.chart.from + i, view.chart);
+  $("table-slot").replaceChildren(table);
+
+  $("risk-result").textContent = view.risk.message;
+}
+
+// Единственото място, което вика historyView() — новите данни, смяната на
+// прозореца и калкулаторът за риска минават през него, затова рискът никога
+// не остава остарял: няма "последен показан отговор" за пазене никъде.
+// explicitRisk е true само при изрично "Сметни" (не при ново търсене или
+// смяна на прозореца) — тогава, и само тогава, фокусът отива върху
+// #risk-result (tabindex="-1" в HTML): #status е единствената aria-live
+// област, а рискът се обявява чрез преместен фокус, не чрез собствен
+// aria-live (преглед, кръг 3).
+function redraw({ explicitRisk = false } = {}) {
+  if (!lastData) { lastView = null; $("history").hidden = true; return; }
+  lastView = historyView({ data: lastData, window: currentWindow, lang, t, riskInput: readRiskInput(), explicitRisk });
+  paintPairs($, lastView);
+  paintHistory(lastView);
+  if (explicitRisk && lastView.visible && !lastView.empty && lastView.risk.focus) $("risk-result").focus();
+}
+
+let windowButtons = [];
+function buildWindowButtons() {
+  const group = $("windows");
+  group.setAttribute("aria-label", t.window_label);
+  windowButtons = WINDOWS.map((n) => {
+    const b = el("button", { type: "button", text: t.window_years(n) });
+    b.dataset.window = String(n);
+    b.setAttribute("aria-pressed", String(n === currentWindow));
+    b.onclick = () => setWindow(n);
+    return b;
+  });
+  group.replaceChildren(...windowButtons);
+}
+
+function setWindow(n) {
+  currentWindow = WINDOWS.includes(n) ? n : DEFAULT_WINDOW;
+  for (const b of windowButtons) b.setAttribute("aria-pressed", String(Number(b.dataset.window) === currentWindow));
+  redraw();
+  updateUrl();
+  // Ф5/преглед: смяната на прозореца обявява точно едно кратко изречение —
+  // #status, визуално скрит — нищо друго в #result/#history не е aria-live.
+  if (lastData) $("status").textContent = t.status_window_changed(currentWindow);
+}
+buildWindowButtons();
+
+$("csv").onclick = () => {
+  if (!lastView || !lastView.visible || lastView.empty) return;
+  const blob = new Blob([lastView.csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: lastView.csvFilename });
+  document.body.append(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
+
+// Прочита текущите ден/месец и прерисува всичко — рискът се смята наново
+// от historyView() всеки път, затова "Сметни" не пази собствено състояние.
+$("risk-go").onclick = () => { redraw({ explicitRisk: true }); };
+
+// Ф5/печат: <details>, затворен на екран, не показва съдържанието си при
+// печат само чрез CSS (моделът на рендиране не е обикновен display) —
+// отваря се програмно преди печат и състоянието му се връща след това.
+let tableWasOpen = false;
+window.addEventListener("beforeprint", () => {
+  tableWasOpen = $("table-wrap").open;
+  $("table-wrap").open = true;
+});
+window.addEventListener("afterprint", () => { $("table-wrap").open = tableWasOpen; });
 
 // Всяко ново търсене/lookup обезсилва предишните недовършени — забавен
 // отговор от по-стара заявка не бива да презаписва по-новия избор.
@@ -112,6 +286,7 @@ async function lookup(lat, lon) {
   const mySeq = ++lookupSeq;
   say("");
   $("result").hidden = true; // старата карта не остава видима, докато чакаме/при грешка
+  $("history").hidden = true; lastData = null; lastView = null; // ново търсене обезсилва старата история веднага (Стъпка 7, правило 1)
   if (map) map.setMarker(lat, lon);
   let r;
   try { r = await fetch(`/api/v1/frost?lat=${lat}&lon=${lon}`); }

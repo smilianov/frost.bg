@@ -39,7 +39,30 @@
   </section>
 
   <p id="message" class="message" hidden aria-live="polite"></p>
-  <section id="result" class="result" hidden aria-live="polite"></section>
+  <section id="result" class="result" hidden></section>
+  <p id="status" class="visually-hidden" aria-live="polite"></p>
+  <section id="history" class="history" hidden>
+    <h2 id="history-title"></h2>
+    <p id="history-empty" class="hint" hidden></p>
+    <div id="history-body">
+      <div class="windows" role="group" id="windows" aria-label=""></div>
+      <p id="window-note" class="hint"></p>
+      <p id="compare" class="compare"></p>
+      <div id="chart" class="chart-wrap"></div>
+      <p id="chart-readout" class="chart-readout"></p>
+      <details id="table-wrap"><summary id="table-summary"></summary><div id="table-slot"></div></details>
+      <p><button id="csv" type="button" class="ghost"></button></p>
+      <h3 id="season-title"></h3>
+      <p id="season" class="season"></p>
+      <h3 id="risk-title"></h3>
+      <div class="risk">
+        <label><span id="risk-day-label"></span><input id="risk-day" inputmode="numeric" maxlength="2"></label>
+        <label><span id="risk-month-label"></span><input id="risk-month" inputmode="numeric" maxlength="2"></label>
+        <button id="risk-go" type="button"></button>
+      </div>
+      <p id="risk-result" class="risk-result" tabindex="-1"></p>
+    </div>
+  </section>
 </main>
 <footer class="foot">
   <span id="source"></span> · <span id="geocoder-credit"><a href="https://open-meteo.com/" rel="noopener">Open-Meteo (имена на места)</a></span> · <a href="/api/v1/config">API</a>

@@ -6,13 +6,6 @@ One Worker serves both the static files and the API, on one domain. CORS is
 open (`Access-Control-Allow-Origin: *`) — the API is public, free to use
 from another site or app.
 
-> **The examples below are from the synthetic grid**
-> (`grid/grid.json`, `synthetic: true`, `source_id: "synthetic"`) — the
-> numbers for Manole are not real frost data, just a plausible stand-in for
-> development (see [`operations.md`](operations.md)). Real numbers arrive
-> after the first Copernicus CDS run; the response shape does not change,
-> only the contents of `source` (see below the example).
-
 ## `GET /api/v1/frost?lat=&lon=`
 
 `lat`, `lon` — decimal degrees. The processing order:
@@ -39,11 +32,11 @@ Example — `GET /api/v1/frost?lat=42.18425&lon=24.92936` (Manole):
 ```json
 {
   "query": {"lat": 42.184, "lon": 24.929},
-  "cell": {"lat": 42.2, "lon": 24.9, "elev_m": 200, "distance_m": 2979},
-  "typical": {"last_spring": "04-12", "first_autumn": "10-17"},
-  "safe": {"last_spring": "04-16", "first_autumn": "10-12"},
+  "cell": {"lat": 42.2, "lon": 24.9, "elev_m": 99, "distance_m": 2979},
+  "typical": {"last_spring": "03-29", "first_autumn": "11-25"},
+  "safe": {"last_spring": "04-11", "first_autumn": "10-30"},
   "years_used": 30,
-  "years": [[1996, "04-08", "10-19"], [1997, "04-16", "10-13"], [1998, "04-12", "10-17"], "… (30 entries total)"],
+  "years": [[1996, "04-18", "11-26"], [1997, "04-18", "10-30"], [1998, "03-30", "11-18"], "… (30 entries total)"],
   "period": {"start": 1996, "end": 2025},
   "threshold_c": 0,
   "note": {
@@ -51,15 +44,19 @@ Example — `GET /api/v1/frost?lat=42.18425&lon=24.92936` (Manole):
     "en": "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation."
   },
   "source": {
-    "bg": "Пробни данни (синтетична мрежа)",
-    "en": "Sample data (synthetic grid)",
-    "url": null,
-    "attribution": null
+    "bg": "ERA5-Land през Copernicus CDS, 1996–2025",
+    "en": "ERA5-Land via Copernicus CDS, 1996–2025",
+    "url": "https://cds.climate.copernicus.eu/datasets/derived-era5-land-daily-statistics",
+    "attribution": "Contains modified Copernicus Climate Change Service information 2026"
   },
-  "synthetic": true,
+  "synthetic": false,
   "version": "1"
 }
 ```
+
+The example is from production (`GET
+/api/v1/frost?lat=42.18425&lon=24.92936`, fetched from
+<https://frost.bg>).
 
 Fields: `query` — the requested coordinates, rounded to 3 decimals; `cell`
 — the cell's center, its elevation and the distance to it (the elevation
@@ -67,8 +64,12 @@ comes from the CDS geopotential for a CDS grid; from Open-Meteo for a grid
 from an Open-Meteo run; made up for a synthetic one); `typical`/`safe` —
 dates as `MM-DD` (no year — the client carries them into whichever year it
 needs); `null` instead of a date means fewer than 10 years had a valid
-frost date in that direction; `years` — the raw per-year dates (used by the
-future windowed history chart, phase 2, see the spec); `period` — the first
+frost date in that direction; `years` — the raw per-year dates; from these
+the page computes the history for a chosen period (10/20/30 years) entirely
+in the browser — the API remains without a period parameter or any other
+response variant (see the
+[phase 2 spec](../superpowers/specs/2026-09-23-frost-bg-phase2-design.md));
+`period` — the first
 and last of the 30 years; `synthetic` — `true` while the grid is from
 `--synthetic`, not real data; `version` — the API format version (`"1"`,
 from the `/api/v1/` path), distinct from `app_version` in `/api/v1/config`
@@ -83,6 +84,11 @@ below (the application's own version).
 | `cds` (production) | `ERA5-Land през Copernicus CDS, 1996–2025` / `ERA5-Land via Copernicus CDS, 1996–2025` | the dataset's page on CDS | `Contains modified Copernicus Climate Change Service information 2026` (the computation year; required by the CDS licence) |
 | `openmeteo` | `ERA5 през Open-Meteo, 1996–2025` / `ERA5 via Open-Meteo, 1996–2025` | `https://open-meteo.com/` | `Weather data by Open-Meteo.com` |
 | `synthetic` | `Пробни данни (синтетична мрежа)` / `Sample data (synthetic grid)` | `null` | `null` |
+
+The synthetic grid is only for local development without network access to
+CDS/Open-Meteo (`grid/compute_grid.py --synthetic`, see
+[`operations.md`](operations.md)); in production `source_id` is always
+`cds`, as in the example above.
 
 Caching: `Cache-Control: public, max-age=300, s-maxage=86400` — the browser
 keeps the response for 5 minutes, Cloudflare's edge (the Cache API,
@@ -150,7 +156,7 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.2.1"
+  "app_version": "0.3.0"
 }
 ```
 

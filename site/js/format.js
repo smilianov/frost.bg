@@ -34,9 +34,20 @@ export function readQuery(search) {
   return { lat, lon };
 }
 
-export function shareUrl(base, lat, lon) {
+export const WINDOWS = [10, 20, 30];
+export const DEFAULT_WINDOW = 30;
+
+// Прозорецът (10/20/30 години) идва от адреса; всичко друго пада на 30.
+export function readWindow(search) {
+  const raw = new URLSearchParams(search || "").get("window");
+  const n = Number(raw);
+  return WINDOWS.includes(n) ? n : DEFAULT_WINDOW;
+}
+
+export function shareUrl(base, lat, lon, window = DEFAULT_WINDOW) {
   const r = (x) => String(Math.round(x * 1000) / 1000);
-  return `${base}?lat=${r(lat)}&lon=${r(lon)}`;
+  const w = window !== DEFAULT_WINDOW ? `&window=${window}` : "";
+  return `${base}?lat=${r(lat)}&lon=${r(lon)}${w}`;
 }
 
 // Етикет на място от геокодера: „име, област, община“ — каквото има.

@@ -45,7 +45,11 @@ Their Bulgarian twins: [`docs/bg/`](docs/bg/README.md).
 
 ## Spec
 
+Phase 1 (the grid and API v1):
 `docs/superpowers/specs/2026-09-14-frost-bg-design.md`
+
+Phase 2 (the page's year history):
+`docs/superpowers/specs/2026-09-23-frost-bg-phase2-design.md`
 
 ## Data source
 

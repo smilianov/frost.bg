@@ -36,6 +36,18 @@ a { color: var(--accent); }
 
 [hidden] { display: none !important; }
 
+/* Ф5/преглед: #status носи кратките обяви за читатели на екрана — не се
+   вижда, но остава в документа (screen reader-ите не четат display:none). */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .top {
@@ -162,7 +174,7 @@ button {
   cursor: pointer;
 }
 
-#go, #locate {
+#go, #locate, #csv {
   padding: 9px 16px;
   border-radius: 8px;
   border: 1px solid var(--accent);
@@ -170,7 +182,7 @@ button {
   color: var(--on-accent);
 }
 
-#locate.ghost {
+#locate.ghost, #csv.ghost {
   background: none;
   color: var(--accent);
 }
@@ -238,4 +250,201 @@ button {
   font-size: 0.85rem;
   opacity: 0.75;
   border-top: 1px solid var(--line);
+}
+
+/* --- фаза 2: историята (без анимация никъде в тази секция) ------------- */
+
+.hint { font-size: 0.85rem; opacity: 0.75; margin: 4px 0; }
+
+.history {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.history h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.history h3 { margin: 20px 0 6px; font-size: 1.05rem; }
+
+.windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.windows button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.windows button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.compare { margin: 8px 0; }
+
+/* Графиката е inline SVG с фиксиран viewBox (720×260) — CSS font-size вътре
+   е в нейните собствени "user units" и се смалява заедно с целия SVG, щом
+   рендираната ширина падне под viewBox-а (320 CSS пиксела вместо ~700 прави
+   9px четимия текст на тиковете ~4px). За да "оцелее" текстът, графиката не
+   се смалява под min-width — вместо това превърта хоризонтално вътре в
+   собствената си рамка (.chart-wrap), както таблицата (#table-slot) вече
+   прави; страницата като цяло не прелива на 320 пиксела.
+   Месечните етикети (x=4) стоят на левия ръб и си остават видими веднага. */
+.chart-wrap { margin: 12px 0; overflow-x: auto; }
+
+.chart {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+}
+
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .tick { fill: var(--ink); font-size: 11px; opacity: 0.75; }
+
+/* Двата реда се различават и по форма (кръг/ромб в chart.js), и по цвят тук. */
+.chart .pt.spring { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
+.chart .pt.autumn { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
+/* Графиката вече е ЕДНА tab спирка (не всяка точка); фокусният контур
+   идва от общото :focus-visible правило по-горе — тук не трябва отделно. */
+
+/* Преглед (Ф5): избор на година вместо 60 мънички tab спирки — широки
+   невидими цели по година (.year-band, чертани преди точките в chart.js),
+   стрелки/Home/End/Escape, видима курсорна линия и открояване на точките
+   на избраната година. Никаква анимация. */
+.chart .year-band { cursor: pointer; }
+.chart .year-cursor { stroke: var(--accent); stroke-width: 1.5; }
+.chart .pt.year-selected { stroke-width: 2.5; }
+
+.chart-readout {
+  min-height: 1.2em; /* без скок на оформлението при първия избор */
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* Ф5: графиката/таблицата пазят пълния обхват; избраният прозорец само се
+   откроява — извън него точките остават видими, само различими другояче.
+   Преглед кръг 5: opacity версията (0.35 светло / 0.65 тъмно) измерена
+   срещу WCAG 1.4.11 (смислена графика, праг 3:1) не минаваше в НИТО една
+   тема — контурът на смесения цвят срещу фона даваше ~1.6:1 в светла тема
+   и 2.15:1 (пролет) / 2.34:1 (есен) в тъмна. Затова тук не се избледнява:
+   запълването пада до цвета на фона (кухи точки), а контурът остава на
+   пълния цвят на реда — измерено срещу двата фона:
+     пролетна #2f6fb3: 4.97:1 светло, 3.41:1 тъмно
+     есенна   #c1571c: 4.33:1 светло, 3.92:1 тъмно
+   И четирите над прага 3:1, в двете теми, без нужда от @media override.
+   Формата (кръг/ромб) носи сезона и без друго; цветът тук е подкрепящ.
+   Без анимация. */
+.chart .pt.out-of-window { fill: var(--paper); }
+.chart .pt.spring.out-of-window { stroke: #2f6fb3; stroke-width: 1.5; }
+.chart .pt.autumn.out-of-window { stroke: #c1571c; stroke-width: 1.5; }
+/* Преглед (последна вълна): .pt.spring.out-of-window (4 класа) винаги
+   печели пред .pt.year-selected (3 класа), без значение от реда им във
+   файла — избраната точка извън прозореца затова оставаше с тънкия контур
+   (1.5) вместо избрания (2.5). Правило за самото съчетание (5 класа)
+   печели и двете по-горе, каквото и да е специфичността им поотделно. */
+.chart .pt.spring.out-of-window.year-selected,
+.chart .pt.autumn.out-of-window.year-selected { stroke-width: 2.5; }
+
+/* Таблица: обикновен текст, друг праг (WCAG 1.4.3, 4.5:1, не 1.4.11).
+   Измерено: opacity 0.6 срещу var(--ink) даваше 4.04:1 в светла тема (под
+   прага) и 5.77:1 в тъмна (над); 0.65 минава и двете (4.69:1 светло). */
+.years tr.out-of-window { opacity: 0.65; }
+
+#table-slot { overflow-x: auto; }
+
+.years {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.years caption { text-align: left; font-weight: 600; padding-bottom: 6px; }
+.years th, .years td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+
+.risk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin: 8px 0;
+}
+
+.risk label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 4px;
+}
+
+.risk input {
+  width: 4rem;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.risk button {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.risk-result { margin-top: 8px; }
+
+/* Преглед, кръг 3/5: #risk-result получава фокуса програмно след изрично
+   "Сметни" (tabindex="-1" — не е в Tab реда). Поправка на кръг 5: това НЕ
+   значи, че мишката изобщо не може да го фокусира — стандартът позволява
+   клик/избор на текст върху елемент с отрицателен tabindex да го фокусира.
+   Тук е безобидно: единственият видим ефект е същият контур, елементът е
+   обикновен параграф без собствено поведение, а съдържанието му вече се
+   вижда без фокус. :focus-visible не улавя скриптово .focus(), затова тук
+   е обикновен :focus. */
+#risk-result:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media print {
+  .chart-wrap, .years { background: #fff; color: #000; }
+  .chart .grid { stroke: #999; }
+  .chart .tick { fill: #000; }
+  .years th, .years td, .years caption { color: #000; }
+  /* затворен <details> не показва съдържанието си само чрез CSS (моделът
+     на рендиране не е обикновен display) — app.js отваря #table-wrap
+     програмно на beforeprint/afterprint вместо да разчита на правило тук */
+  /* открояването (кухи точки/избледнели редове) е екранно, не за печат —
+     извън прозореца пак плътно, същия цвят като в прозореца */
+  .chart .pt.spring.out-of-window { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
+  .chart .pt.autumn.out-of-window { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
+  .years tr.out-of-window { opacity: 1; }
+  /* съчетанието (5 класа, извън @media) иначе би надвило и печатния ресет
+     по-горе, по същата причина като бележката при дефиницията му */
+  .chart .pt.spring.out-of-window.year-selected { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
+  .chart .pt.autumn.out-of-window.year-selected { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
+  /* избраната година е екранно взаимодействие — печатът е статичен снимък */
+  .chart .year-cursor { visibility: hidden !important; }
+  .chart .pt.year-selected { stroke-width: 1; }
+  .chart .year-band { cursor: auto; }
+}
+
+@media (forced-colors: active) {
+  .chart .pt.spring, .chart .pt.autumn { fill: currentColor; stroke: currentColor; }
+  .chart .grid { stroke: currentColor; opacity: 0.5; }
+  /* Кръг 5-те цветове за кухи точки (#2f6fb3/#c1571c/var(--paper)) имат
+     по-висока специфичност от горното и биха го надвили мълчаливо — тук
+     се връща на currentColor/Canvas, за да не изчезнат под forced-colors. */
+  .chart .pt.out-of-window { fill: Canvas; }
+  .chart .pt.spring.out-of-window, .chart .pt.autumn.out-of-window { stroke: currentColor; }
+  .chart .year-cursor { stroke: currentColor; }
 }
