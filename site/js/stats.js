@@ -73,3 +73,72 @@ export function pair(rows) {
     autumnCount: autumns.length,
   };
 }
+
+// --- дължина на сезона без слана -----------------------------------------
+//
+// Медианата на разликите НЕ е разлика на медианите, затова сезонът се смята
+// по години и чак тогава се взема медианата. Върху 365-дневния календар:
+// A − S − 1, със S = 0 при липсваща пролетна и A = 366 при липсваща есенна
+// дата (тогава интервалът е отрязан на границата на годината). Не се брои
+// нито денят на пролетната, нито на есенната слана.
+export function seasonSummary(rows) {
+  const byYear = (Array.isArray(rows) ? rows : []).filter(validRow).map((r) => {
+    const s = dayOfYear(r[1]), a = dayOfYear(r[2]);
+    return { year: r[0], days: (a === null ? 366 : a) - (s === null ? 0 : s) - 1, clipped: s === null || a === null };
+  });
+  if (!byYear.length) return null;
+  const lengths = byYear.map((y) => y.days).sort((x, y) => x - y);
+  const n = lengths.length;
+  const typical = n % 2 ? lengths[(n - 1) / 2] : (lengths[n / 2 - 1] + lengths[n / 2]) / 2;
+  const at = (d) => byYear.filter((y) => y.days === d).map((y) => y.year);
+  const min = lengths[0], max = lengths[n - 1];
+  return {
+    typical, count: n, byYear,
+    shortest: { days: min, years: at(min) },
+    longest: { days: max, years: at(max) },
+    clipped: byYear.filter((y) => y.clipped).length,
+  };
+}
+
+// --- риск от пролетна слана след дата ------------------------------------
+//
+// Само пролетен: данните отговарят единствено на „последната пролетна слана
+// е била след D (и преди 1 юли)“. Знаменателят са всички редове в прозореца,
+// включително годините без записана слана — те са „без събитие“.
+const LAST_SPRING_DAY = dayOfYear("06-30");
+
+export function riskAfter(rows, mmdd) {
+  const d = dayOfYear(mmdd);
+  if (d === null || d > LAST_SPRING_DAY) return null;
+  const usable = (Array.isArray(rows) ? rows : []).filter(validRow);
+  if (!usable.length) return null;
+  const count = usable.filter((r) => {
+    const s = dayOfYear(r[1]);
+    return s !== null && s > d;
+  }).length;
+  return { count, total: usable.length, percent: Math.round((count / usable.length) * 100) };
+}
+
+// --- сравнение „последните 10 срещу всичките 30“ -------------------------
+//
+// Отговаря на „затопля ли се при мен“ — по-честно от тригодишен прозорец.
+// Сезон без дата в единия прозорец не дава сравнение (null).
+const FULL_YEARS = 30, RECENT_YEARS = 10, NOTICEABLE_DAYS = 3;
+
+function diff(fullMMDD, recentMMDD) {
+  const a = dayOfYear(fullMMDD), b = dayOfYear(recentMMDD);
+  if (a === null || b === null) return null;
+  const days = Math.abs(b - a);
+  if (days < NOTICEABLE_DAYS) return { days, direction: "same" };
+  return { days, direction: b < a ? "earlier" : "later" };
+}
+
+export function compareWindows(years, periodEnd) {
+  const full = pair(selectWindow(years, periodEnd, FULL_YEARS).rows);
+  const recent = pair(selectWindow(years, periodEnd, RECENT_YEARS).rows);
+  return {
+    full, recent,
+    spring: diff(full.typical.last_spring, recent.typical.last_spring),
+    autumn: diff(full.typical.first_autumn, recent.typical.first_autumn),
+  };
+}

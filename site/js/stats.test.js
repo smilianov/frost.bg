@@ -71,3 +71,69 @@ test("pair: негодна дата в реда не се брои за сезо
   const rs = Array.from({ length: 11 }, (_, i) => [1996 + i, i === 0 ? "31-31" : "04-01", "10-01"]);
   assert.equal(pair(rs).springCount, 10);
 });
+
+import { seasonSummary, riskAfter, compareWindows } from "./stats.js";
+
+test("seasonSummary: дължината се смята по години, не от типичните дати", () => {
+  // 03-31 (ден 90) и 10-01 (ден 274) -> 274-90-1 = 183
+  const rs = [[2020, "03-31", "10-01"], [2021, "03-31", "10-02"], [2022, "04-01", "10-01"]];
+  const s = seasonSummary(rs);
+  assert.equal(s.count, 3);
+  assert.equal(s.typical, 183, "медианата на 183, 184, 182");
+  assert.deepEqual([s.shortest.days, s.shortest.years], [182, [2022]]);
+  assert.deepEqual([s.longest.days, s.longest.years], [184, [2021]]);
+});
+
+test("seasonSummary: липсваща сезонна дата отрязва на границата на годината", () => {
+  const s = seasonSummary([[2020, null, "10-01"], [2021, "03-31", null], [2022, null, null]]);
+  assert.deepEqual(s.byYear.map((y) => y.days), [273, 275, 365], "S=0 / A=366");
+  assert.equal(s.clipped, 3, "и трите са отрязани");
+});
+
+test("seasonSummary: медиана при четен брой позволява половинка; съседни дати дават 0", () => {
+  assert.equal(seasonSummary([[2020, "04-01", "10-01"], [2021, "04-01", "10-02"]]).typical, 182.5);
+  assert.equal(seasonSummary([[2020, "04-01", "04-02"]]).typical, 0, "съседни дати = 0 дни");
+  assert.equal(seasonSummary([]), null);
+  assert.equal(seasonSummary([[2020, "31-31", null]]).count, 1, "негодна дата се брои като липсваща");
+});
+
+test("riskAfter: строго по-късно от датата, знаменател = всички редове", () => {
+  const rs = [
+    [2020, "04-25", "10-01"],   // след 20 април
+    [2021, "04-20", "10-01"],   // точно на датата — не се брои
+    [2022, "04-10", "10-01"],
+    [2023, null, "10-01"],      // без записана слана — влиза в знаменателя
+  ];
+  assert.deepEqual(riskAfter(rs, "04-20"), { count: 1, total: 4, percent: 25 });
+  assert.deepEqual(riskAfter(rs, "01-01"), { count: 3, total: 4, percent: 75 });
+  assert.deepEqual(riskAfter([], "04-20"), null);
+});
+
+test("riskAfter: само пролет — датите от юли нататък и негодните се отказват", () => {
+  const rs = [[2020, "04-25", "10-01"]];
+  for (const bad of ["07-01", "12-31", "13-01", "04-31", "", null, "4-1"]) {
+    assert.equal(riskAfter(rs, bad), null, String(bad));
+  }
+  assert.ok(riskAfter(rs, "06-30"), "30 юни още е пролет");
+  assert.deepEqual(riskAfter(rs, "02-29"), riskAfter(rs, "03-01"), "29 февруари = 1 март");
+});
+
+test("compareWindows: разликата в дни между последните 10 и всичките 30", () => {
+  const years = Array.from({ length: 30 }, (_, i) => {
+    const y = 1996 + i;
+    return [y, y >= 2016 ? "03-20" : "04-01", "10-01"];
+  });
+  const c = compareWindows(years, 2025);
+  assert.equal(c.recent.typical.last_spring, "03-20");
+  assert.equal(c.full.typical.last_spring, "04-01");
+  assert.deepEqual(c.spring, { days: 12, direction: "earlier" });
+  assert.deepEqual(c.autumn, { days: 0, direction: "same" });
+});
+
+test("compareWindows: без дата в единия прозорец -> null за този сезон", () => {
+  const years = Array.from({ length: 30 }, (_, i) => [1996 + i, i < 20 ? "04-01" : null, "10-01"]);
+  const c = compareWindows(years, 2025);
+  assert.equal(c.recent.typical.last_spring, null, "последните 10 години нямат пролетни дати");
+  assert.equal(c.spring, null);
+  assert.ok(c.autumn);
+});
