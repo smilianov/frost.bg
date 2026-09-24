@@ -16,6 +16,10 @@ const get = (path, e = env(), ctx) => worker.fetch(new Request(`https://frost.bg
 // нова версия, нова мрежа или друга карта/геокодер = други ключове; старите
 // записи просто изтичат по TTL.
 const REV = (map = "osm", geocoder = "openmeteo") => encodeURIComponent(`0.3.1|${grid.computed}|${map}|${geocoder}`);
+// /config носи и превключвателя ELEVATION в собствената си ревизия (fix
+// round 1, findings 1) — /frost и /geocode не го ползват и не се пипат.
+const CONFIG_REV = (map = "osm", geocoder = "openmeteo", elevationFlag = true) =>
+  encodeURIComponent(`0.3.1|${grid.computed}|${map}|${geocoder}|${elevationFlag}`);
 
 // Заглавките, общи за всеки JSON отговор (успех или грешка) — CORS и content-type
 // не бива да изчезват тихо при бъдещи промени.
@@ -258,6 +262,41 @@ test("/api/v1/elevation: успешен отговор се кешира под 
   }
 });
 
+// Fix round 1, finding 2: Ф6 обещава изрично null при липсваща стойност —
+// доставчикът връщащ null не е грешка на доставчика, а легитимен, кешируем отговор.
+test("/api/v1/elevation: доставчикът връща null -> 200 с elevation_m: null, кешира се (не 502)", async () => {
+  resetCooldown();
+  const e = env({ FETCH: () => new Response(JSON.stringify({ elevation: [null] }), { status: 200 }) });
+  const r = await get("/api/v1/elevation?lat=42.2&lon=24.9", e);
+  assert.equal(r.status, 200);
+  assertSharedHeaders(r);
+  const b = await r.json();
+  assert.equal(b.elevation_m, null);
+  assert.match(r.headers.get("cache-control"), /s-maxage=604800/);
+});
+
+// Fix round 1, finding 3: грешка, различна от throttling (тук — негодни
+// данни от доставчика), не пали кеш-маркера — само `e.throttled` решава.
+test("/api/v1/elevation: негодни данни от доставчика (не throttling) -> 502, но НЕ пали маркера в кеша", async () => {
+  const store = stubCache();
+  try {
+    resetCooldown();
+    const e = env({ FETCH: () => new Response(JSON.stringify({}), { status: 200 }) }); // 200, но без "elevation" -> malformed
+    const r1 = await getSettled("/api/v1/elevation?lat=42.2&lon=24.9", e, makeCtx());
+    assert.equal(r1.status, 502);
+    assert.equal(store.puts, 0, "негодни данни не са throttling — маркерът не се пали");
+    // и следваща заявка пак стига до доставчика — не е спряна от несъществуващ маркер
+    let calls = 0;
+    const e2 = env({ FETCH: () => { calls++; return new Response(JSON.stringify({ elevation: [10] }), { status: 200 }); } });
+    const r2 = await getSettled("/api/v1/elevation?lat=42.2&lon=24.9", e2, makeCtx());
+    assert.equal(r2.status, 200);
+    assert.equal(calls, 1);
+  } finally {
+    clearCacheStub();
+    resetCooldown();
+  }
+});
+
 test("непознат /api/* -> 404 JSON not_found", async () => {
   const r = await get("/api/v1/nope");
   assert.equal(r.status, 404);
@@ -385,7 +424,7 @@ test("/api/v1/config: кешът се пълни под голия път", asyn
     const r1 = await getSettled("/api/v1/config", env(), makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${REV()}`), [...store.keys()].join(" "));
+    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${CONFIG_REV()}`), [...store.keys()].join(" "));
   } finally {
     clearCacheStub();
   }
@@ -396,7 +435,7 @@ test("/api/v1/config: попадение връща каквото е в кеш�
     const r1 = await getSettled("/api/v1/config", env(), makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    store.set(`https://frost.bg/api/v1/config?rev=${REV()}`, cachedEntry({ sentinel: true }));
+    store.set(`https://frost.bg/api/v1/config?rev=${CONFIG_REV()}`, cachedEntry({ sentinel: true }));
     const r2 = await get("/api/v1/config", env(), makeCtx());
     assert.equal(r2.status, 200);
     assertSharedHeaders(r2);
@@ -443,13 +482,13 @@ test("/api/v1/config: друг MAP в env при запазен кеш -> дру
     const r1 = await getSettled("/api/v1/config", env(), makeCtx());
     assert.equal((await r1.json()).map, "osm");
     assert.equal(store.puts, 1);
-    store.set(`https://frost.bg/api/v1/config?rev=${REV()}`, cachedEntry({ sentinel: true }));
+    store.set(`https://frost.bg/api/v1/config?rev=${CONFIG_REV()}`, cachedEntry({ sentinel: true }));
     const r2 = await getSettled("/api/v1/config", env({ MAP: "google", GOOGLE_MAPS_KEY: "AIzaTEST" }), makeCtx());
     const b2 = await r2.json();
     assert.notDeepEqual(b2, { sentinel: true }, "смяната на картата не бива да връща стария запис");
     assert.equal(b2.map, "google");
     assert.equal(store.puts, 2, "нов ключ -> нов put");
-    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${REV("google", "openmeteo")}`), [...store.keys()].join(" "));
+    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${CONFIG_REV("google", "openmeteo")}`), [...store.keys()].join(" "));
     // а старият ключ си стои непокътнат (изтича по TTL, не се трие)
     const r3 = await get("/api/v1/config", env(), makeCtx());
     assert.deepEqual(await r3.json(), { sentinel: true });
@@ -461,7 +500,7 @@ test("/api/v1/config: MAP=google БЕЗ ключ е ефективно osm -> с
   const store = stubCache();
   try {
     await getSettled("/api/v1/config", env(), makeCtx());
-    store.set(`https://frost.bg/api/v1/config?rev=${REV()}`, cachedEntry({ sentinel: true }));
+    store.set(`https://frost.bg/api/v1/config?rev=${CONFIG_REV()}`, cachedEntry({ sentinel: true }));
     const r = await get("/api/v1/config", env({ MAP: "google", GOOGLE_MAPS_KEY: "" }), makeCtx());
     assert.deepEqual(await r.json(), { sentinel: true });
     assert.equal(store.puts, 1);
@@ -469,6 +508,48 @@ test("/api/v1/config: MAP=google БЕЗ ключ е ефективно osm -> с
     clearCacheStub();
   }
 });
+
+// Fix round 1, finding 1: /config трябва да кешира под ключ, който включва
+// превключвателя ELEVATION — иначе смяната му не стига до ръба (същата
+// проверка като за MAP по-горе, но за двете посоки).
+test("/api/v1/config: смяна на ELEVATION (on -> off) при запазен кеш -> друг ключ, свеж отговор", async () => {
+  const store = stubCache();
+  try {
+    const r1 = await getSettled("/api/v1/config", env(), makeCtx());
+    assert.equal((await r1.json()).elevation, true);
+    assert.equal(store.puts, 1);
+    store.set(`https://frost.bg/api/v1/config?rev=${CONFIG_REV()}`, cachedEntry({ sentinel: true }));
+    const r2 = await getSettled("/api/v1/config", env({ ELEVATION: "off" }), makeCtx());
+    const b2 = await r2.json();
+    assert.notDeepEqual(b2, { sentinel: true }, "смяната на ELEVATION не бива да връща стария запис");
+    assert.equal(b2.elevation, false);
+    assert.equal(store.puts, 2, "нов ключ -> нов put");
+    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${CONFIG_REV("osm", "openmeteo", false)}`), [...store.keys()].join(" "));
+    // старият ключ (elevation: true) си стои непокътнат
+    const r3 = await get("/api/v1/config", env(), makeCtx());
+    assert.deepEqual(await r3.json(), { sentinel: true });
+  } finally {
+    clearCacheStub();
+  }
+});
+test("/api/v1/config: смяна на ELEVATION (off -> on) при запазен кеш -> друг ключ, свеж отговор", async () => {
+  const store = stubCache();
+  try {
+    const r1 = await getSettled("/api/v1/config", env({ ELEVATION: "off" }), makeCtx());
+    assert.equal((await r1.json()).elevation, false);
+    assert.equal(store.puts, 1);
+    store.set(`https://frost.bg/api/v1/config?rev=${CONFIG_REV("osm", "openmeteo", false)}`, cachedEntry({ sentinel: true }));
+    const r2 = await getSettled("/api/v1/config", env(), makeCtx());
+    const b2 = await r2.json();
+    assert.notDeepEqual(b2, { sentinel: true }, "смяната на ELEVATION не бива да връща стария запис");
+    assert.equal(b2.elevation, true);
+    assert.equal(store.puts, 2, "нов ключ -> нов put");
+    assert.ok(store.has(`https://frost.bg/api/v1/config?rev=${CONFIG_REV()}`), [...store.keys()].join(" "));
+  } finally {
+    clearCacheStub();
+  }
+});
+
 test("/api/v1/geocode: смяна на GEOCODER (с ключ) при запазен кеш -> доставчикът се вика пак, provider google", async () => {
   const store = stubCache();
   try {

@@ -21,18 +21,28 @@ test("нула и отрицателна височина са валидни с
 
 test("негоден отговор -> ElevationError, без стойности в съобщението", async () => {
   // JSON.stringify(NaN) дава null, т.е. { elevation: [NaN] } всъщност пращаше
-  // { elevation: [null] } по мрежата — дублира случая по-горе и не докосваше
-  // клона за нецяла (не-крайна) стойност. Суров текст с 1e999 се парсва до
+  // { elevation: [null] } по мрежата — вече не е негодно (виж следващия
+  // тест: null е легитимен отговор, fix round 1, finding 2), затова тук
+  // остава само истински негодните форми. Суров текст с 1e999 се парсва до
   // Infinity: typeof "number", но не е крайно — реално покрива Number.isFinite.
   const raw = (text) => () => new Response(text, { status: 200, headers: { "content-type": "application/json" } });
-  const cases = [ok({}), ok({ elevation: [] }), ok({ elevation: "350" }), ok({ elevation: [null] }), raw('{"elevation":[1e999]}'), ok([1, 2])];
+  const cases = [ok({}), ok({ elevation: [] }), ok({ elevation: "350" }), raw('{"elevation":[1e999]}'), ok([1, 2])];
   for (const fetchImpl of cases) {
     await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl }), (e) => {
       assert.ok(e instanceof ElevationError);
       assert.ok(!/350|Infinity/.test(e.message), e.message);
+      assert.equal(e.throttled, false, "негодни данни не са throttling");
       return true;
     });
   }
+});
+
+// Fix round 1, finding 2: Ф6 обещава изрично null при липсваща стойност —
+// доставчикът може да връща null за точки без данни, и това не е грешка на
+// доставчика, а легитимен отговор. Само истински негодни форми (масив с
+// друг тип/дължина, обект без elevation, NaN/Infinity) остават ElevationError.
+test("височина null от доставчика -> легитимен отговор { elevation_m: null }, не грешка", async () => {
+  assert.deepEqual(await elevation({ lat: 42, lon: 24, fetchImpl: ok({ elevation: [null] }) }), { elevation_m: null });
 });
 
 test("429 и 5xx включват кратък отказ: следващата заявка не пита нагоре", async () => {
@@ -45,6 +55,25 @@ test("429 и 5xx включват кратък отказ: следващата 
   assert.equal(calls, 1, "в отказа не се пита нагоре");
   await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: f, now: 1000 + 10 * 60 * 1000 + 1 }));
   assert.equal(calls, 2, "след 10 минути пак се пита");
+});
+
+// Fix round 1, finding 3: маршрутът (worker/index.js) вече не съпоставя
+// текста на e.message, за да реши дали да пали споделения кеш-маркер —
+// чете стабилно свойство `throttled`. И двата пътя, които слагат isolate-а
+// в кулдаун (прясно 429/5xx И локалната „вече в кулдаун“ проверка), трябва
+// да го носят — иначе смяна на текста на съобщението тихо би изключила
+// координацията между isolate-и.
+test("throttling/кулдаун грешките носят стабилен маркер throttled:true", async () => {
+  resetCooldown();
+  await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: status(429), now: 1000 }), (e) => {
+    assert.ok(e instanceof ElevationError);
+    assert.equal(e.throttled, true, "прясно 429 -> throttled");
+    return true;
+  });
+  await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: () => { throw new Error("не бива да се пита нагоре"); }, now: 2000 }), (e) => {
+    assert.equal(e.throttled, true, "локалната проверка „вече в кулдаун“ също носи маркера");
+    return true;
+  });
 });
 
 test("503 (5xx) също включва кратък отказ, не само 429", async () => {

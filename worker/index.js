@@ -60,8 +60,20 @@ const elevationOn = (env) => env.ELEVATION !== "off";
 // просто изтичат по TTL (нищо не се трие). Deploy, който не сменя нито едно
 // от четирите, продължава да улучва старите записи — затова версията се
 // вдига при всяко издание (operations.md).
+function revParts(env) {
+  return [APP_VERSION, grid.computed, effectiveMap(env), effectiveGeocoder(env)];
+}
 function cacheRev(env) {
-  return encodeURIComponent([APP_VERSION, grid.computed, effectiveMap(env), effectiveGeocoder(env)].join("|"));
+  return encodeURIComponent(revParts(env).join("|"));
+}
+
+// /config-специфична ревизия (fix round 1, finding 1): същата четворка,
+// плюс превключвателя ELEVATION — само тук. /frost и /geocode не докладват
+// elevation и съдържанието им не зависи от него, затова cacheRev() по-горе
+// остава непроменена за тях; иначе ELEVATION on->off/off->on би оставял
+// стария кеширан /config (с грешна стойност на elevation) до денонощие.
+function configRev(env) {
+  return encodeURIComponent([...revParts(env), elevationOn(env)].join("|"));
 }
 
 async function handleFrost(url, env, ctx) {
@@ -82,7 +94,7 @@ async function handleFrost(url, env, ctx) {
 
 async function handleConfig(env, url, ctx) {
   const cache = cacheOf();
-  const key = cache ? new Request(`${url.origin}/api/v1/config?rev=${cacheRev(env)}`) : null;
+  const key = cache ? new Request(`${url.origin}/api/v1/config?rev=${configRev(env)}`) : null;
   if (cache) {
     const hit = await cache.match(key);
     if (hit) return hit;
@@ -140,11 +152,12 @@ async function handleElevation(url, env, ctx) {
     return res;
   } catch (e) {
     if (e instanceof ElevationError) {
-      // Само истинско throttling (429/5xx нагоре) пали маркера — не всяка
-      // ElevationError: таймаут или негодни данни от доставчика не значат
-      // "спри да питаш", elevation.js самото не пали и локалния си cooldown
-      // за тях (виж elevation.js).
-      if (cache && e.message === "elevation provider is throttling") {
+      // Само истинско throttling пали маркера — не всяка ElevationError:
+      // таймаут или негодни данни от доставчика не значат "спри да питаш",
+      // elevation.js самото не пали и локалния си cooldown за тях. Четем
+      // стабилното свойство `e.throttled` (fix round 1, finding 3), не
+      // текста на съобщението — думите могат да се сменят, свойството не.
+      if (cache && e.throttled) {
         const marker = new Response(null, { status: 200, headers: { "cache-control": "max-age=600" } });
         ctx?.waitUntil?.(cache.put(cooldownKey, marker));
       }

@@ -204,12 +204,16 @@ reports: `google` only with its key present, otherwise `osm` /
   after its 5 minutes the browser gets that old copy from the edge again —
   the new value reaches people only when the edge expires or you bump the
   version;
-- toggling **`ELEVATION`** (`on`/`off`) doesn't change the `cacheRev()` key
-  either — the same trade-off as `GOOGLE_MAPS_KEY` above: `/config` keeps
-  the old response for up to a day, and the new value reaches people only
-  on a new deploy with a new version. `/api/v1/elevation` itself carries
-  its **own** separate `rev` (see the next section) — it isn't part of
-  this foursome at all.
+- **toggling `ELEVATION` (`on`/`off`) DOES change `/config`'s key** —
+  unlike `GOOGLE_MAPS_KEY` above: `/config` (and only `/config`) caches
+  under its own revision, `configRev()` in `worker/index.js` — the same
+  foursome plus the switch. The change reaches the edge immediately on a
+  new deploy (a new rev), and browsers within 5 minutes, exactly like a
+  `MAP`/`GEOCODER` change. `/frost` and `/geocode` don't report
+  `elevation` and don't depend on it, so their `cacheRev()` stays
+  unchanged — only `/config` carries the extra element. `/api/v1/elevation`
+  itself carries its **own**, entirely separate `rev` (see the next
+  section) — in neither `cacheRev()` nor `configRev()`.
 
 ## The point's elevation: budget, a short refusal and the `ELEVATION` switch
 
@@ -246,9 +250,10 @@ endpoint keeps its own, stricter safeguard:
   safeguard.
 - **The `ELEVATION` switch** under `[vars]` in `wrangler.toml`: `"on"` by
   default, `"off"` disables the endpoint entirely (returns `404`) and the
-  page's row. It is not part of `/config`'s `rev` (see "The key carries a
-  revision" above) — flipping it reaches the edge only on a new deploy
-  with a new version.
+  page's row. It is part of `/config`'s `rev` (`configRev()`, see "The key
+  carries a revision" above) — flipping it reaches the edge immediately.
+  `/api/v1/elevation` itself carries its own, separate `rev` (below) — in
+  neither `cacheRev()` nor `configRev()`.
 - The endpoint accepts only points in Bulgaria — the same rule as `/frost`
   (`outside_bulgaria` on 400) — there is no way through this API to ask
   the provider about an arbitrary point anywhere in the world.

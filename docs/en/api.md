@@ -246,9 +246,11 @@ secret. Exactly these keys:
 - `elevation` — whether `/api/v1/elevation` is enabled (the `ELEVATION`
   switch in `wrangler.toml`, `[vars]`, `"on"` by default); `false` means
   the endpoint returns `404` and the page doesn't append the point's
-  elevation. Unlike the map/geocoder, this value is **not** part of the
-  cache revision below — flipping the switch reaches the edge only on a
-  new deploy with a new version (see [`operations.md`](operations.md)).
+  elevation. Just like the map/geocoder, this value **is** part of
+  `/config`'s cache revision below (its own `configRev()`, separate from
+  `/frost`/`/geocode`) — flipping the switch reaches the edge immediately
+  on a new deploy, browsers within 5 minutes (see
+  [`operations.md`](operations.md)).
 
 Caching: `Cache-Control: public, max-age=300, s-maxage=86400`; the edge key
 carries a revision, so a change of map/geocoder or a new grid reaches the

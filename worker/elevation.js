@@ -11,7 +11,16 @@ const URL_BASE = "https://api.open-meteo.com/v1/elevation";
 const TIMEOUT_MS = 8000;
 const COOLDOWN_MS = 10 * 60 * 1000;
 
-export class ElevationError extends Error {}
+// `throttled` е стабилен маркер за "спри да питаш, доставчикът иска пауза"
+// (fix round 1, finding 3) — маршрутът (worker/index.js) го чете, за да
+// реши дали да опресни споделения Cache API маркер, вместо да съпоставя
+// текста на `message`: думите могат да се сменят, свойството не.
+export class ElevationError extends Error {
+  constructor(message, { throttled = false } = {}) {
+    super(message);
+    this.throttled = throttled;
+  }
+}
 
 let cooldownUntil = 0;
 export function resetCooldown() { cooldownUntil = 0; }
@@ -55,20 +64,23 @@ async function fetchAndParse(fetchImpl, url, timeoutMs) {
 }
 
 export async function elevation({ lat, lon, fetchImpl = fetch, timeoutMs = TIMEOUT_MS, now = Date.now() }) {
-  if (now < cooldownUntil) throw new ElevationError("elevation provider in cooldown");
+  if (now < cooldownUntil) throw new ElevationError("elevation provider in cooldown", { throttled: true });
   const url = new URL(URL_BASE);
   url.searchParams.set("latitude", String(lat));
   url.searchParams.set("longitude", String(lon));
   const result = await fetchAndParse(fetchImpl, url.toString(), timeoutMs);
   if (result.throttled) {
     cooldownUntil = now + COOLDOWN_MS;
-    throw new ElevationError("elevation provider is throttling");
+    throw new ElevationError("elevation provider is throttling", { throttled: true });
   }
   const body = result.body;
   if (body === null || typeof body !== "object" || Array.isArray(body)) throw new ElevationError("elevation provider returned malformed data");
   const list = body.elevation;
   if (!Array.isArray(list) || list.length < 1) throw new ElevationError("elevation provider returned malformed data");
   const v = list[0];
+  // Fix round 1, finding 2: null е легитимен отговор (Ф6) — точка, за която
+  // доставчикът просто няма стойност, не е грешка на доставчика.
+  if (v === null) return { elevation_m: null };
   if (typeof v !== "number" || !Number.isFinite(v)) throw new ElevationError("elevation provider returned malformed data");
   return { elevation_m: Math.round(v) };
 }
