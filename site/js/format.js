@@ -1,4 +1,21 @@
 // format.js — чисти функции, без DOM.
+
+// num()/safeHttpUrl(): преместени от app.js (fix wave, Task 7 review) — за
+// да могат да се тестват тук и да се преизползват от elevation.js (view
+// модела за височината на точката), без DOM.
+export function num(x) {
+  if (x === null || x === undefined || x === "") return null; // Number(null)===0, Number("")===0 — не бива да минават за истински 0
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+export function safeHttpUrl(u) {
+  if (typeof u !== "string" || !u) return null;
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch (_) { return null; }
+}
+
 const MONTHS = {
   bg: ["януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври", "ноември", "декември"],
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],

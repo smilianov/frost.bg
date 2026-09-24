@@ -96,6 +96,68 @@ explicitly, not just the header) for a day; the edge key also carries a
 revision (version, grid date, map, geocoder). Why, and what that means on
 deploy — "The API cache" in [`operations.md`](operations.md).
 
+## `GET /api/v1/elevation?lat=&lon=`
+
+The elevation of **the point itself** — not the cell from `/frost`. A
+garden in a valley bottom can sit hundreds of metres below its cell's
+average elevation, which is exactly why the `/frost` dates can mislead:
+compare the two.
+
+Input and normalization — **the same rules as `/frost`**: syntax and bounds
+→ 400 `bad_request`; the point rounded to 0.1° must be on the grid,
+otherwise 400 `outside_bulgaria` (there is no way through this endpoint to
+ask the provider about a point outside Bulgaria); rounding to 3 decimals —
+that is the `query` in the response and the cache key, and it's what the
+provider is asked about too.
+
+Provider: [Open-Meteo Elevation](https://open-meteo.com/en/docs/elevation-api)
+(Copernicus DEM GLO-90, ~90 m resolution) — a different terrain model from
+ERA5-Land (the grid behind `/frost`), so this elevation and `cell.elev_m`
+can differ noticeably. A deadline over the request **and** reading the
+body, a format check, **no automatic retries**.
+
+Example — `GET /api/v1/elevation?lat=42.18425&lon=24.92936`:
+
+```json
+{
+  "query": {"lat": 42.184, "lon": 24.929},
+  "elevation_m": 350,
+  "source": {
+    "bg": "Copernicus DEM GLO-90 през Open-Meteo",
+    "en": "Copernicus DEM GLO-90 via Open-Meteo",
+    "url": "https://open-meteo.com/en/docs/elevation-api",
+    "attribution": "Elevation data: Copernicus DEM GLO-90 · Weather data by Open-Meteo.com"
+  },
+  "version": "1"
+}
+```
+
+`elevation_m` is rounded to a whole metre; a missing value is explicitly
+`null`, never `0` — zero is a valid elevation (sea level or below it) and
+must not be confused with no data. `source` carries attribution to both
+Copernicus and Open-Meteo — the same fixed four keys `bg`, `en`, `url`,
+`attribution`, independent of the grid's `source_id` (unlike `sourceLabel`
+in `/frost` above).
+
+Errors: `bad_request`/`outside_bulgaria` (400, same rules as `/frost`);
+`elevation_failed` (502) — the provider didn't respond, responded with an
+error, or is in a short refusal after an earlier 429/5xx (see "The point's
+elevation" in [`operations.md`](operations.md)); `not_found` (404) — for
+an unknown path **and** when the `ELEVATION` switch is off
+(`wrangler.toml`).
+
+Caching: `Cache-Control: public, max-age=300, s-maxage=604800` — like
+`/geocode`, a week at the edge (a place's elevation doesn't change over
+time). The edge key carries its **own** revision — only the application
+version and the elevation provider (`APP_VERSION|openmeteo-elevation`) —
+not the map/geocoder from the shared `cacheRev()`, which this endpoint
+doesn't use.
+
+The frost result **never waits** for this endpoint: the page shows the
+frost result immediately, the point's elevation is appended after a
+separate, independent request — on error or a missing value the line is
+simply absent (never `0`, never the cell's elevation instead).
+
 ## `GET /api/v1/geocode?q=&lang=bg|en&limit=`
 
 Place name → a list of candidates with coordinates, for search suggestions.
@@ -156,7 +218,8 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.0"
+  "app_version": "0.3.1",
+  "elevation": true
 }
 ```
 
@@ -179,7 +242,15 @@ secret. Exactly these keys:
 - `version` — the API format version (same value as in `/frost` responses;
   `/geocode` carries no version); `app_version` — the application's own
   version (`package.json`, tracked from the changelog — see
-  [`../../CHANGELOG.md`](../../CHANGELOG.md)).
+  [`../../CHANGELOG.md`](../../CHANGELOG.md));
+- `elevation` — whether `/api/v1/elevation` is enabled (the `ELEVATION`
+  switch in `wrangler.toml`, `[vars]`, `"on"` by default); `false` means
+  the endpoint returns `404` and the page doesn't append the point's
+  elevation. Just like the map/geocoder, this value **is** part of
+  `/config`'s cache revision below (its own `configRev()`, separate from
+  `/frost`/`/geocode`) — flipping the switch reaches the edge immediately
+  on a new deploy, browsers within 5 minutes (see
+  [`operations.md`](operations.md)).
 
 Caching: `Cache-Control: public, max-age=300, s-maxage=86400`; the edge key
 carries a revision, so a change of map/geocoder or a new grid reaches the
@@ -196,11 +267,12 @@ One body shape for every error, in both languages:
 
 | `code` | HTTP | When |
 |---|---|---|
-| `bad_request` | 400 | `/frost`: `lat`/`lon` missing, not numbers, or outside ±90°/±180° |
-| `outside_bulgaria` | 400 | `/frost`: the point rounded to 0.1° isn't on the grid |
+| `bad_request` | 400 | `/frost`, `/elevation`: `lat`/`lon` missing, not numbers, or outside ±90°/±180° |
+| `outside_bulgaria` | 400 | `/frost`, `/elevation`: the point rounded to 0.1° isn't on the grid |
 | `bad_query` | 400 | `/geocode`: `q` under 2 characters |
 | `geocoder_failed` | 502 | `/geocode`: the provider didn't respond or its response was malformed |
-| `not_found` | 404 | unknown `/api/*` path |
+| `elevation_failed` | 502 | `/elevation`: the provider didn't respond, its response was malformed, or it's in a short refusal after an earlier 429/5xx |
+| `not_found` | 404 | unknown `/api/*` path, or `/elevation` when `ELEVATION = "off"` |
 | `not_found` | 405 | a method other than `GET`/`OPTIONS` on a known `/api/*` path — the response also carries `Allow: GET, OPTIONS` |
 
 Error responses always carry `Cache-Control: no-store` — they never enter

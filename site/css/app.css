@@ -243,6 +243,11 @@ button {
   opacity: 0.85;
 }
 
+/* Задача 7: бележката за височината на точката (.hint) идва веднага след
+   .cell, само когато е дошла успешно — прилепена, не с обичайния горен
+   отстъп на .hint. */
+.cell + #elev-note.hint { margin-top: 0; }
+
 .foot {
   max-width: 44rem;
   margin: 24px auto;

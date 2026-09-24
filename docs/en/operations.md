@@ -203,7 +203,80 @@ reports: `google` only with its key present, otherwise `osm` /
   not change the key: the edge keeps the old `/config` for up to a day, and
   after its 5 minutes the browser gets that old copy from the edge again —
   the new value reaches people only when the edge expires or you bump the
-  version.
+  version;
+- **toggling `ELEVATION` (`on`/`off`) DOES change `/config`'s key** —
+  unlike `GOOGLE_MAPS_KEY` above: `/config` (and only `/config`) caches
+  under its own revision, `configRev()` in `worker/index.js` — the same
+  foursome plus the switch. The change reaches the edge immediately on a
+  new deploy (a new rev), and browsers within 5 minutes, exactly like a
+  `MAP`/`GEOCODER` change. `/frost` and `/geocode` don't report
+  `elevation` and don't depend on it, so their `cacheRev()` stays
+  unchanged — only `/config` carries the extra element. `/api/v1/elevation`
+  itself carries its **own**, entirely separate `rev` (see the next
+  section) — in neither `cacheRev()` nor `configRev()`.
+
+## The point's elevation: budget, a short refusal and the `ELEVATION` switch
+
+`GET /api/v1/elevation?lat=&lon=` asks [Open-Meteo
+Elevation](https://open-meteo.com/en/docs/elevation-api) (Copernicus DEM
+GLO-90) for the elevation of **the point itself** — separate from the
+cell's elevation, which comes from `/frost` (ERA5-Land). Open-Meteo's free
+tier is limited — 600 requests per minute, 5,000 per hour, 10,000 per day —
+and is for non-commercial use; the zone's rate-limiting rule (above, "The
+request-rate limit") protects `frost.bg` from a flood in general, but
+doesn't specifically protect this budget upstream to Open-Meteo — so the
+endpoint keeps its own, stricter safeguard:
+
+- **A short refusal after a 429 or 5xx from the provider**: 10 minutes,
+  during which the endpoint returns `502 elevation_failed` without asking
+  Open-Meteo at all. Kept at **two levels**:
+  - `worker/elevation.js` keeps a fast local safeguard — a plain module
+    variable (`cooldownUntil`), checked before every request;
+  - the route in `worker/index.js` also keeps **its own marker in the
+    shared Cache API** (`caches.default`, key
+    `…/api/v1/elevation?cooldown=1&rev=…`, `Cache-Control: max-age=600`),
+    checked **before** the provider is even reached — before the local
+    check above is even called.
+
+  **Why both.** Cloudflare spreads requests across many isolates and swaps
+  them freely — the local safeguard by itself only protects the isolate
+  that actually received the 429/5xx; a "neighbouring" isolate that
+  remembers nothing locally would still ask upstream. The Cache API marker
+  fixes exactly that. **Important, so its scope isn't overstated: the
+  marker is shared only between the isolates of ONE Cloudflare data
+  centre (colo)** — the Cache API isn't global — it doesn't stop requests
+  originating at a different data centre elsewhere in the world. This is
+  not a global pause of the Worker, but a wider, still per-data-centre,
+  safeguard. **And even for that centre — best effort, not a guarantee:**
+  the marker is written asynchronously (`ctx.waitUntil`, it doesn't delay
+  the response to the client) and the write to the Cache API itself carries
+  no guarantee; concurrent requests that land in the exact window before
+  the marker becomes visible can slip through and still ask the provider.
+  This is coordination that reduces upstream load, not a guaranteed pause
+  for the whole data centre.
+- **The `ELEVATION` switch** under `[vars]` in `wrangler.toml`: `"on"` by
+  default, `"off"` disables the endpoint entirely (returns `404`) and the
+  page's row. It is part of `/config`'s `rev` (`configRev()`, see "The key
+  carries a revision" above) — flipping it reaches the edge immediately.
+  `/api/v1/elevation` itself carries its own, separate `rev` (below) — in
+  neither `cacheRev()` nor `configRev()`. **Honest about the browser:** the
+  edge stops new requests right away; requests made **after** the
+  browser's cached copies of `/config` and `/api/v1/elevation` expire (up
+  to 5 minutes, `max-age=300`) see the change. But an already **open**
+  page doesn't check this on its own — `/config` is read once, at load,
+  and nothing re-checks it afterward — so the page's row stays until the
+  page is reloaded (regular or hard); it does not disappear on its own
+  after those 5 minutes.
+- The endpoint accepts only points in Bulgaria — the same rule as `/frost`
+  (`outside_bulgaria` on 400) — there is no way through this API to ask
+  the provider about an arbitrary point anywhere in the world.
+- Cache on a successful response: `s-maxage=604800` (a week, like
+  `/geocode`) — a place's elevation doesn't change; the key carries its own
+  revision (`APP_VERSION|openmeteo-elevation`), not the map/geocoder.
+- The frost result **never waits** for this endpoint: the page shows the
+  frost result immediately, the point's elevation is appended after a
+  separate request — on error or a missing value the line is simply
+  absent (`site/js/app.js`).
 
 ## Map tiles
 

@@ -4,6 +4,15 @@ export const TEXTS = {
     bg: "ERA5 е мрежа от 9–25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни височината на клетката с тази на мястото си.",
     en: "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation.",
   },
+  // Задача 7: посочването за /api/v1/elevation (Open-Meteo Elevation,
+  // Copernicus DEM GLO-90) — отделно от sourceLabel() по-долу, което е за
+  // произхода на самата мрежа (/frost), не за височината на точката.
+  elevationSource: {
+    bg: "Copernicus DEM GLO-90 през Open-Meteo",
+    en: "Copernicus DEM GLO-90 via Open-Meteo",
+    url: "https://open-meteo.com/en/docs/elevation-api",
+    attribution: "Elevation data: Copernicus DEM GLO-90 · Weather data by Open-Meteo.com",
+  },
   // year идва от данните (grid.computed), не от часовника — иначе тестовете
   // и продукцията заедно остаряват на Нова година. sourceId идва от
   // grid.source_id (compute_grid.py): cds | openmeteo | synthetic — етикетът,
@@ -33,5 +42,7 @@ export const TEXTS = {
                        en: "The place search did not respond. Try again shortly." },
     bad_query: { bg: "Търсенето иска поне 2 знака.", en: "The search needs at least 2 characters." },
     not_found: { bg: "Няма такъв адрес в API-то.", en: "No such API endpoint." },
+    elevation_failed: { bg: "Услугата за височината не отговори. Опитай пак след малко.",
+                         en: "The elevation service did not respond. Try again shortly." },
   },
 };

@@ -1,9 +1,10 @@
 import { T } from "./texts.js";
-import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW } from "./format.js";
+import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW, num, safeHttpUrl } from "./format.js";
 import { createMap } from "./map.js";
 import { renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
 import { historyView, inWindow, langSwitchQuery } from "./history.js";
 import { paintPairs } from "./paint.js";
+import { elevationView } from "./elevation.js";
 
 const lang = document.body.dataset.lang === "en" ? "en" : "bg";
 const t = T[lang];
@@ -35,6 +36,10 @@ let currentWindow = readWindow(location.search);
 let lastData = null;   // последният отговор на /frost, за прерисуване без заявка
 let lastView = null;   // последният изглед от historyView() — CSV чете от него, не смята наново
 let lastLat = null, lastLon = null; // за updateUrl() при смяна на прозореца, без нова заявка
+// /config, зареден накрая на файла — elevation отсъства (напр. мрежова
+// грешка при зареждането му) значи "не е изрично изключено", третира се
+// като включено, точно както cfg.elevation !== false по-долу.
+let cfg = { map: "osm", google_maps_key: null, geocoder: "openmeteo", grid: {} };
 updateLangSwitch(); // Ф7: window се пази в #lang-switch дори преди първата успешна заявка
 
 function say(msg) { const m = $("message"); m.textContent = msg; m.hidden = !msg; }
@@ -52,18 +57,7 @@ function el(tag, attrs = {}) {
   return node;
 }
 function text(s) { return document.createTextNode(String(s)); }
-function num(x) {
-  if (x === null || x === undefined || x === "") return null; // Number(null)===0, Number("")===0 — не бива да минават за истински 0
-  const n = Number(x);
-  return Number.isFinite(n) ? n : null;
-}
-function safeHttpUrl(u) {
-  if (typeof u !== "string" || !u) return null;
-  try {
-    const parsed = new URL(u);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
-  } catch (_) { return null; }
-}
+// num()/safeHttpUrl() живеят в format.js (тествани там, без DOM) — тук само внесени.
 
 // dd-тата на last_spring/first_autumn носят id-та, за да могат paintPairs()
 // да ги пренапише при смяна на прозореца, без да строи картите наново.
@@ -104,9 +98,19 @@ function render(d) {
   pairsNote.hidden = true;
 
   const cellP = el("p", {
+    id: "cell",
     class: "cell",
     text: `${t.cell}: ${cellLat ?? "—"}, ${cellLon ?? "—"} · ${t.elev} ${elevM ?? "—"} m · ${t.distance} ${km} ${t.km}`,
   });
+  // Задача 7: празни, скрити слотове — fetchElevation() ги попълва после,
+  // ако и само ако височината на точката пристигне успешно (никога
+  // предварително). #elev-source носи посочването (Open-Meteo/Copernicus) —
+  // изисквано от лиценза им, точно както #src по-долу за мрежата на /frost;
+  // не зависи от geocoder/MAP конфигурацията.
+  const elevNoteP = el("p", { id: "elev-note", class: "hint" });
+  elevNoteP.hidden = true;
+  const elevSrcP = el("p", { id: "elev-source", class: "src" });
+  elevSrcP.hidden = true;
 
   const noteP = el("p", { class: "note" });
   noteP.append(el("strong", { text: `${t.note_title}:` }), text(` ${d?.note?.[lang] ?? ""}`));
@@ -125,7 +129,7 @@ function render(d) {
       : text(t.api),
   );
 
-  $("result").replaceChildren(pairs, pairsNote, cellP, noteP, srcP);
+  $("result").replaceChildren(pairs, pairsNote, cellP, elevNoteP, elevSrcP, noteP, srcP);
   $("result").hidden = false;
   $("synthetic").hidden = !d?.synthetic;
   if (qLat !== null) $("lat").value = qLat;
@@ -279,6 +283,38 @@ window.addEventListener("beforeprint", () => {
 });
 window.addEventListener("afterprint", () => { $("table-wrap").open = tableWasOpen; });
 
+// Задача 7: височината на самата точка (Open-Meteo Elevation), дописана към
+// реда на клетката СЛЕД резултата за сланата — никога не го чака. Носи
+// собствения mySeq на заявката (Ф7): забавен или негоден отговор от по-стар
+// lookup() не бива да пипа DOM-а на по-новия. Грешка или elevation_m===null
+// -> elevationView() връща null, редът просто липсва; никога 0, никога
+// височината на клетката вместо нея. Посочването (#elev-source) идва
+// заедно с реда — не се показва самичка стойност без нейния източник
+// (лицензите на Open-Meteo/Copernicus го изискват, review fix wave).
+async function fetchElevation(mySeq, lat, lon) {
+  let r;
+  try { r = await fetch(`/api/v1/elevation?lat=${lat}&lon=${lon}`); }
+  catch (_) { return; }
+  if (mySeq !== lookupSeq || !r.ok) return;
+  let body;
+  try { body = await r.json(); }
+  catch (_) { return; }
+  if (mySeq !== lookupSeq) return;
+  const view = elevationView(body, { lang, t });
+  if (!view) return;
+  const cell = $("cell");
+  if (cell) cell.append(text(` · ${view.pointElevText}`));
+  const note = $("elev-note");
+  if (note) { note.textContent = view.elevNoteText; note.hidden = false; }
+  const src = $("elev-source");
+  if (src) {
+    src.replaceChildren(text(`${t.source}: `));
+    src.append(view.sourceUrl ? el("a", { href: view.sourceUrl, rel: "noopener", text: view.sourceText }) : text(view.sourceText));
+    if (view.sourceAttribution) src.append(text(` · ${view.sourceAttribution}`));
+    src.hidden = false;
+  }
+}
+
 // Всяко ново търсене/lookup обезсилва предишните недовършени — забавен
 // отговор от по-стара заявка не бива да презаписва по-новия избор.
 let lookupSeq = 0;
@@ -303,6 +339,8 @@ async function lookup(lat, lon) {
   catch (_) { if (mySeq !== lookupSeq) return; return say(t.network_error); }
   if (mySeq !== lookupSeq) return;
   render(body);
+  // Стъпка 5: винаги СЛЕД render(d) — сланите никога не чакат височината.
+  if (cfg?.elevation !== false) fetchElevation(mySeq, lat, lon);
 }
 
 // 1. търсене по име
@@ -399,11 +437,10 @@ function footerGeocoder(cfg) {
 
 // 2. картата — след config, за да знаем доставчика; после адресът със ?lat&lon
 (async () => {
-  let cfg = { map: "osm", google_maps_key: null, geocoder: "openmeteo", grid: {} };
   try {
     const parsed = await (await fetch("/api/v1/config")).json();
     if (parsed && typeof parsed === "object") cfg = parsed; // не-обект (напр. null) -> подразбиращите се
-  } catch (_) { /* картата пак ще е OSM */ }
+  } catch (_) { /* картата пак ще е OSM, височината — включена по подразбиране */ }
   $("synthetic").hidden = !cfg?.grid?.synthetic;
   footerSource(cfg);
   footerGeocoder(cfg);
