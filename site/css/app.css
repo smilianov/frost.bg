@@ -36,6 +36,18 @@ a { color: var(--accent); }
 
 [hidden] { display: none !important; }
 
+/* Ф5/преглед: #status носи кратките обяви за читатели на екрана — не се
+   вижда, но остава в документа (screen reader-ите не четат display:none). */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .top {

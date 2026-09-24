@@ -57,6 +57,9 @@ export const T = {
     // за chart.js: renderChart/renderTable (не са в списъка от sdd-документа)
     spring_word: "пролетна", autumn_word: "есенна",
     no_data_year: "няма достатъчно данни",
+    // Ф5/преглед: единственият жив статус — #status (визуално скрит), не #result
+    status_result_ready: (lat, lon) => `Резултат готов за ${lat}, ${lon}.`,
+    status_window_changed: (n) => `Периодът е сменен на последните ${n} години.`,
   },
   en: {
     title: "When is the frost at your place?",
@@ -115,5 +118,8 @@ export const T = {
     // for chart.js: renderChart/renderTable (not in the sdd document's list)
     spring_word: "spring", autumn_word: "autumn",
     no_data_year: "not enough data",
+    // Ф5/review: the one live status — #status (visually hidden), not #result
+    status_result_ready: (lat, lon) => `Result ready for ${lat}, ${lon}.`,
+    status_window_changed: (n) => `Period changed to the last ${n} years.`,
   },
 };
