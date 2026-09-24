@@ -32,11 +32,11 @@
 ```json
 {
   "query": {"lat": 42.184, "lon": 24.929},
-  "cell": {"lat": 42.2, "lon": 24.9, "elev_m": 200, "distance_m": 2979},
-  "typical": {"last_spring": "04-12", "first_autumn": "10-17"},
-  "safe": {"last_spring": "04-16", "first_autumn": "10-12"},
+  "cell": {"lat": 42.2, "lon": 24.9, "elev_m": 99, "distance_m": 2979},
+  "typical": {"last_spring": "03-29", "first_autumn": "11-25"},
+  "safe": {"last_spring": "04-11", "first_autumn": "10-30"},
   "years_used": 30,
-  "years": [[1996, "04-08", "10-19"], [1997, "04-16", "10-13"], [1998, "04-12", "10-17"], "… (30 записа общо)"],
+  "years": [[1996, "04-18", "11-26"], [1997, "04-18", "10-30"], [1998, "03-30", "11-18"], "… (30 записа общо)"],
   "period": {"start": 1996, "end": 2025},
   "threshold_c": 0,
   "note": {
@@ -44,15 +44,18 @@
     "en": "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation."
   },
   "source": {
-    "bg": "Пробни данни (синтетична мрежа)",
-    "en": "Sample data (synthetic grid)",
-    "url": null,
-    "attribution": null
+    "bg": "ERA5-Land през Copernicus CDS, 1996–2025",
+    "en": "ERA5-Land via Copernicus CDS, 1996–2025",
+    "url": "https://cds.climate.copernicus.eu/datasets/derived-era5-land-daily-statistics",
+    "attribution": "Contains modified Copernicus Climate Change Service information 2026"
   },
-  "synthetic": true,
+  "synthetic": false,
   "version": "1"
 }
 ```
+
+Примерът е от production (`GET /api/v1/frost?lat=42.18425&lon=24.92936`,
+изтеглен от <https://frost.bg>).
 
 Полета: `query` — заявените координати, закръглени до 3 знака; `cell` —
 центърът на клетката, височината ѝ и разстоянието до нея (височината е от
@@ -79,6 +82,11 @@ Open-Meteo; при синтетична — измислена); `typical`/`safe
 | `cds` (продукция) | `ERA5-Land през Copernicus CDS, 1996–2025` / `ERA5-Land via Copernicus CDS, 1996–2025` | страницата на набора в CDS | `Contains modified Copernicus Climate Change Service information 2026` (годината на смятането; изисква се от лиценза на CDS) |
 | `openmeteo` | `ERA5 през Open-Meteo, 1996–2025` / `ERA5 via Open-Meteo, 1996–2025` | `https://open-meteo.com/` | `Weather data by Open-Meteo.com` |
 | `synthetic` | `Пробни данни (синтетична мрежа)` / `Sample data (synthetic grid)` | `null` | `null` |
+
+Синтетичната мрежа е само за локална разработка без мрежов достъп до
+CDS/Open-Meteo (`grid/compute_grid.py --synthetic`, вижте
+[`operations.md`](operations.md)); в production `source_id` винаги е
+`cds`, какъвто е и примерът по-горе.
 
 Кеш: `Cache-Control: public, max-age=300, s-maxage=86400` — браузърът пази
 отговора 5 минути, ръбът на Cloudflare (Cache API, изрично, не само по

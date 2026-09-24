@@ -13,9 +13,12 @@ Planner).
 - [`operations.md`](operations.md) — how the grid is computed and
   refreshed, how to run and test the project locally, the cache, how it is
   deployed to Cloudflare and what is still missing.
-- [The spec](../superpowers/specs/2026-09-14-frost-bg-design.md) — the full
-  design of the project (the decisions behind it, the grid file format,
-  what phase 2 has planned).
+- [The phase 1 spec](../superpowers/specs/2026-09-14-frost-bg-design.md) —
+  the design of the grid and of API v1 (the decisions behind it, the grid
+  file format); its section on a future phase 2 has been superseded by the
+  actual design — see [the phase 2
+  spec](../superpowers/specs/2026-09-23-frost-bg-phase2-design.md) for the
+  page's year history.
 
 ## Where the data comes from
 
@@ -28,9 +31,11 @@ previous calendar year (currently 1996–2025; the window shifts by one year
 every January). Frost is a day with a minimum ≤ **0 °C**. `grid.json`
 (2,080 points over Bulgaria's grid) is computed **in advance**, offline —
 see [`operations.md`](operations.md) for how and when. The grid records
-its origin (`source_id`) and the page and the API say it as it is: while
-the grid in the repo is synthetic, the source reads "sample data", not
-ERA5-Land.
+its origin (`source_id`) and the page and the API say it as it is: in
+production the source is real — ERA5-Land via Copernicus CDS
+(`source_id: "cds"`). A synthetic mode (`source_id: "synthetic"`, a
+plausible stand-in without network access) exists only for local
+development — see [`operations.md`](operations.md).
 
 Open-Meteo still has two jobs in the project: as the **geocoder** (place
 name → coordinates, [`api.md`](api.md)) and as a **cross-check** for the
@@ -71,13 +76,23 @@ comparison of "the last 10 against all 30", the length of the
 **frost-free season** (typical, shortest, longest) and the **risk of
 spring frost after a chosen date** — everywhere with the caveat that this
 is a historical frequency, not a forecast for that particular year. The
-table of yearly numbers can also be downloaded as CSV.
+table of yearly numbers can also be downloaded as CSV. The date scale and
+the full 30-year range don't change when the period changes — the chosen
+period is only highlighted in the chart and the table. The period is kept
+in the page's URL (`?window=10|20|30`, defaulting to 30) — **page-only**:
+the API has no such parameter and always returns the full 30 years in
+`years`.
 
-A year with no row in `years` means "not enough data" (fewer than 10 valid
-years in that direction); `null` for a specific date in a row means "no
-frost recorded" that year — two different things. February 29 counts as
-March 1. The full design of the history is in [the phase 2
-spec](../superpowers/specs/2026-09-23-frost-bg-phase2-design.md).
+Three separate states, easy to confuse: a **missing row** in `years`
+means the grid didn't accept that year (fewer than 300 valid days) — it
+doesn't enter the denominators, and the chart shows an empty spot; `null`
+**for a seasonal date** in a row that is present means no frost was
+recorded in that half of the year, in the available data — it doesn't
+enter that season's quantiles, but it does count as "no event" for the
+risk figure; `null` for the **typical/safe** date (at the top of the
+page) means fewer than 10 years had frost for that season — "too few
+years for a reliable date", not "no frost". February 29 counts as
+March 1.
 
 ## The known limitation — valley bottoms
 

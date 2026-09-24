@@ -39,10 +39,15 @@
 
 - **Графика с последните 30 години** под датите: по една точка за
   последната пролетна и първата есенна слана, месеците по оста, таблица със
-  същите числа и бутон **„свали CSV“**.
+  същите числа и бутон **„свали CSV“**. Обхватът на годините и скалата на
+  датите са постоянни — смяната на периода само откроява избраните години,
+  без да пресяга осите.
 - **Период 10 / 20 / 30 години** — датите се пресмятат за избрания период
   от същия отговор, без нова заявка. По-къси периоди няма: под 10 години
-  със слана „сигурна в 9 от 10 години“ е безсмислица.
+  със слана „сигурна в 9 от 10 години“ е безсмислица. Прозорецът е в адреса
+  на страницата (`?window=10|20|30`, подразбиращо се 30) — пазен при
+  презареждане, споделяне и смяна на езика; само на страницата, API-то няма
+  такъв параметър.
 - **Сравнение „последните 10 срещу всичките 30“** — с колко дни се е
   преместила типичната слана.
 - **Сезон без слана** — типична, най-къса и най-дълга дължина, смятани по
@@ -58,10 +63,15 @@
 
 - **A chart of the last 30 years** under the dates: one point for the last
   spring and the first autumn frost, months along the axis, a table with the
-  same numbers and a **"download CSV"** button.
+  same numbers and a **"download CSV"** button. The year range and date
+  scale stay fixed — changing the period only highlights the chosen years,
+  it never rescales the axes.
 - **Period 10 / 20 / 30 years** — the dates are recomputed for the chosen
   period from the same response, with no new request. No shorter periods:
   with fewer than ten frost years "safe in 9 years out of 10" is meaningless.
+  The period lives in the page's URL (`?window=10|20|30`, defaulting to
+  30) — kept across reloads, sharing and language switches; page-only, the
+  API has no such parameter.
 - **A comparison "the last 10 against all 30"** — by how many days the
   typical frost has moved.
 - **Frost-free season** — typical, shortest and longest length, computed per
