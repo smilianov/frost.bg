@@ -345,6 +345,13 @@ button {
 .chart .pt.out-of-window { fill: var(--paper); }
 .chart .pt.spring.out-of-window { stroke: #2f6fb3; stroke-width: 1.5; }
 .chart .pt.autumn.out-of-window { stroke: #c1571c; stroke-width: 1.5; }
+/* Преглед (последна вълна): .pt.spring.out-of-window (4 класа) винаги
+   печели пред .pt.year-selected (3 класа), без значение от реда им във
+   файла — избраната точка извън прозореца затова оставаше с тънкия контур
+   (1.5) вместо избрания (2.5). Правило за самото съчетание (5 класа)
+   печели и двете по-горе, каквото и да е специфичността им поотделно. */
+.chart .pt.spring.out-of-window.year-selected,
+.chart .pt.autumn.out-of-window.year-selected { stroke-width: 2.5; }
 
 /* Таблица: обикновен текст, друг праг (WCAG 1.4.3, 4.5:1, не 1.4.11).
    Измерено: opacity 0.6 срещу var(--ink) даваше 4.04:1 в светла тема (под
@@ -421,6 +428,10 @@ button {
   .chart .pt.spring.out-of-window { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
   .chart .pt.autumn.out-of-window { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
   .years tr.out-of-window { opacity: 1; }
+  /* съчетанието (5 класа, извън @media) иначе би надвило и печатния ресет
+     по-горе, по същата причина като бележката при дефиницията му */
+  .chart .pt.spring.out-of-window.year-selected { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
+  .chart .pt.autumn.out-of-window.year-selected { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
   /* избраната година е екранно взаимодействие — печатът е статичен снимък */
   .chart .year-cursor { visibility: hidden !important; }
   .chart .pt.year-selected { stroke-width: 1; }

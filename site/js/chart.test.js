@@ -39,29 +39,40 @@ test("chartModel: етикетите на месеците са на истин�
 // Преглед: selectYear() е решението зад readout-а на графиката (Ф5:
 // "избор на година... Tooltip казва година, сезон и дата") — чист израз на
 // (model, year), тества се директно, без DOM.
-test("selectYear: връща точките на годината, или null за сезон без точка", () => {
+test("selectYear: връща точките на годината и hasRow:true, или null за сезон без точка", () => {
   const m = chartModel(rows, { from: 2023, to: 2025 });
   assert.deepEqual(selectYear(m, 2023), {
     year: 2023,
     spring: { year: 2023, day: 91, season: "spring", mmdd: "04-01" },
     autumn: { year: 2023, day: 274, season: "autumn", mmdd: "10-01" },
+    hasRow: true,
   });
-  assert.equal(selectYear(m, 2024).spring, null, "2024 няма пролетна дата");
+  assert.equal(selectYear(m, 2024).spring, null, "2024 няма пролетна дата, но си има ред");
+  assert.equal(selectYear(m, 2024).hasRow, true);
   assert.equal(selectYear(m, 2024).autumn.mmdd, "10-05");
   assert.equal(selectYear(m, 2025).autumn, null, "2025 няма есенна дата");
 });
 
-test("selectYear: година без нито една точка -> и двата сезона null (не хвърля)", () => {
+// Преглед (последна вълна): "годината няма ред изобщо" != "има ред, но
+// сезонът е null" — hasRow ги разграничава (таблицата вече го правеше).
+test("selectYear: година без нито един ред -> hasRow:false, и двата сезона null (не хвърля)", () => {
   const m = chartModel(rows, { from: 2023, to: 2025 });
-  assert.deepEqual(selectYear(m, 2026), { year: 2026, spring: null, autumn: null });
+  assert.deepEqual(selectYear(m, 2026), { year: 2026, spring: null, autumn: null, hasRow: false });
 });
 
 test("yearReadoutText: годината и двата сезона, с t.no_frost_recorded за липсваща сезонна точка", () => {
-  const t = { spring_word: "пролетна", autumn_word: "есенна", no_frost_recorded: "няма записана слана" };
+  const t = { spring_word: "пролетна", autumn_word: "есенна", no_frost_recorded: "няма записана слана", no_data_year: "няма достатъчно данни" };
   const m = chartModel(rows, { from: 2023, to: 2025 });
   assert.equal(yearReadoutText(selectYear(m, 2023), "bg", t), "2023 · пролетна: 1 април · есенна: 1 октомври");
   assert.equal(yearReadoutText(selectYear(m, 2024), "bg", t), "2024 · пролетна: няма записана слана · есенна: 5 октомври");
-  assert.equal(yearReadoutText(selectYear(m, 2026), "bg", t), "2026 · пролетна: няма записана слана · есенна: няма записана слана");
+});
+
+// Преглед (последна вълна): година без ред изобщо (различно от ред със
+// сезон null) чете no_data_year в readout-а, точно както в таблицата.
+test("yearReadoutText: година без нито един ред -> t.no_data_year, не t.no_frost_recorded", () => {
+  const t = { spring_word: "пролетна", autumn_word: "есенна", no_frost_recorded: "няма записана слана", no_data_year: "няма достатъчно данни" };
+  const m = chartModel(rows, { from: 2023, to: 2025 });
+  assert.equal(yearReadoutText(selectYear(m, 2026), "bg", t), "2026 · няма достатъчно данни");
 });
 
 test("toCsv: заглавен коментар, колони, празно за липсваща дата", () => {
@@ -177,6 +188,22 @@ test("renderChart: цялата графика е ЕДНА tab спирка — 
   });
 });
 
+// Преглед (последна вълна): role="application" потискаше обикновеното
+// разглеждане на четеца на екрана, без да дава нищо насреща — role="img" +
+// aria-describedby към видимия readout е връзката, не aria-activedescendant.
+test("renderChart: role=\"img\" (не \"application\"), aria-describedby сочи към readoutId, ако е подаден", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const withReadout = renderChart(model, { lang: "bg", title: "т", t, readoutId: "chart-readout" });
+    assert.equal(withReadout.attrs.role, "img");
+    assert.equal(withReadout.attrs["aria-describedby"], "chart-readout");
+
+    const withoutReadout = renderChart(model, { lang: "bg", title: "т", t });
+    assert.equal(withoutReadout.attrs["aria-describedby"], undefined, "без readoutId не се слага празна връзка");
+  });
+});
+
 test("renderChart: стрелките местят избраната година; Home/End до краищата; Escape изчиства", () => {
   withFakeDocument(() => {
     const model = chartModel(rows, { from: 2023, to: 2025 });
@@ -207,6 +234,40 @@ test("renderChart: клик върху точка избира годината 
     const svg = renderChart(model, { lang: "bg", title: "т", t, onSelectYear: (y) => selections.push(y) });
     findNode(svg, "rect", "pt autumn").fire("click"); // 2023 или 2024 — първата есенна точка (2023)
     assert.equal(selections.at(-1), 2023);
+  });
+});
+
+// Преглед (последна вълна): допирът/кликът няма Escape — повторен допир
+// върху вече избраната година е единственият изход за пипващи устройства.
+test("renderChart: повторен клик върху вече избраната година я изчиства (допир няма Escape)", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const selections = [];
+    const svg = renderChart(model, { lang: "bg", title: "т", t, onSelectYear: (y) => selections.push(y) });
+    const spring = findNode(svg, "circle", "pt spring"); // 2023
+
+    spring.fire("click");
+    assert.equal(selections.at(-1), 2023, "първи клик избира");
+    spring.fire("click");
+    assert.equal(selections.at(-1), null, "втори клик на СЪЩАТА точка изчиства");
+    spring.fire("click");
+    assert.equal(selections.at(-1), 2023, "трети клик избира отново — не е заключено на null");
+  });
+});
+
+// Клавиатурата не бива да наследи това поведение: Home/End на вече
+// избраната граница трябва да си остане потвърждение, не изчистване.
+test("renderChart: Home/End на вече избраната граница НЕ изчиства (само допирът превключва)", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const selections = [];
+    const svg = renderChart(model, { lang: "bg", title: "т", t, onSelectYear: (y) => selections.push(y) });
+    svg.fire("keydown", { key: "Home" });
+    assert.equal(selections.at(-1), 2023);
+    svg.fire("keydown", { key: "Home" });
+    assert.equal(selections.at(-1), 2023, "повторно Home си остава 2023, не null");
   });
 });
 

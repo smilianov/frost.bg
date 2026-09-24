@@ -195,7 +195,10 @@ function paintHistory(view) {
       lang, title: view.chart.title, t,
       // Ф5: "избор на година... Tooltip казва година, сезон и дата" — видимо
       // в #chart-readout И обявено политично през #status (единствената
-      // live област; никаква втора тук).
+      // live област; никаква втора тук). readoutId свързва графиката с
+      // #chart-readout през aria-describedby (преглед, последна вълна —
+      // role="application" отпадна, замества го role="img" + описание).
+      readoutId: "chart-readout",
       onSelectYear: (year) => {
         const text = year === null ? "" : yearReadoutText(selectYear(view.chart.model, year), lang, t);
         $("chart-readout").textContent = text;

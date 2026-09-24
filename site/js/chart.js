@@ -7,8 +7,10 @@ const MONTH_STARTS = Array.from({ length: 12 }, (_, i) => dayOfYear(`${String(i 
 
 export function chartModel(rows, { from, to }) {
   const points = [];
+  const yearsWithRows = new Set(); // преглед: за selectYear — "няма ред" != "ред без тази сезонна дата"
   for (const r of Array.isArray(rows) ? rows : []) {
     if (!Array.isArray(r) || !Number.isInteger(r[0])) continue;
+    yearsWithRows.add(r[0]);
     for (const [i, season] of [[1, "spring"], [2, "autumn"]]) {
       const day = dayOfYear(r[i]);
       if (day !== null) points.push({ year: r[0], day, season, mmdd: toMMDD(day) });
@@ -19,6 +21,7 @@ export function chartModel(rows, { from, to }) {
     months: MONTH_STARTS.map((day, i) => ({ day, label: i + 1 })),
     years: { from, to },
     empty: points.length === 0,
+    yearsWithRows,
   };
 }
 
@@ -51,34 +54,47 @@ function pointLabel(p, lang, t) {
 }
 
 // Преглед: изборът на година — чист израз на (model, year), без DOM. Връща
-// точките на тази година (или null за сезон без записана слана/без ред —
-// графиката не разграничава двете, за разлика от таблицата, която има
-// суровите редове). Ползва се и от renderChart (клавиатура/клик), и от
-// извикващия (app.js) за видимия readout — едно и също изчисление.
+// точките на тази година (или null за сезон без записана слана), плюс
+// hasRow — "годината няма ред изобщо" вече е различно от "има ред, но
+// сезонът е null" (преглед, последна вълна): readout-ът вече разграничава
+// двете, както и таблицата под него. Ползва се и от renderChart
+// (клавиатура/клик), и от извикващия (app.js) за видимия readout — едно и
+// също изчисление.
 export function selectYear(model, year) {
   const spring = model.points.find((p) => p.year === year && p.season === "spring") ?? null;
   const autumn = model.points.find((p) => p.year === year && p.season === "autumn") ?? null;
-  return { year, spring, autumn };
+  const hasRow = model.yearsWithRows?.has(year) ?? false;
+  return { year, spring, autumn, hasRow };
 }
 
 // Текстът на readout-а — видимо (app.js го пише в #chart-readout) и обявено
 // (app.js го праща и на #status, едно и също изречение, никаква втора live
-// област). t.no_frost_recorded покрива и "няма ред" и "ред без тази
-// сезонна дата" — графиката не разграничава двете (виж бележката горе);
-// таблицата под нея пази пълната разлика.
+// област). t.no_data_year/t.no_frost_recorded са същите ключове, с които
+// таблицата (renderTable) прави точно тази разлика — readout-ът я пази.
 export function yearReadoutText(readout, lang, t) {
+  if (!readout.hasRow) return `${readout.year} · ${t.no_data_year}`;
   const springText = readout.spring ? formatMMDD(readout.spring.mmdd, lang) : t.no_frost_recorded;
   const autumnText = readout.autumn ? formatMMDD(readout.autumn.mmdd, lang) : t.no_frost_recorded;
   return `${readout.year} · ${t.spring_word}: ${springText} · ${t.autumn_word}: ${autumnText}`;
 }
 
-export function renderChart(model, { lang, title, t, onSelectYear }) {
+export function renderChart(model, { lang, title, t, onSelectYear, readoutId }) {
+  // Преглед (последна вълна): role="application" потискаше обикновеното
+  // разглеждане на четеца на екрана и не даваше нищо насреща (точките вече
+  // не са фокусируеми поотделно, нямаше нито избраният елемент, нито
+  // връзка към readout-а в дървото за достъпност). role="img" — статична
+  // именувана графика с обяснение как се навигира в самото ѝ име — плюс
+  // aria-describedby към видимия readout (app.js подава readoutId="chart-
+  // readout"): текущият избор се разкрива там, а не с aria-activedescendant
+  // (по-крехко за role="img", изисква стабилни id-та за всяка точка/лента).
+  // #status (app.js) продължава да го обявява политично при всяка смяна.
   const svg = svgEl("svg", {
     viewBox: `0 0 ${W} ${H}`, class: "chart",
-    role: "application", tabindex: "0",
+    role: "img", tabindex: "0",
     "aria-label": `${title} — ${t.chart_nav_hint}`,
     preserveAspectRatio: "xMidYMid meet",
   });
+  if (readoutId) svg.setAttribute("aria-describedby", readoutId);
   const svgTitle = svgEl("title");
   svgTitle.textContent = title;
   svg.append(svgTitle);
@@ -130,13 +146,20 @@ export function renderChart(model, { lang, title, t, onSelectYear }) {
     paintSelection();
     if (onSelectYear) onSelectYear(selected);
   }
+  // Допир/клик няма Escape — преглед (последна вълна): допир върху вече
+  // избраната година я изчиства (toggle), вместо да я потвърждава пак без
+  // изход. Само за показалец/допир — клавиатурата (Home/End и т.н. по-долу)
+  // остава директна, инак повторно Home/End би изчиствало по невнимание.
+  function selectViaPointer(year) {
+    selectYearAndNotify(year === selected ? null : year);
+  }
 
   for (let year = model.years.from; year <= model.years.to; year++) {
     const band = svgEl("rect", {
       x: x(year) - bandWidth / 2, y: PAD_T, width: bandWidth, height: H - PAD_T - PAD_B,
       class: "year-band", fill: "transparent",
     });
-    band.addEventListener("click", () => selectYearAndNotify(year));
+    band.addEventListener("click", () => selectViaPointer(year));
     svg.append(band);
   }
 
@@ -155,7 +178,7 @@ export function renderChart(model, { lang, title, t, onSelectYear }) {
     const pointTitle = svgEl("title");
     pointTitle.textContent = label;
     node.append(pointTitle);
-    node.addEventListener("click", () => selectYearAndNotify(p.year));
+    node.addEventListener("click", () => selectViaPointer(p.year));
     svg.append(node);
     pointEntries.push({ node, year: p.year });
   }
