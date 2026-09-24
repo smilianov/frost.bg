@@ -20,10 +20,16 @@ test("нула и отрицателна височина са валидни с
 });
 
 test("негоден отговор -> ElevationError, без стойности в съобщението", async () => {
-  for (const body of [{}, { elevation: [] }, { elevation: "350" }, { elevation: [null] }, { elevation: [NaN] }, [1, 2]]) {
-    await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: ok(body) }), (e) => {
+  // JSON.stringify(NaN) дава null, т.е. { elevation: [NaN] } всъщност пращаше
+  // { elevation: [null] } по мрежата — дублира случая по-горе и не докосваше
+  // клона за нецяла (не-крайна) стойност. Суров текст с 1e999 се парсва до
+  // Infinity: typeof "number", но не е крайно — реално покрива Number.isFinite.
+  const raw = (text) => () => new Response(text, { status: 200, headers: { "content-type": "application/json" } });
+  const cases = [ok({}), ok({ elevation: [] }), ok({ elevation: "350" }), ok({ elevation: [null] }), raw('{"elevation":[1e999]}'), ok([1, 2])];
+  for (const fetchImpl of cases) {
+    await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl }), (e) => {
       assert.ok(e instanceof ElevationError);
-      assert.ok(!/350|NaN/.test(e.message), e.message);
+      assert.ok(!/350|Infinity/.test(e.message), e.message);
       return true;
     });
   }
@@ -41,10 +47,26 @@ test("429 и 5xx включват кратък отказ: следващата 
   assert.equal(calls, 2, "след 10 минути пак се пита");
 });
 
+test("503 (5xx) също включва кратък отказ, не само 429", async () => {
+  resetCooldown();
+  let calls = 0;
+  const f = () => { calls++; return status(503)(); };
+  await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: f, now: 1000 }));
+  assert.equal(calls, 1);
+  await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: f, now: 2000 }), /cooldown/i);
+  assert.equal(calls, 1, "в отказа не се пита нагоре");
+});
+
 test("краен срок: бавен доставчик -> ElevationError", async () => {
   resetCooldown();
   const slow = () => new Promise(() => {});
   await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: slow, timeoutMs: 20 }), ElevationError);
+});
+
+test("краен срок покрива и четенето на тялото: забавено тяло -> ElevationError, не късен успех", async () => {
+  resetCooldown();
+  const stalledBody = { ok: true, status: 200, json: () => new Promise(() => {}) };
+  await assert.rejects(() => elevation({ lat: 42, lon: 24, fetchImpl: () => Promise.resolve(stalledBody), timeoutMs: 20 }), ElevationError);
 });
 
 test("мрежова грешка -> ElevationError, без автоматичен повторен опит", async () => {
