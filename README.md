@@ -122,3 +122,24 @@ python3 grid/compute_grid.py --synthetic       # правдоподобна мр
 
 Цялата мрежа през Open-Meteo би отнела около 16 дни от един IP — затова този
 път е само за проби и за кръстосаната проверка, не за истинската мрежа.
+
+## Лиценз
+
+Кодът е под лиценз **MIT** — виж [`LICENSE`](LICENSE), © 2026 Georgi
+Smilianov.
+
+Данните не са наши, за да ги преотстъпваме под същия лиценз:
+
+- мрежата (`grid/grid.json`) е производна на ERA5-Land през [Copernicus
+  Climate Data Store](https://cds.climate.copernicus.eu/) и носи
+  посочването на Copernicus, което вече е показано в API-то и на
+  страницата — вижте [условията на
+  Copernicus](https://www.copernicus.eu/en/access-data/copyright-and-licences);
+- имената на местата идват от [Open-Meteo](https://open-meteo.com/en/terms)
+  (или от Google, когато е настроен — [условията на Google Maps
+  Platform](https://cloud.google.com/maps-platform/terms));
+- плочките на картата са от
+  [OpenStreetMap](https://www.openstreetmap.org/copyright), по неговите
+  собствени условия;
+- Leaflet е вграден в проекта (`site/vendor/leaflet/`) под
+  [BSD-2-Clause](site/vendor/leaflet/LICENSE).

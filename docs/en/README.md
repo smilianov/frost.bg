@@ -114,3 +114,24 @@ rectangle 41.2–44.3° N × 22.3–28.7° E plus a half-step (0.05°) margin
 around it (41.16/22.26 rounds to 41.2/22.3 and gets an answer). Beyond
 that — a polite refusal, not an approximation from a neighboring cell.
 Details on the boundaries and error codes are in [`api.md`](api.md).
+
+## Licence
+
+The code is under the **MIT** licence — see [`LICENSE`](../../LICENSE) at
+the repository root, © 2026 Georgi Smilianov.
+
+The data is not ours to relicense:
+
+- the grid (`grid/grid.json`) is derived from ERA5-Land via the
+  [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) and
+  carries the Copernicus attribution already shown in the API and on the
+  page — see [Copernicus's own
+  terms](https://www.copernicus.eu/en/access-data/copyright-and-licences);
+- place names come from [Open-Meteo](https://open-meteo.com/en/terms) (or
+  Google, when configured — see the [Google Maps Platform
+  terms](https://cloud.google.com/maps-platform/terms));
+- map tiles come from
+  [OpenStreetMap](https://www.openstreetmap.org/copyright), under its own
+  terms;
+- Leaflet is vendored in the project (`site/vendor/leaflet/`) under
+  [BSD-2-Clause](../../site/vendor/leaflet/LICENSE).
