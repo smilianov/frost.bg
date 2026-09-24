@@ -1,6 +1,8 @@
 import { T } from "./texts.js";
-import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl } from "./format.js";
+import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, WINDOWS, DEFAULT_WINDOW } from "./format.js";
 import { createMap } from "./map.js";
+import { selectWindow, pair, seasonSummary, riskAfter, compareWindows } from "./stats.js";
+import { chartModel, toCsv, renderChart, renderTable } from "./chart.js";
 
 const lang = document.body.dataset.lang === "en" ? "en" : "bg";
 const t = T[lang];
@@ -16,7 +18,21 @@ $("locate").textContent = t.locate; $("go").textContent = t.go;
 $("lang-switch").textContent = t.lang_switch; $("lang-switch").href = t.lang_switch_href;
 $("synthetic").textContent = t.synthetic_banner;
 
+// фаза 2 — историята: статичните етикети (изчисленото се пълни в renderHistory)
+$("history-title").textContent = t.history;
+$("season-title").textContent = t.season;
+$("risk-title").textContent = t.risk_label;
+$("risk-day-label").textContent = t.risk_day;
+$("risk-month-label").textContent = t.risk_month;
+$("risk-go").textContent = t.risk_go;
+$("csv").textContent = t.csv_download;
+$("table-summary").textContent = t.table_caption;
+
 let map = null;
+// Началният прозорец идва от адреса, преди първата заявка (Стъпка 7, правило 4).
+let currentWindow = readWindow(location.search);
+let lastData = null;   // последният отговор на /frost, за прерисуване без заявка
+let lastLat = null, lastLon = null; // за updateUrl() при смяна на прозореца, без нова заявка
 
 function say(msg) { const m = $("message"); m.textContent = msg; m.hidden = !msg; }
 
@@ -46,13 +62,15 @@ function safeHttpUrl(u) {
   } catch (_) { return null; }
 }
 
-function pairCard(title, hint, pair, safeClass) {
+// dd-тата на last_spring/first_autumn носят id-та, за да могат redrawPairs()
+// да ги пренапише при смяна на прозореца, без да строи картите наново.
+function pairCard(title, hint, pair, safeClass, ids) {
   const card = el("div", { class: safeClass ? "pair safe" : "pair" });
   card.append(el("h2", { text: title }), el("p", { class: "hint", text: hint }));
   const dl = el("dl");
   dl.append(
-    el("dt", { text: t.last_spring }), el("dd", { text: formatMMDD(pair?.last_spring, lang) }),
-    el("dt", { text: t.first_autumn }), el("dd", { text: formatMMDD(pair?.first_autumn, lang) }),
+    el("dt", { text: t.last_spring }), el("dd", { id: ids.spring, text: formatMMDD(pair?.last_spring, lang) }),
+    el("dt", { text: t.first_autumn }), el("dd", { id: ids.autumn, text: formatMMDD(pair?.first_autumn, lang) }),
   );
   card.append(dl);
   return card;
@@ -68,9 +86,11 @@ function render(d) {
 
   const pairs = el("div", { class: "pairs" });
   pairs.append(
-    pairCard(t.typical, t.typical_hint, d?.typical, false),
-    pairCard(t.safe, t.safe_hint, d?.safe, true),
+    pairCard(t.typical, t.typical_hint, d?.typical, false, { spring: "typical-spring", autumn: "typical-autumn" }),
+    pairCard(t.safe, t.safe_hint, d?.safe, true, { spring: "safe-spring", autumn: "safe-autumn" }),
   );
+  const pairsNote = el("p", { id: "pairs-note", class: "hint" });
+  pairsNote.hidden = true;
 
   const cellP = el("p", {
     class: "cell",
@@ -94,16 +114,151 @@ function render(d) {
       : text(t.api),
   );
 
-  $("result").replaceChildren(pairs, cellP, noteP, srcP);
+  $("result").replaceChildren(pairs, pairsNote, cellP, noteP, srcP);
   $("result").hidden = false;
   $("synthetic").hidden = !d?.synthetic;
   if (qLat !== null) $("lat").value = qLat;
   if (qLon !== null) $("lon").value = qLon;
   if (qLat !== null && qLon !== null) {
-    history.replaceState(null, "", shareUrl(location.origin + location.pathname, qLat, qLon));
-    $("lang-switch").href = `${t.lang_switch_href}?lat=${qLat}&lon=${qLon}`;
+    lastLat = qLat; lastLon = qLon;
+    updateUrl();
+  } else {
+    lastLat = null; lastLon = null;
   }
+  renderHistory(d); // Стъпка 7, правило 1: render(d) вика renderHistory(d) накрая
 }
+
+// updateUrl(): адресът и #lang-switch носят и текущия прозорец (Стъпка 7,
+// правило 3). shareUrl("", …) дава само "?lat=…&lon=…[&window=…]" — същото
+// закръгляне и същото условие за window, без да се дублира логиката тук.
+function updateUrl() {
+  if (lastLat === null || lastLon === null) return;
+  history.replaceState(null, "", shareUrl(location.origin + location.pathname, lastLat, lastLon, currentWindow));
+  $("lang-switch").href = `${t.lang_switch_href}${shareUrl("", lastLat, lastLon, currentWindow)}`;
+}
+
+// --- фаза 2: прозорецът, сравнението, сезонът, рискът, CSV --------------
+
+function redrawPairs(p, w) {
+  $("typical-spring").textContent = formatMMDD(p.typical.last_spring, lang);
+  $("typical-autumn").textContent = formatMMDD(p.typical.first_autumn, lang);
+  $("safe-spring").textContent = formatMMDD(p.safe.last_spring, lang);
+  $("safe-autumn").textContent = formatMMDD(p.safe.first_autumn, lang);
+  // typical/safe стават null именно когато годините в прозореца са под 10
+  // (виж pair() в stats.js) — това е сигналът за t.too_few_years, не withData.
+  const short = p.typical.last_spring === null || p.typical.first_autumn === null;
+  $("pairs-note").textContent = short ? t.too_few_years : "";
+  $("pairs-note").hidden = !short;
+}
+
+function redrawCompare(cmp) {
+  const parts = [];
+  if (cmp.spring) parts.push(t.compare_spring(cmp.spring.days, cmp.spring.direction));
+  if (cmp.autumn) parts.push(t.compare_autumn(cmp.autumn.days, cmp.autumn.direction));
+  $("compare").textContent = parts.join(" · ");
+}
+
+function redrawSeason(summary) {
+  const p = $("season");
+  if (!summary) { p.textContent = t.no_history; return; }
+  const parts = [
+    t.season_summary(summary.typical, summary.shortest.days, summary.longest.days),
+    t.season_years(summary.shortest.years),
+    t.season_years(summary.longest.years),
+  ];
+  if (summary.clipped > 0) parts.push(t.season_clipped);
+  p.textContent = parts.join(" · ");
+}
+
+function redrawChart(model, w, d) {
+  const cellLat = num(d?.cell?.lat), cellLon = num(d?.cell?.lon);
+  const title = t.chart_title(cellLat ?? "—", cellLon ?? "—", w.from, w.to);
+  $("chart").replaceChildren(model.empty
+    ? el("p", { class: "hint", text: t.no_history })
+    : renderChart(model, { lang, title, t }));
+  $("table-slot").replaceChildren(renderTable(w.rows, { lang, t, from: w.from, to: w.to }));
+}
+
+// Изречението до сигурната дата (Стъпка 7, правило 7) — пише се в
+// #risk-result, единствената aria-live област на #history: при смяна на
+// прозореца точно тя се обявява накратко, не цялата таблица/графика.
+function redrawSafeMeans(p, w) {
+  const safeDate = p?.safe?.last_spring;
+  if (!safeDate) { $("risk-result").textContent = ""; return; }
+  const risk = riskAfter(w.rows, safeDate);
+  if (!risk) { $("risk-result").textContent = ""; return; }
+  $("risk-result").textContent = t.safe_means(risk.count, risk.total, formatMMDD(safeDate, lang));
+}
+
+function renderHistory(d) {
+  lastData = d;
+  const years = Array.isArray(d?.years) ? d.years : [];
+  const periodEnd = num(d?.period?.end);
+  const section = $("history");
+  if (!years.length || periodEnd === null) { section.hidden = true; return; }
+  section.hidden = false;
+
+  const w = selectWindow(years, periodEnd, currentWindow);
+  const p = pair(w.rows);
+  // двойките горе се пресмятат за прозореца; при под 10 години — обяснение
+  redrawPairs(p, w);
+  redrawCompare(compareWindows(years, periodEnd));
+  redrawSeason(seasonSummary(w.rows));
+  redrawChart(chartModel(w.rows, { from: w.from, to: w.to }), w, d);
+  redrawSafeMeans(p, w);
+  $("window-note").textContent = t.window_note(w.from, w.to, w.withData, currentWindow);
+}
+
+let windowButtons = [];
+function buildWindowButtons() {
+  const group = $("windows");
+  group.setAttribute("aria-label", t.window_label);
+  windowButtons = WINDOWS.map((n) => {
+    const b = el("button", { type: "button", text: t.window_years(n) });
+    b.dataset.window = String(n);
+    b.setAttribute("aria-pressed", String(n === currentWindow));
+    b.onclick = () => setWindow(n);
+    return b;
+  });
+  group.replaceChildren(...windowButtons);
+}
+
+function setWindow(n) {
+  currentWindow = WINDOWS.includes(n) ? n : DEFAULT_WINDOW;
+  for (const b of windowButtons) b.setAttribute("aria-pressed", String(Number(b.dataset.window) === currentWindow));
+  if (lastData) renderHistory(lastData);            // без нова заявка
+  updateUrl();
+}
+buildWindowButtons();
+
+$("csv").onclick = () => {
+  if (!lastData) return;
+  const years = Array.isArray(lastData.years) ? lastData.years : [];
+  const periodEnd = num(lastData.period?.end);
+  if (periodEnd === null) return;
+  const w = selectWindow(years, periodEnd, currentWindow);
+  const cell = lastData.cell || {};
+  const csv = toCsv(w.rows, { lat: cell.lat, lon: cell.lon, period: lastData.period, source: lastData.source?.[lang] });
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: `frost-bg-${cell.lat}-${cell.lon}.csv` });
+  document.body.append(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
+
+$("risk-go").onclick = () => {
+  if (!lastData) return;
+  const day = Number($("risk-day").value), month = Number($("risk-month").value);
+  const mmdd = `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const years = Array.isArray(lastData.years) ? lastData.years : [];
+  const periodEnd = num(lastData.period?.end);
+  const w = periodEnd === null ? { rows: [], withData: 0 } : selectWindow(years, periodEnd, currentWindow);
+  const risk = riskAfter(w.rows, mmdd);
+  if (!risk) { $("risk-result").textContent = t.risk_bad_date; return; }
+  let msg = `${t.risk_result(risk.count, risk.total, formatMMDD(mmdd, lang), risk.percent)} ${t.risk_disclaimer}`;
+  if (w.withData < 10) msg += ` ${t.risk_small_sample}`;
+  $("risk-result").textContent = msg;
+};
 
 // Всяко ново търсене/lookup обезсилва предишните недовършени — забавен
 // отговор от по-стара заявка не бива да презаписва по-новия избор.
@@ -112,6 +267,7 @@ async function lookup(lat, lon) {
   const mySeq = ++lookupSeq;
   say("");
   $("result").hidden = true; // старата карта не остава видима, докато чакаме/при грешка
+  $("history").hidden = true; lastData = null; // ново търсене обезсилва старата история веднага (Стъпка 7, правило 1)
   if (map) map.setMarker(lat, lon);
   let r;
   try { r = await fetch(`/api/v1/frost?lat=${lat}&lon=${lon}`); }

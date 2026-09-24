@@ -170,7 +170,7 @@ button {
   color: var(--on-accent);
 }
 
-#locate.ghost {
+#locate.ghost, #csv.ghost {
   background: none;
   color: var(--accent);
 }
@@ -238,4 +238,118 @@ button {
   font-size: 0.85rem;
   opacity: 0.75;
   border-top: 1px solid var(--line);
+}
+
+/* --- фаза 2: историята (без анимация никъде в тази секция) ------------- */
+
+.hint { font-size: 0.85rem; opacity: 0.75; margin: 4px 0; }
+
+.history {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.history h2 { margin: 0 0 8px; font-size: 1.2rem; }
+.history h3 { margin: 20px 0 6px; font-size: 1.05rem; }
+
+.windows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.windows button {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.windows button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.compare { margin: 8px 0; }
+
+.chart-wrap { margin: 12px 0; }
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .tick { fill: var(--ink); font-size: 9px; opacity: 0.75; }
+
+/* Двата реда се различават и по форма (кръг/ромб в chart.js), и по цвят тук. */
+.chart .pt.spring { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
+.chart .pt.autumn { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
+.chart .pt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#table-slot { overflow-x: auto; }
+
+.years {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.years caption { text-align: left; font-weight: 600; padding-bottom: 6px; }
+.years th, .years td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+
+.risk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+  margin: 8px 0;
+}
+
+.risk label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 4px;
+}
+
+.risk input {
+  width: 4rem;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.risk button {
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.risk-result { margin-top: 8px; }
+
+@media print {
+  .chart-wrap, .years { background: #fff; color: #000; }
+  .chart .grid { stroke: #999; }
+  .chart .tick { fill: #000; }
+  .years th, .years td, .years caption { color: #000; }
+  /* графиката и таблицата остават видими при печат, дори затворени на екран */
+  #table-wrap:not([open]) #table-slot { display: block; }
+}
+
+@media (forced-colors: active) {
+  .chart .pt.spring, .chart .pt.autumn { fill: currentColor; stroke: currentColor; }
+  .chart .grid { stroke: currentColor; opacity: 0.5; }
 }

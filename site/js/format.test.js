@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl } from "./format.js";
+import { formatMMDD, readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow } from "./format.js";
 
 test("formatMMDD bg", () => {
   assert.equal(formatMMDD("03-27", "bg"), "27 март");
@@ -64,4 +64,18 @@ test("placeLabel: общината не се повтаря, когато е с�
 test("geocodeUrl: кодира заявката и иска максимума предложения (10), за да излязат всички еднакви имена", () => {
   assert.equal(geocodeUrl("Ново село", "bg"), "/api/v1/geocode?q=%D0%9D%D0%BE%D0%B2%D0%BE%20%D1%81%D0%B5%D0%BB%D0%BE&lang=bg&limit=10");
   assert.equal(geocodeUrl("a&b=c", "en"), "/api/v1/geocode?q=a%26b%3Dc&lang=en&limit=10");
+});
+
+test("readWindow: само 10, 20 и 30; всичко друго е 30", () => {
+  assert.equal(readWindow("?window=10"), 10);
+  assert.equal(readWindow("?window=20"), 20);
+  assert.equal(readWindow("?window=30"), 30);
+  for (const bad of ["?window=3", "?window=5", "?window=0", "?window=abc", "?window=", "", "?lat=42"]) {
+    assert.equal(readWindow(bad), 30, bad);
+  }
+});
+
+test("shareUrl носи прозореца само когато не е подразбиращият се", () => {
+  assert.equal(shareUrl("https://frost.bg/", 42.184, 24.929, 30), "https://frost.bg/?lat=42.184&lon=24.929");
+  assert.equal(shareUrl("https://frost.bg/", 42.184, 24.929, 10), "https://frost.bg/?lat=42.184&lon=24.929&window=10");
 });
