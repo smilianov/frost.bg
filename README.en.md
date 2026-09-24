@@ -136,11 +136,15 @@ The data is not ours to relicense:
 - the grid (`grid/grid.json`) is derived from ERA5-Land via the
   [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) and
   carries the Copernicus attribution already shown in the API and on the
-  page — see [Copernicus's own
-  terms](https://www.copernicus.eu/en/access-data/copyright-and-licences);
+  page — under the [CC-BY licence on Copernicus
+  CDS](https://cds.climate.copernicus.eu/licences/cc-by);
 - place names come from [Open-Meteo](https://open-meteo.com/en/terms) (or
   Google, when configured — see the [Google Maps Platform
   terms](https://cloud.google.com/maps-platform/terms));
+- the point's own elevation comes from Open-Meteo Elevation (Copernicus DEM
+  GLO-90 via Open-Meteo, a separate attribution from the geocoder above) —
+  see [Open-Meteo Elevation's own
+  terms](https://open-meteo.com/en/docs/elevation-api);
 - map tiles come from
   [OpenStreetMap](https://www.openstreetmap.org/copyright), under its own
   terms;

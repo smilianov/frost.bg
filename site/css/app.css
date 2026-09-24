@@ -304,18 +304,37 @@ button {
    Полиране: месечните етикети изчезваха при скрол надясно (стояха на x=4
    вътре в САМИЯ превъртащ се SVG). Сега живеят в собствен неподвижен SVG
    (.chart-axis, renderChartAxis() в chart.js) до .chart-wrap, не вътре в
-   него. .chart-row е flex ред; align-items: stretch (подразбиране) изравнява
-   височините на двете колони — по-високото дете (.chart-wrap, от собствената
-   height:auto на .chart) задава реда, .chart-axis-svg взима height:100% от
-   нея. dayY()/H (chart.js) е едно и също user-unit->px съответствие и в
-   двете, докато височината на реда не мръдне — тиковете съвпадат ред по ред
-   с решетката, без JS синхронизация. min-width: 0 на .chart-wrap е нужен,
-   инак flex детето не се смалява под съдържанието си (640px) и скролът би
-   излязъл на цялата страница вместо да си остане вътре в .chart-wrap. */
-.chart-row { display: flex; margin: 12px 0; }
+   него.
+
+   Преглед, кръг 1: първият опит (align-items: stretch + .chart с
+   height:auto) се разминаваше с ~15px — класически (не overlay) хоризонтален
+   скролбар отвътре добавя собствената си дебелина към ЕСТЕСТВЕНАТА височина
+   на .chart-wrap (SVG-то + лентата), stretch я даваше на .chart-axis, а
+   самото .chart (replaced елемент, height:auto заключен към viewBox-а през
+   ШИРИНАТА му) си оставаше на старата, по-ниска височина — колоната растеше,
+   плотът не.
+
+   Затова сега и двете SVG-та имат ЕДНА И СЪЩА изрична CSS височина
+   (--chart-h, трябва да е равно на H в chart.js — 260), а .chart-row е
+   align-items: flex-start, не stretch: всяко дете взима само собствената си
+   естествена височина, скролбарът (ако изобщо се появи) просто удължава
+   .chart-wrap-а НАДОЛУ, под фиксираните 260px на плота, без да дърпа
+   .chart-axis след себе си. Тъй като .chart вече не извежда височината си от
+   ширината си (height:auto), renderChart() (chart.js) сменя preserveAspectRatio
+   на "none" — плотът се разтяга/свива независимо по x/y вместо да добавя
+   "letterbox" рамки при несъвпадение на съотношението, което пак би
+   разместило y спрямо оста. Леката несиметрична скала (x расте с ширината на
+   .chart-wrap, y е винаги точно 1:1) леко сплесква кръговете/ромбовете — за
+   сметка на точно подравняване, вместо приблизително. dayY()/H (chart.js) е
+   едно и също user-unit->px съответствие и в двете, докато --chart-h не се
+   смени — тиковете съвпадат ред по ред с решетката, без JS синхронизация.
+   min-width: 0 на .chart-wrap е нужен, инак flex детето не се смалява под
+   съдържанието си (640px) и скролът би излязъл на цялата страница вместо да
+   си остане вътре в .chart-wrap. */
+.chart-row { display: flex; align-items: flex-start; margin: 12px 0; --chart-h: 260px; }
 
 .chart-axis { flex: 0 0 26px; width: 26px; }
-.chart-axis-svg { display: block; width: 100%; height: 100%; }
+.chart-axis-svg { display: block; width: 100%; height: var(--chart-h); }
 
 .chart-wrap { flex: 1 1 auto; min-width: 0; overflow-x: auto; }
 
@@ -323,7 +342,7 @@ button {
   display: block;
   width: 100%;
   min-width: 640px;
-  height: auto;
+  height: var(--chart-h);
 }
 
 .chart .grid { stroke: var(--line); stroke-width: 1; }

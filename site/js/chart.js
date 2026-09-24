@@ -129,11 +129,17 @@ export function renderChart(model, { lang, title, t, onSelectYear, readoutId }) 
   // readout"): текущият избор се разкрива там, а не с aria-activedescendant
   // (по-крехко за role="img", изисква стабилни id-та за всяка точка/лента).
   // #status (app.js) продължава да го обявява политично при всяка смяна.
+  // Преглед (полиране, кръг 1): .chart вече е с изрична CSS височина
+  // (app.css: var(--chart-h), не height:auto заключено към viewBox-а през
+  // ширината) — за да остане 1 user unit == 1px по y (и оттам съвпадение
+  // ред по ред с renderChartAxis()), preserveAspectRatio е "none": плотът се
+  // разтяга/свива независимо по x/y, вместо "meet" да добави letterbox рамки
+  // при разминаване между реалното съотношение на кутията и 720:260.
   const svg = svgEl("svg", {
     viewBox: `0 0 ${W} ${H}`, class: "chart",
     role: "img", tabindex: "0",
     "aria-label": `${title} — ${t.chart_nav_hint}`,
-    preserveAspectRatio: "xMidYMid meet",
+    preserveAspectRatio: "none",
   });
   if (readoutId) svg.setAttribute("aria-describedby", readoutId);
   const svgTitle = svgEl("title");

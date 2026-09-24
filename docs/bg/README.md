@@ -122,11 +122,15 @@ ERA5(-Land) е мрежа от **9–25 км**. В котловини (равн�
 - мрежата (`grid/grid.json`) е производна на ERA5-Land през [Copernicus
   Climate Data Store](https://cds.climate.copernicus.eu/) и носи
   посочването на Copernicus, което вече е показано в API-то и на
-  страницата — вижте [условията на
-  Copernicus](https://www.copernicus.eu/en/access-data/copyright-and-licences);
+  страницата — по [лиценза CC-BY на Copernicus
+  CDS](https://cds.climate.copernicus.eu/licences/cc-by);
 - имената на местата идват от [Open-Meteo](https://open-meteo.com/en/terms)
   (или от Google, когато е настроен — [условията на Google Maps
   Platform](https://cloud.google.com/maps-platform/terms));
+- височината на самата точка идва от Open-Meteo Elevation (Copernicus DEM
+  GLO-90 през Open-Meteo, отделно посочване от геокодера по-горе) — вижте
+  [условията на Open-Meteo
+  Elevation](https://open-meteo.com/en/docs/elevation-api);
 - плочките на картата са от
   [OpenStreetMap](https://www.openstreetmap.org/copyright), по неговите
   собствени условия;
