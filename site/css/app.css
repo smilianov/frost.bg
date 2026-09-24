@@ -293,6 +293,11 @@ button {
 .chart .pt.autumn { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
 .chart .pt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Ф5: графиката/таблицата пазят пълния обхват; избраният прозорец само се
+   откроява — извън него точките/редовете само избледняват, не изчезват. */
+.chart .pt.out-of-window { opacity: 0.35; }
+.years tr.out-of-window { opacity: 0.6; }
+
 #table-slot { overflow-x: auto; }
 
 .years {
@@ -345,8 +350,10 @@ button {
   .chart .grid { stroke: #999; }
   .chart .tick { fill: #000; }
   .years th, .years td, .years caption { color: #000; }
-  /* графиката и таблицата остават видими при печат, дори затворени на екран */
-  #table-wrap:not([open]) #table-slot { display: block; }
+  /* затворен <details> не показва съдържанието си само чрез CSS (моделът
+     на рендиране не е обикновен display) — app.js отваря #table-wrap
+     програмно на beforeprint/afterprint вместо да разчита на правило тук */
+  .chart .pt.out-of-window, .years tr.out-of-window { opacity: 1; } /* открояването е екранно, не за печат */
 }
 
 @media (forced-colors: active) {
