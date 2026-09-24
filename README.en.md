@@ -125,3 +125,28 @@ python3 grid/compute_grid.py --synthetic       # a plausible grid without networ
 The whole grid via Open-Meteo would take about 16 days from one IP — which
 is why this path is only for probes and the cross-check, not for the real
 grid.
+
+## Licence
+
+The code is under the **MIT** licence — see [`LICENSE`](LICENSE), © 2026
+Georgi Smilianov.
+
+The data is not ours to relicense:
+
+- the grid (`grid/grid.json`) is derived from ERA5-Land via the
+  [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) and
+  carries the Copernicus attribution already shown in the API and on the
+  page — under the [CC-BY licence on Copernicus
+  CDS](https://cds.climate.copernicus.eu/licences/cc-by);
+- place names come from [Open-Meteo](https://open-meteo.com/en/terms) (or
+  Google, when configured — see the [Google Maps Platform
+  terms](https://cloud.google.com/maps-platform/terms));
+- the point's own elevation comes from Open-Meteo Elevation (Copernicus DEM
+  GLO-90 via Open-Meteo, a separate attribution from the geocoder above) —
+  see [Open-Meteo Elevation's own
+  terms](https://open-meteo.com/en/docs/elevation-api);
+- map tiles come from
+  [OpenStreetMap](https://www.openstreetmap.org/copyright), under its own
+  terms;
+- Leaflet is vendored in the project (`site/vendor/leaflet/`) under
+  [BSD-2-Clause](site/vendor/leaflet/LICENSE).

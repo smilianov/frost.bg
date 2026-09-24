@@ -43,7 +43,29 @@ const svgEl = (tag, attrs = {}) => {
   return n;
 };
 
-const W = 720, H = 260, PAD_L = 44, PAD_R = 12, PAD_T = 12, PAD_B = 28;
+const W = 720, H = 260, PAD_L = 8, PAD_R = 12, PAD_T = 12, PAD_B = 28;
+const AXIS_W = 30; // viewBox ширината на renderChartAxis() — тесен, неподвижен стълб
+
+// Преглед (полиране): месечните етикети изчезваха при хоризонтален скрол —
+// стояха на x=4 вътре в САМИЯ превъртащ се SVG (.chart-wrap { overflow-x:
+// auto }), затова напускаха видимата рамка веднага при скрол надясно.
+// Поправката дели графиката на два SVG-та — renderChart() (плотът, вътре в
+// .chart-wrap, превърта се) и renderChartAxis() (неподвижна тясна колона до
+// него, .chart-axis, извън .chart-wrap). dayY() е ЕДИНСТВЕНОТО място, което
+// смята y от ден-от-годината — двете SVG-та го викат по еднакъв начин, та
+// тиковете да съвпаднат ред по ред с плота, докато не мърда height-ът на
+// реда (виж app.css: .chart-row е flex, align-items: stretch по подразбиране
+// изравнява височините на двете колони без JS синхронизация).
+export function dayY(day) {
+  return PAD_T + ((day - 1) / 364) * (H - PAD_T - PAD_B);
+}
+
+// Позициите на месечните тикове — чист извод от MONTH_STARTS през dayY().
+// renderChartAxis() го изчертава; renderChart() вече не чертае текста тук,
+// само решетъчните линии (виж я по-долу).
+export function monthAxisTicks() {
+  return MONTH_STARTS.map((day, i) => ({ day, label: i + 1, y: dayY(day) }));
+}
 
 // Един локализиран текст за точка — година, сезон, дата — ползва се и за
 // aria-label, и за <title>, за да не се разминават (Ф5: „Tooltip казва
@@ -78,6 +100,25 @@ export function yearReadoutText(readout, lang, t) {
   return `${readout.year} · ${t.spring_word}: ${springText} · ${t.autumn_word}: ${autumnText}`;
 }
 
+// Неподвижната колона до .chart-wrap (виж app.js/app.css: .chart-axis, извън
+// .chart-wrap) — само месечната скала, в собствен SVG със същата viewBox
+// височина (H) и същото dayY() като renderChart(). Чисто декоративна: role
+// на "графика" вече носи самият renderChart() (role="img" + aria-describedby
+// към readout-а) — тук aria-hidden, никакъв tabindex, за да си остане
+// графиката ЕДНА tab спирка.
+export function renderChartAxis() {
+  const svg = svgEl("svg", {
+    viewBox: `0 0 ${AXIS_W} ${H}`, class: "chart-axis-svg",
+    "aria-hidden": "true", preserveAspectRatio: "none",
+  });
+  for (const tick of monthAxisTicks()) {
+    const label = svgEl("text", { x: 4, y: tick.y + 4, class: "tick" });
+    label.textContent = String(tick.label);
+    svg.append(label);
+  }
+  return svg;
+}
+
 export function renderChart(model, { lang, title, t, onSelectYear, readoutId }) {
   // Преглед (последна вълна): role="application" потискаше обикновеното
   // разглеждане на четеца на екрана и не даваше нищо насреща (точките вече
@@ -88,11 +129,17 @@ export function renderChart(model, { lang, title, t, onSelectYear, readoutId }) 
   // readout"): текущият избор се разкрива там, а не с aria-activedescendant
   // (по-крехко за role="img", изисква стабилни id-та за всяка точка/лента).
   // #status (app.js) продължава да го обявява политично при всяка смяна.
+  // Преглед (полиране, кръг 1): .chart вече е с изрична CSS височина
+  // (app.css: var(--chart-h), не height:auto заключено към viewBox-а през
+  // ширината) — за да остане 1 user unit == 1px по y (и оттам съвпадение
+  // ред по ред с renderChartAxis()), preserveAspectRatio е "none": плотът се
+  // разтяга/свива независимо по x/y, вместо "meet" да добави letterbox рамки
+  // при разминаване между реалното съотношение на кутията и 720:260.
   const svg = svgEl("svg", {
     viewBox: `0 0 ${W} ${H}`, class: "chart",
     role: "img", tabindex: "0",
     "aria-label": `${title} — ${t.chart_nav_hint}`,
-    preserveAspectRatio: "xMidYMid meet",
+    preserveAspectRatio: "none",
   });
   if (readoutId) svg.setAttribute("aria-describedby", readoutId);
   const svgTitle = svgEl("title");
@@ -100,14 +147,13 @@ export function renderChart(model, { lang, title, t, onSelectYear, readoutId }) 
   svg.append(svgTitle);
   const yearsSpan = Math.max(1, model.years.to - model.years.from);
   const x = (year) => PAD_L + ((year - model.years.from) / yearsSpan) * (W - PAD_L - PAD_R);
-  const y = (day) => PAD_T + ((day - 1) / 364) * (H - PAD_T - PAD_B);
 
+  // Месечните ЕТИКЕТИ вече не се чертаят тук (виж renderChartAxis) — само
+  // решетъчните линии, които и без друго трябва да превъртат заедно с
+  // точките (иначе биха изглеждали неподвижни спрямо данните).
   for (const m of model.months) {
-    const yy = y(m.day);
+    const yy = dayY(m.day);
     svg.append(svgEl("line", { x1: PAD_L, x2: W - PAD_R, y1: yy, y2: yy, class: "grid" }));
-    const label = svgEl("text", { x: 4, y: yy + 4, class: "tick" });
-    label.textContent = String(m.label);
-    svg.append(label);
   }
   for (const year of [model.years.from, model.years.to]) {
     const edgeLabel = svgEl("text", { x: x(year), y: H - 8, class: "tick", "text-anchor": year === model.years.from ? "start" : "end" });
@@ -164,7 +210,7 @@ export function renderChart(model, { lang, title, t, onSelectYear, readoutId }) 
   }
 
   for (const p of model.points) {
-    const cx = x(p.year), cy = y(p.day);
+    const cx = x(p.year), cy = dayY(p.day);
     const baseClass = p.season === "spring" ? "pt spring" : "pt autumn";
     const node = p.season === "spring"
       ? svgEl("circle", { cx, cy, r: 4, class: baseClass })

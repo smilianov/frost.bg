@@ -300,18 +300,55 @@ button {
    се смалява под min-width — вместо това превърта хоризонтално вътре в
    собствената си рамка (.chart-wrap), както таблицата (#table-slot) вече
    прави; страницата като цяло не прелива на 320 пиксела.
-   Месечните етикети (x=4) стоят на левия ръб и си остават видими веднага. */
-.chart-wrap { margin: 12px 0; overflow-x: auto; }
+
+   Полиране: месечните етикети изчезваха при скрол надясно (стояха на x=4
+   вътре в САМИЯ превъртащ се SVG). Сега живеят в собствен неподвижен SVG
+   (.chart-axis, renderChartAxis() в chart.js) до .chart-wrap, не вътре в
+   него.
+
+   Преглед, кръг 1: първият опит (align-items: stretch + .chart с
+   height:auto) се разминаваше с ~15px — класически (не overlay) хоризонтален
+   скролбар отвътре добавя собствената си дебелина към ЕСТЕСТВЕНАТА височина
+   на .chart-wrap (SVG-то + лентата), stretch я даваше на .chart-axis, а
+   самото .chart (replaced елемент, height:auto заключен към viewBox-а през
+   ШИРИНАТА му) си оставаше на старата, по-ниска височина — колоната растеше,
+   плотът не.
+
+   Затова сега и двете SVG-та имат ЕДНА И СЪЩА изрична CSS височина
+   (--chart-h, трябва да е равно на H в chart.js — 260), а .chart-row е
+   align-items: flex-start, не stretch: всяко дете взима само собствената си
+   естествена височина, скролбарът (ако изобщо се появи) просто удължава
+   .chart-wrap-а НАДОЛУ, под фиксираните 260px на плота, без да дърпа
+   .chart-axis след себе си. Тъй като .chart вече не извежда височината си от
+   ширината си (height:auto), renderChart() (chart.js) сменя preserveAspectRatio
+   на "none" — плотът се разтяга/свива независимо по x/y вместо да добавя
+   "letterbox" рамки при несъвпадение на съотношението, което пак би
+   разместило y спрямо оста. Леката несиметрична скала (x расте с ширината на
+   .chart-wrap, y е винаги точно 1:1) леко сплесква кръговете/ромбовете — за
+   сметка на точно подравняване, вместо приблизително. dayY()/H (chart.js) е
+   едно и също user-unit->px съответствие и в двете, докато --chart-h не се
+   смени — тиковете съвпадат ред по ред с решетката, без JS синхронизация.
+   min-width: 0 на .chart-wrap е нужен, инак flex детето не се смалява под
+   съдържанието си (640px) и скролът би излязъл на цялата страница вместо да
+   си остане вътре в .chart-wrap. */
+.chart-row { display: flex; align-items: flex-start; margin: 12px 0; --chart-h: 260px; }
+
+.chart-axis { flex: 0 0 26px; width: 26px; }
+.chart-axis-svg { display: block; width: 100%; height: var(--chart-h); }
+
+.chart-wrap { flex: 1 1 auto; min-width: 0; overflow-x: auto; }
 
 .chart {
   display: block;
   width: 100%;
   min-width: 640px;
-  height: auto;
+  height: var(--chart-h);
 }
 
 .chart .grid { stroke: var(--line); stroke-width: 1; }
-.chart .tick { fill: var(--ink); font-size: 11px; opacity: 0.75; }
+/* .tick е споделен между renderChart() (двата крайни годишни етикета) и
+   renderChartAxis() (месечните тикове) — един SVG text клас, едно правило. */
+.tick { fill: var(--ink); font-size: 11px; opacity: 0.75; }
 
 /* Двата реда се различават и по форма (кръг/ромб в chart.js), и по цвят тук. */
 .chart .pt.spring { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
@@ -421,9 +458,9 @@ button {
 #risk-result:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 @media print {
-  .chart-wrap, .years { background: #fff; color: #000; }
+  .chart-axis, .chart-wrap, .years { background: #fff; color: #000; }
   .chart .grid { stroke: #999; }
-  .chart .tick { fill: #000; }
+  .tick { fill: #000; }
   .years th, .years td, .years caption { color: #000; }
   /* затворен <details> не показва съдържанието си само чрез CSS (моделът
      на рендиране не е обикновен display) — app.js отваря #table-wrap
@@ -441,6 +478,32 @@ button {
   .chart .year-cursor { visibility: hidden !important; }
   .chart .pt.year-selected { stroke-width: 1; }
   .chart .year-band { cursor: auto; }
+
+  /* Полиране: заглавието на таблицата излизаше двойно в печатния preview —
+     <summary> (#table-summary) и <caption> на самата <table> носят един и
+     същ текст (t.table_caption, app.js/chart.js). <details> вече е отворен
+     за печат (app.js, beforeprint) — самата разгъваема "дръжка" вече няма
+     смисъл, а <caption> си е истинското, семантично заглавие на таблицата.
+     Хованото тук не е самата <table>/<details> структура — само визуалният
+     дубликат; #table-summary остава в DOM-а (и се връща видим на екрана
+     след afterprint), CSS display:none не го маха от дървото. */
+  #table-summary { display: none; }
+
+  /* Полиране: редът за източника (footer .foot — #source/geocoder-credit/
+     API) понякога оставаше сам на последна страница — съдържанието преди
+     него изпълва предходната докрай и .foot не се събира на нея, затова
+     принтерът вмъква разлом точно преди footer-а. break-before: avoid моли
+     да не се вмъква разлом ТУК (браузърът пренася малко съдържание от
+     предходната страница на новата вместо да остави footer-а сам), а
+     break-inside: avoid пази самия footer от разцепване, ако все пак не се
+     събере на един ред. page-break-* е същото за по-стари печатни движки,
+     които все още не познават break-*. */
+  .foot {
+    break-inside: avoid;
+    break-before: avoid;
+    page-break-inside: avoid;
+    page-break-before: avoid;
+  }
 }
 
 @media (forced-colors: active) {

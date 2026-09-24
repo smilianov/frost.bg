@@ -111,3 +111,28 @@ ERA5(-Land) е мрежа от **9–25 км**. В котловини (равн�
 получава отговор). Извън това — учтив отказ, не приближение от съседна
 клетка. Подробности за границите и кодовете на грешки — в
 [`api.md`](api.md).
+
+## Лиценз
+
+Кодът е под лиценз **MIT** — виж [`LICENSE`](../../LICENSE) в корена на
+репото, © 2026 Georgi Smilianov.
+
+Данните не са наши, за да ги преотстъпваме под същия лиценз:
+
+- мрежата (`grid/grid.json`) е производна на ERA5-Land през [Copernicus
+  Climate Data Store](https://cds.climate.copernicus.eu/) и носи
+  посочването на Copernicus, което вече е показано в API-то и на
+  страницата — по [лиценза CC-BY на Copernicus
+  CDS](https://cds.climate.copernicus.eu/licences/cc-by);
+- имената на местата идват от [Open-Meteo](https://open-meteo.com/en/terms)
+  (или от Google, когато е настроен — [условията на Google Maps
+  Platform](https://cloud.google.com/maps-platform/terms));
+- височината на самата точка идва от Open-Meteo Elevation (Copernicus DEM
+  GLO-90 през Open-Meteo, отделно посочване от геокодера по-горе) — вижте
+  [условията на Open-Meteo
+  Elevation](https://open-meteo.com/en/docs/elevation-api);
+- плочките на картата са от
+  [OpenStreetMap](https://www.openstreetmap.org/copyright), по неговите
+  собствени условия;
+- Leaflet е вграден в проекта (`site/vendor/leaflet/`) под
+  [BSD-2-Clause](../../site/vendor/leaflet/LICENSE).

@@ -3,7 +3,7 @@
 // (без DOM библиотека) стига да хване хвърлящ бъг и грешна структура тук.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chartModel, toCsv, renderChart, renderTable, selectYear, yearReadoutText } from "./chart.js";
+import { chartModel, toCsv, renderChart, renderChartAxis, renderTable, selectYear, yearReadoutText, dayY, monthAxisTicks } from "./chart.js";
 
 const rows = [[2023, "04-01", "10-01"], [2024, null, "10-05"], [2025, "03-20", null]];
 
@@ -34,6 +34,48 @@ test("chartModel: етикетите на месеците са на истин�
   assert.deepEqual(m.months[0], { day: 1, label: 1 });
   assert.deepEqual(m.months[2], { day: 60, label: 3 }, "1 март е ден 60");
   assert.deepEqual(m.months[11], { day: 335, label: 12 });
+});
+
+// Преглед (полиране): месечните етикети изчезваха при хоризонтален скрол,
+// защото се чертаеха вътре в самия превъртащ се SVG (viewBox 720×260,
+// текстът на x=4 напуска видимата рамка веднага щом .chart-wrap се
+// превърти надясно). Поправката дели графиката на два SVG-та — плотът
+// (превърта се) и неподвижна тясна колона до него (renderChartAxis) — с
+// еднаква viewBox височина и еднакво изчисление на y. dayY() е единственото
+// място, което смята тази y (renderChart за точките/решетката,
+// renderChartAxis за месечните тикове) — тества се директно, без DOM, за да
+// е сигурно, че двете SVG-та НЕ могат да се разминат мълчаливо.
+// Преглед (полиране, кръг 1): предишният вариант на тези тестове беше
+// самопозоваващ се — очакванията идваха от самата dayY() (или от
+// monthAxisTicks(), която просто я вика), затова мутация ВЪТРЕ в dayY()
+// (знаменателят 364 -> 730, PAD_T 12 -> 0) минаваше всичките 25 теста
+// незабелязано. Тук очакванията са абсолютни числа, независими от чужди
+// извиквания в chart.js: 12 = PAD_T (ден 1 е точно горе), 232 = H - PAD_B
+// (ден 365 е точно долу — PAD_T се съкращава тук, затова трябват И двете
+// проверки, не само едната: PAD_T 12->0 не пипва резултата за ден 365), и
+// 1 март (ден 60), сметнато на ръка по същата формула, но с литерали,
+// вписани направо в теста, не чрез повторно извикване на chart.js.
+test("dayY: абсолютни стойности, независими от собствената формула (пипва denominator/padding мутации)", () => {
+  assert.equal(dayY(1), 12, "ден 1 = PAD_T (12) точно");
+  assert.equal(dayY(365), 232, "ден 365 = H - PAD_B (260-28) точно");
+  const day60ByHand = 12 + (59 / 364) * 220; // PAD_T + ((60-1)/364)*(H-PAD_T-PAD_B), сметнато на ръка
+  assert.ok(Math.abs(dayY(60) - day60ByHand) < 1e-9, `1 март (ден 60) ≈ ${day60ByHand}`);
+});
+
+test("dayY: расте монотонно с деня, чиста функция (еднакъв резултат при повторно извикване)", () => {
+  assert.ok(dayY(335) > dayY(1), "по-късен ден -> по-надолу в SVG (по-голямо y)");
+  assert.equal(dayY(60), dayY(60));
+});
+
+test("monthAxisTicks: 12 тика, същите дни/етикети като chartModel().months, y от dayY()", () => {
+  const ticks = monthAxisTicks();
+  assert.equal(ticks.length, 12);
+  assert.deepEqual(ticks[0], { day: 1, label: 1, y: dayY(1) });
+  assert.deepEqual(ticks[2], { day: 60, label: 3, y: dayY(60) }, "1 март е ден 60");
+  assert.deepEqual(ticks[11], { day: 335, label: 12, y: dayY(335) });
+  for (let i = 1; i < ticks.length; i++) {
+    assert.ok(ticks[i].y > ticks[i - 1].y, "тиковете вървят надолу по реда на месеците");
+  }
 });
 
 // Преглед: selectYear() е решението зад readout-а на графиката (Ф5:
@@ -170,6 +212,74 @@ test("renderChart: не хвърля, рисува и двете редици, �
 
     const svgTitle = svg.children.find((c) => c.tag === "title");
     assert.equal(svgTitle.textContent, "история на клетката", "заглавието на svg се пише, не хвърля");
+  });
+});
+
+// Преглед (полиране): renderChart вече не чертае месечните етикети (те са в
+// renderChartAxis, извън превъртащия се SVG) — само решетката (12 линии) и
+// двата крайни етикета на годините (.tick, при x/y на годините) остават.
+test("renderChart: НЕ чертае месечните тикове (12 текста) вътре в превъртащия се SVG — само решетката и годините", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const svg = renderChart(model, { lang: "bg", title: "т", t });
+
+    const grid = svg.children.filter((c) => c.tag === "line" && c.attrs.class === "grid");
+    assert.equal(grid.length, 12, "12-те месечни решетъчни линии си остават в плота");
+
+    const ticks = svg.children.filter((c) => c.tag === "text" && c.attrs.class === "tick");
+    assert.equal(ticks.length, 2, "само двата крайни годишни етикета — месечните текстове са преместени в renderChartAxis");
+    assert.deepEqual(ticks.map((n) => n.textContent).sort(), ["2023", "2025"]);
+  });
+});
+
+test("renderChartAxis: 12 неподвижни месечни тика (1..12), y-та като dayY(), aria-hidden, без tabindex", () => {
+  withFakeDocument(() => {
+    const svg = renderChartAxis();
+    assert.equal(svg.attrs["aria-hidden"], "true", "декоративна — графиката вече има собствен role=\"img\"+описание");
+    assert.equal(svg.attrs.tabindex, undefined, "не е втора tab спирка — графиката си остава ЕДНА");
+
+    const ticks = svg.children.filter((c) => c.tag === "text" && c.attrs.class === "tick");
+    assert.equal(ticks.length, 12);
+    assert.deepEqual(ticks.map((n) => n.textContent), Array.from({ length: 12 }, (_, i) => String(i + 1)));
+
+    // Същото y като dayY() за същия ден (1 март = ден 60) — гаранцията, че
+    // плотът и неподвижната ос не могат да се разминат: и двата тика y=…+4
+    // (базовата линия на текста, виж renderChart-а за месечните тикове по-рано).
+    const marchTick = ticks[2];
+    assert.equal(marchTick.attrs.y, String(dayY(60) + 4));
+  });
+});
+
+// Преглед (полиране, кръг 1): reviewer-ът показа, че никой тест не сравнява
+// ДВЕТЕ рендирани SVG-та едно с друго — мутация само в renderChart() (напр.
+// решетката отмества с +20, без dayY() въобще да е пипната) минаваше
+// незабелязано, защото всеки тест до момента проверяваше всяко SVG само
+// спрямо dayY(), никога едното спрямо другото. Тук НЕ викаме dayY() в самото
+// твърдение — намираме решетката и тика на плота/оста ПО РЕД (и двете се
+// чертаят месец по месец, януари..декември), и сравняваме реално изрисуваните
+// y едно спрямо друго. Ако renderChart() и renderChartAxis() тръгнат да
+// смятат y по различен начин един спрямо друг — независимо дали dayY() е
+// вярна — този тест пада.
+test("renderChart + renderChartAxis: решетката на плота и тикът на оста за същия месец имат едно и също y (не само срещу dayY())", () => {
+  withFakeDocument(() => {
+    const model = chartModel(rows, { from: 2023, to: 2025 });
+    const t = { spring_word: "пролетна", autumn_word: "есенна", chart_nav_hint: "стрелки" };
+    const plot = renderChart(model, { lang: "bg", title: "т", t });
+    const axis = renderChartAxis();
+
+    const gridLines = plot.children.filter((c) => c.tag === "line" && c.attrs.class === "grid");
+    const axisTicks = axis.children.filter((c) => c.tag === "text" && c.attrs.class === "tick");
+    assert.equal(gridLines.length, 12);
+    assert.equal(axisTicks.length, 12);
+
+    for (let i = 0; i < 12; i++) {
+      // +4 е базовата линия на текста в renderChartAxis (виж по-горе) — без
+      // нея тикът пада точно върху решетъчната линия на плота.
+      const gridY = Number(gridLines[i].attrs.y1);
+      const tickY = Number(axisTicks[i].attrs.y) - 4;
+      assert.equal(gridY, tickY, `месец ${i + 1}: решетката (${gridY}) и тикът (${tickY}) трябва да съвпадат`);
+    }
   });
 });
 
