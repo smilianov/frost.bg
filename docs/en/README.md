@@ -62,6 +62,23 @@ lie over the Black Sea, where ERA5-Land has no temperatures — they are
 `null` in both directions; separately, land cells may have fewer than 10
 years of frost in one direction.
 
+## The year history
+
+Under the two dates, the page also shows up to the last 30 years: a chart
+by year, a choice of period **10 / 20 / 30 years** (the typical and safe
+dates are recomputed from the same response, with no new request), a
+comparison of "the last 10 against all 30", the length of the
+**frost-free season** (typical, shortest, longest) and the **risk of
+spring frost after a chosen date** — everywhere with the caveat that this
+is a historical frequency, not a forecast for that particular year. The
+table of yearly numbers can also be downloaded as CSV.
+
+A year with no row in `years` means "not enough data" (fewer than 10 valid
+years in that direction); `null` for a specific date in a row means "no
+frost recorded" that year — two different things. February 29 counts as
+March 1. The full design of the history is in [the phase 2
+spec](../superpowers/specs/2026-09-23-frost-bg-phase2-design.md).
+
 ## The known limitation — valley bottoms
 
 ERA5(-Land) is a **9–25 km** grid. In valley bottoms (flat ground between

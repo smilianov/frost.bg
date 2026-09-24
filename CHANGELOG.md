@@ -31,6 +31,50 @@
 
 ---
 
+## [0.3.0] — 2026-09-23
+
+### 🇧🇬 Български
+
+#### Историята по години
+
+- **Графика с последните 30 години** под датите: по една точка за
+  последната пролетна и първата есенна слана, месеците по оста, таблица със
+  същите числа и бутон **„свали CSV“**.
+- **Период 10 / 20 / 30 години** — датите се пресмятат за избрания период
+  от същия отговор, без нова заявка. По-къси периоди няма: под 10 години
+  със слана „сигурна в 9 от 10 години“ е безсмислица.
+- **Сравнение „последните 10 срещу всичките 30“** — с колко дни се е
+  преместила типичната слана.
+- **Сезон без слана** — типична, най-къса и най-дълга дължина, смятани по
+  години (не от типичните дати).
+- **Риск от пролетна слана след дата** — „в 4 от 30 години е имало слана
+  след 20 април и преди 1 юли — 13 %“, с уговорката, че е историческа
+  честота, не прогноза. Същото изречение обяснява и сигурната дата.
+- API-то не се променя: `/api/v1/frost` връща същото, включително `years`.
+
+### 🇬🇧 English
+
+#### The year history
+
+- **A chart of the last 30 years** under the dates: one point for the last
+  spring and the first autumn frost, months along the axis, a table with the
+  same numbers and a **"download CSV"** button.
+- **Period 10 / 20 / 30 years** — the dates are recomputed for the chosen
+  period from the same response, with no new request. No shorter periods:
+  with fewer than ten frost years "safe in 9 years out of 10" is meaningless.
+- **A comparison "the last 10 against all 30"** — by how many days the
+  typical frost has moved.
+- **Frost-free season** — typical, shortest and longest length, computed per
+  year (not from the typical dates).
+- **Risk of spring frost after a date** — "in 4 of 30 years there was frost
+  after 20 April and before 1 July — 13 %", with the caveat that it is a
+  historical frequency, not a forecast. The same sentence explains the safe
+  date.
+- The API does not change: `/api/v1/frost` returns the same, including
+  `years`.
+
+---
+
 ## [0.2.1] — 2026-09-20
 
 ### 🇧🇬 Български

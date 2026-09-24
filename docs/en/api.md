@@ -6,13 +6,6 @@ One Worker serves both the static files and the API, on one domain. CORS is
 open (`Access-Control-Allow-Origin: *`) — the API is public, free to use
 from another site or app.
 
-> **The examples below are from the synthetic grid**
-> (`grid/grid.json`, `synthetic: true`, `source_id: "synthetic"`) — the
-> numbers for Manole are not real frost data, just a plausible stand-in for
-> development (see [`operations.md`](operations.md)). Real numbers arrive
-> after the first Copernicus CDS run; the response shape does not change,
-> only the contents of `source` (see below the example).
-
 ## `GET /api/v1/frost?lat=&lon=`
 
 `lat`, `lon` — decimal degrees. The processing order:
@@ -67,8 +60,12 @@ comes from the CDS geopotential for a CDS grid; from Open-Meteo for a grid
 from an Open-Meteo run; made up for a synthetic one); `typical`/`safe` —
 dates as `MM-DD` (no year — the client carries them into whichever year it
 needs); `null` instead of a date means fewer than 10 years had a valid
-frost date in that direction; `years` — the raw per-year dates (used by the
-future windowed history chart, phase 2, see the spec); `period` — the first
+frost date in that direction; `years` — the raw per-year dates; from these
+the page computes the history for a chosen period (10/20/30 years) entirely
+in the browser — the API remains without a period parameter or any other
+response variant (see the
+[phase 2 spec](../superpowers/specs/2026-09-23-frost-bg-phase2-design.md));
+`period` — the first
 and last of the 30 years; `synthetic` — `true` while the grid is from
 `--synthetic`, not real data; `version` — the API format version (`"1"`,
 from the `/api/v1/` path), distinct from `app_version` in `/api/v1/config`
@@ -150,7 +147,7 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.2.1"
+  "app_version": "0.3.0"
 }
 ```
 
