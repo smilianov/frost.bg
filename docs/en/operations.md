@@ -298,5 +298,9 @@ public API where such clients are normal. Garden Planner sends
   the `GOOGLE_KEY` secret in production —
   `npx wrangler secret put GOOGLE_KEY` (never in `wrangler.toml`); without
   it the geocoder stays Open-Meteo;
-- deploy from GitHub Actions on merge to `main` — noted for later (phase 2
-  in the spec); CI only runs tests so far.
+- deploy from GitHub Actions on merge to `main` — still missing. It was on
+  the phase 1 spec's "phase 2" list, but phase 2 itself turned out to be
+  the page's year history
+  (`docs/superpowers/specs/2026-09-23-frost-bg-phase2-design.md`) and
+  explicitly excluded automatic deploy from its scope — it remains an open
+  task with no phase attached. CI only runs tests so far.

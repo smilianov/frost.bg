@@ -45,7 +45,11 @@ npm test
 
 ## Спецификация
 
+Фаза 1 (мрежата и API v1):
 `docs/superpowers/specs/2026-09-14-frost-bg-design.md`
+
+Фаза 2 (историята по години на страницата):
+`docs/superpowers/specs/2026-09-23-frost-bg-phase2-design.md`
 
 ## Източник на данните
 

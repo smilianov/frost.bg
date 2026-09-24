@@ -292,5 +292,9 @@ User-Agent като `Python-urllib/3.12` или без User-Agent, а frost.bg �
   "google"`): тайната `GOOGLE_KEY` в продукция —
   `npx wrangler secret put GOOGLE_KEY` (никога във `wrangler.toml`); без нея
   геокодерът си остава Open-Meteo;
-- deploy от GitHub Actions при сливане в `main` — записано за по-късно
-  (фаза 2 в спецификацията), CI засега само тества.
+- deploy от GitHub Actions при сливане в `main` — все още липсва. Беше в
+  списъка „Фаза 2“ на спецификацията от фаза 1, но самата фаза 2 се оказа
+  историята по години на страницата
+  (`docs/superpowers/specs/2026-09-23-frost-bg-phase2-design.md`) и изрично
+  изключи автоматичния deploy от обхвата си — остава отворена задача без
+  определена фаза. CI засега само тества.

@@ -80,8 +80,10 @@ table of yearly numbers can also be downloaded as CSV. The date scale and
 the full 30-year range don't change when the period changes — the chosen
 period is only highlighted in the chart and the table. The period is kept
 in the page's URL (`?window=10|20|30`, defaulting to 30) — **page-only**:
-the API has no such parameter and always returns the full 30 years in
-`years`.
+the API returns all the yearly rows it has within the 30-year period —
+which can be fewer than 30, or none at all for a sea cell — and the page's
+period buttons only choose which of them the numbers are computed from;
+the response never depends on `window`.
 
 Three separate states, easy to confuse: a **missing row** in `years`
 means the grid didn't accept that year (fewer than 300 valid days) — it
