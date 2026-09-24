@@ -314,11 +314,26 @@ button {
 .chart .pt:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Ф5: графиката/таблицата пазят пълния обхват; избраният прозорец само се
-   откроява — извън него точките/редовете само избледняват, не изчезват.
-   В тъмна тема нисък alpha на тъмен фон изчезва съвсем — прегледът в
-   @media (prefers-color-scheme: dark) по-долу вдига пода, без анимация. */
-.chart .pt.out-of-window { opacity: 0.35; }
-.years tr.out-of-window { opacity: 0.6; }
+   откроява — извън него точките остават видими, само различими другояче.
+   Преглед кръг 5: opacity версията (0.35 светло / 0.65 тъмно) измерена
+   срещу WCAG 1.4.11 (смислена графика, праг 3:1) не минаваше в НИТО една
+   тема — контурът на смесения цвят срещу фона даваше ~1.6:1 в светла тема
+   и 2.15:1 (пролет) / 2.34:1 (есен) в тъмна. Затова тук не се избледнява:
+   запълването пада до цвета на фона (кухи точки), а контурът остава на
+   пълния цвят на реда — измерено срещу двата фона:
+     пролетна #2f6fb3: 4.97:1 светло, 3.41:1 тъмно
+     есенна   #c1571c: 4.33:1 светло, 3.92:1 тъмно
+   И четирите над прага 3:1, в двете теми, без нужда от @media override.
+   Формата (кръг/ромб) носи сезона и без друго; цветът тук е подкрепящ.
+   Без анимация. */
+.chart .pt.out-of-window { fill: var(--paper); }
+.chart .pt.spring.out-of-window { stroke: #2f6fb3; stroke-width: 1.5; }
+.chart .pt.autumn.out-of-window { stroke: #c1571c; stroke-width: 1.5; }
+
+/* Таблица: обикновен текст, друг праг (WCAG 1.4.3, 4.5:1, не 1.4.11).
+   Измерено: opacity 0.6 срещу var(--ink) даваше 4.04:1 в светла тема (под
+   прага) и 5.77:1 в тъмна (над); 0.65 минава и двете (4.69:1 светло). */
+.years tr.out-of-window { opacity: 0.65; }
 
 #table-slot { overflow-x: auto; }
 
@@ -367,17 +382,15 @@ button {
 
 .risk-result { margin-top: 8px; }
 
-/* Преглед, кръг 3: #risk-result получава фокуса програмно след изрично
-   "Сметни" (tabindex="-1" — не е в Tab реда, мишка не го фокусира сама).
-   :focus-visible не улавя скриптово .focus(), затова тук е обикновен
-   :focus — безопасно точно защото елементът не е достижим по друг начин. */
+/* Преглед, кръг 3/5: #risk-result получава фокуса програмно след изрично
+   "Сметни" (tabindex="-1" — не е в Tab реда). Поправка на кръг 5: това НЕ
+   значи, че мишката изобщо не може да го фокусира — стандартът позволява
+   клик/избор на текст върху елемент с отрицателен tabindex да го фокусира.
+   Тук е безобидно: единственият видим ефект е същият контур, елементът е
+   обикновен параграф без собствено поведение, а съдържанието му вече се
+   вижда без фокус. :focus-visible не улавя скриптово .focus(), затова тук
+   е обикновен :focus. */
 #risk-result:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-@media (prefers-color-scheme: dark) {
-  /* На тъмен фон нисък alpha изчезва напълно — открояването пада, но
-     точките извън прозореца трябва да останат видими (Ф5). Без анимация. */
-  .chart .pt.out-of-window { opacity: 0.65; }
-}
 
 @media print {
   .chart-wrap, .years { background: #fff; color: #000; }
@@ -387,10 +400,19 @@ button {
   /* затворен <details> не показва съдържанието си само чрез CSS (моделът
      на рендиране не е обикновен display) — app.js отваря #table-wrap
      програмно на beforeprint/afterprint вместо да разчита на правило тук */
-  .chart .pt.out-of-window, .years tr.out-of-window { opacity: 1; } /* открояването е екранно, не за печат */
+  /* открояването (кухи точки/избледнели редове) е екранно, не за печат —
+     извън прозореца пак плътно, същия цвят като в прозореца */
+  .chart .pt.spring.out-of-window { fill: #2f6fb3; stroke: #1c4770; stroke-width: 1; }
+  .chart .pt.autumn.out-of-window { fill: #c1571c; stroke: #7a3510; stroke-width: 1; }
+  .years tr.out-of-window { opacity: 1; }
 }
 
 @media (forced-colors: active) {
   .chart .pt.spring, .chart .pt.autumn { fill: currentColor; stroke: currentColor; }
   .chart .grid { stroke: currentColor; opacity: 0.5; }
+  /* Кръг 5-те цветове за кухи точки (#2f6fb3/#c1571c/var(--paper)) имат
+     по-висока специфичност от горното и биха го надвили мълчаливо — тук
+     се връща на currentColor/Canvas, за да не изчезнат под forced-colors. */
+  .chart .pt.out-of-window { fill: Canvas; }
+  .chart .pt.spring.out-of-window, .chart .pt.autumn.out-of-window { stroke: currentColor; }
 }

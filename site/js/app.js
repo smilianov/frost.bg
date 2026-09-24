@@ -3,6 +3,7 @@ import { readQuery, shareUrl, parseDecimal, placeLabel, geocodeUrl, readWindow, 
 import { createMap } from "./map.js";
 import { renderChart, renderTable } from "./chart.js";
 import { historyView, inWindow, langSwitchQuery } from "./history.js";
+import { paintPairs } from "./paint.js";
 
 const lang = document.body.dataset.lang === "en" ? "en" : "bg";
 const t = T[lang];
@@ -168,21 +169,6 @@ function markSelection(nodes, yearOf, chart) {
   nodes.forEach((node, i) => { if (!inWindow(yearOf(i), w)) node.classList.add("out-of-window"); });
 }
 
-// Ф2/преглед кръг 4: клетка без нито един ред няма view.pairs изобщо — за
-// нея картите за типична/сигурна дата не се строят, обяснението стои само.
-function paintPairs(view) {
-  const shown = view.pairs; // undefined и когато !visible, и когато empty
-  $("pairs").hidden = !shown;
-  $("pairs-note").hidden = !shown?.tooFewYears;
-  if (!shown) return;
-  $("typical-spring").textContent = shown.typicalSpring;
-  $("typical-autumn").textContent = shown.typicalAutumn;
-  $("safe-spring").textContent = shown.safeSpring;
-  $("safe-autumn").textContent = shown.safeAutumn;
-  $("pairs-note").textContent = shown.tooFewYearsMessage || "";
-  $("safe-means").textContent = view.safeMeans;
-}
-
 // Ф2: "клетка без нито един ред" показва секцията с обяснение (не я крие);
 // само липсващ period.end (нямаме календар изобщо) крие цялата секция.
 function paintHistory(view) {
@@ -224,7 +210,7 @@ function paintHistory(view) {
 function redraw({ explicitRisk = false } = {}) {
   if (!lastData) { lastView = null; $("history").hidden = true; return; }
   lastView = historyView({ data: lastData, window: currentWindow, lang, t, riskInput: readRiskInput(), explicitRisk });
-  paintPairs(lastView);
+  paintPairs($, lastView);
   paintHistory(lastView);
   if (explicitRisk && lastView.visible && !lastView.empty && lastView.risk.focus) $("risk-result").focus();
 }
