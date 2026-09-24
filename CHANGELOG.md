@@ -6,6 +6,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.3.1] — 2026-09-24
+
 ### 🇧🇬 Български
 
 - **<https://frost.bg> е адресът** (21 септември 2026): домейнът е активен в
@@ -16,6 +20,27 @@
 - **Лимит на заявките към API-то**: 300 за 10 секунди от един IP по
   `/api/*`, над това 429 за 10 секунди — правило в Cloudflare, не код (виж
   `docs/bg/operations.md`).
+
+#### Височината на точката
+
+- **`GET /api/v1/elevation?lat=&lon=`** — височината на самата точка (Open-
+  Meteo Elevation, Copernicus DEM GLO-90, ~90 м), отделно от височината на
+  клетката, която вече идва от `/frost`: градина в котловина може да седи
+  стотици метри под средното на клетката си, а точно затова датите на
+  сланата може да подвеждат. Същите правила за вход като `/frost` — „само
+  България“ (400 `outside_bulgaria`), закръгляне до 3 знака; кеш седмица.
+- **Страницата** дописва реда на клетката с „приблизителна височина около
+  точката: ≈ … м“ и кратка бележка, че двете височини идват от различни
+  модели и не коригират датите — само след като резултатът за сланата вече
+  е показан (никога не го чака) и само при успех (никога 0, никога
+  височината на клетката вместо нея; при грешка редът просто липсва).
+- **Бюджет и кратък отказ**: свободният план на Open-Meteo е ограничен и е
+  за нетърговска употреба; при 429 или 5xx от доставчика адресът спира да
+  пита нагоре за 10 минути — пазено на две нива, локално в isolate-а
+  (`worker/elevation.js`) и споделено през Cache API за целия център на
+  Cloudflare (`worker/index.js`), защото Cloudflare разпределя заявките по
+  много isolate-и. Превключвател `ELEVATION` (`on`/`off`) в
+  `wrangler.toml`. Подробности в `docs/bg/operations.md`.
 
 ### 🇬🇧 English
 
@@ -28,6 +53,29 @@
 - **Request-rate limit on the API**: 300 per 10 seconds per IP on `/api/*`,
   above that 429 for 10 seconds — a Cloudflare rule, not code (see
   `docs/en/operations.md`).
+
+#### The point's elevation
+
+- **`GET /api/v1/elevation?lat=&lon=`** — the elevation of the point itself
+  (Open-Meteo Elevation, Copernicus DEM GLO-90, ~90 m), separate from the
+  cell's elevation already returned by `/frost`: a garden in a valley
+  bottom can sit hundreds of metres below its cell's average, which is
+  exactly why the frost dates can mislead. Same input rules as `/frost` —
+  Bulgaria only (400 `outside_bulgaria`), rounded to 3 decimals; cached for
+  a week.
+- **The page** appends the cell line with "approximate elevation near the
+  point: ≈ … m" and a short note that the two elevations come from
+  different models and don't correct the dates — only after the frost
+  result is already shown (never blocking it) and only on success (never
+  0, never the cell's elevation instead; on failure the line is simply
+  absent).
+- **Budget and a short refusal**: Open-Meteo's free tier is limited and for
+  non-commercial use; on a 429 or 5xx from the provider the endpoint stops
+  asking upstream for 10 minutes — kept at two levels, locally per isolate
+  (`worker/elevation.js`) and shared through the Cache API across the whole
+  Cloudflare data centre (`worker/index.js`), since Cloudflare spreads
+  requests across many isolates. An `ELEVATION` (`on`/`off`) switch in
+  `wrangler.toml`. Details in `docs/en/operations.md`.
 
 ---
 

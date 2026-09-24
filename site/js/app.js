@@ -35,6 +35,10 @@ let currentWindow = readWindow(location.search);
 let lastData = null;   // последният отговор на /frost, за прерисуване без заявка
 let lastView = null;   // последният изглед от historyView() — CSV чете от него, не смята наново
 let lastLat = null, lastLon = null; // за updateUrl() при смяна на прозореца, без нова заявка
+// /config, зареден накрая на файла — elevation отсъства (напр. мрежова
+// грешка при зареждането му) значи "не е изрично изключено", третира се
+// като включено, точно както cfg.elevation !== false по-долу.
+let cfg = { map: "osm", google_maps_key: null, geocoder: "openmeteo", grid: {} };
 updateLangSwitch(); // Ф7: window се пази в #lang-switch дори преди първата успешна заявка
 
 function say(msg) { const m = $("message"); m.textContent = msg; m.hidden = !msg; }
@@ -104,9 +108,14 @@ function render(d) {
   pairsNote.hidden = true;
 
   const cellP = el("p", {
+    id: "cell",
     class: "cell",
     text: `${t.cell}: ${cellLat ?? "—"}, ${cellLon ?? "—"} · ${t.elev} ${elevM ?? "—"} m · ${t.distance} ${km} ${t.km}`,
   });
+  // Задача 7: празен, скрит слот — fetchElevation() го попълва после, ако и
+  // само ако височината на точката пристигне успешно (никога предварително).
+  const elevNoteP = el("p", { id: "elev-note", class: "hint" });
+  elevNoteP.hidden = true;
 
   const noteP = el("p", { class: "note" });
   noteP.append(el("strong", { text: `${t.note_title}:` }), text(` ${d?.note?.[lang] ?? ""}`));
@@ -125,7 +134,7 @@ function render(d) {
       : text(t.api),
   );
 
-  $("result").replaceChildren(pairs, pairsNote, cellP, noteP, srcP);
+  $("result").replaceChildren(pairs, pairsNote, cellP, elevNoteP, noteP, srcP);
   $("result").hidden = false;
   $("synthetic").hidden = !d?.synthetic;
   if (qLat !== null) $("lat").value = qLat;
@@ -279,6 +288,29 @@ window.addEventListener("beforeprint", () => {
 });
 window.addEventListener("afterprint", () => { $("table-wrap").open = tableWasOpen; });
 
+// Задача 7: височината на самата точка (Open-Meteo Elevation), дописана към
+// реда на клетката СЛЕД резултата за сланата — никога не го чака. Носи
+// собствения mySeq на заявката (Ф7): забавен или негоден отговор от по-стар
+// lookup() не бива да пипа DOM-а на по-новия. Грешка или elevation_m===null
+// -> редът просто липсва (num() вече връща null и за двете); никога 0,
+// никога височината на клетката вместо нея.
+async function fetchElevation(mySeq, lat, lon) {
+  let r;
+  try { r = await fetch(`/api/v1/elevation?lat=${lat}&lon=${lon}`); }
+  catch (_) { return; }
+  if (mySeq !== lookupSeq || !r.ok) return;
+  let body;
+  try { body = await r.json(); }
+  catch (_) { return; }
+  if (mySeq !== lookupSeq) return;
+  const m = num(body?.elevation_m);
+  if (m === null) return;
+  const cell = $("cell");
+  if (cell) cell.append(text(` · ${t.point_elev(m)}`));
+  const note = $("elev-note");
+  if (note) { note.textContent = t.elev_note; note.hidden = false; }
+}
+
 // Всяко ново търсене/lookup обезсилва предишните недовършени — забавен
 // отговор от по-стара заявка не бива да презаписва по-новия избор.
 let lookupSeq = 0;
@@ -303,6 +335,8 @@ async function lookup(lat, lon) {
   catch (_) { if (mySeq !== lookupSeq) return; return say(t.network_error); }
   if (mySeq !== lookupSeq) return;
   render(body);
+  // Стъпка 5: винаги СЛЕД render(d) — сланите никога не чакат височината.
+  if (cfg?.elevation !== false) fetchElevation(mySeq, lat, lon);
 }
 
 // 1. търсене по име
@@ -399,11 +433,10 @@ function footerGeocoder(cfg) {
 
 // 2. картата — след config, за да знаем доставчика; после адресът със ?lat&lon
 (async () => {
-  let cfg = { map: "osm", google_maps_key: null, geocoder: "openmeteo", grid: {} };
   try {
     const parsed = await (await fetch("/api/v1/config")).json();
     if (parsed && typeof parsed === "object") cfg = parsed; // не-обект (напр. null) -> подразбиращите се
-  } catch (_) { /* картата пак ще е OSM */ }
+  } catch (_) { /* картата пак ще е OSM, височината — включена по подразбиране */ }
   $("synthetic").hidden = !cfg?.grid?.synthetic;
   footerSource(cfg);
   footerGeocoder(cfg);

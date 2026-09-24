@@ -62,6 +62,11 @@ export const T = {
     // Ф5/преглед: единственият жив статус — #status (визуално скрит), не #result
     status_result_ready: (lat, lon) => `Резултат готов за ${lat}, ${lon}.`,
     status_window_changed: (n) => `Периодът е сменен на последните ${n} години.`,
+
+    // Задача 7 — височината на самата точка, дописана след резултата за
+    // сланата (никога не го чака, никога 0, никога височината на клетката).
+    point_elev: (m) => `приблизителна височина около точката: ≈ ${m} м`,
+    elev_note: "Двете височини идват от различни модели и не коригират датите.",
   },
   en: {
     title: "When is the frost at your place?",
@@ -125,5 +130,10 @@ export const T = {
     // Ф5/review: the one live status — #status (visually hidden), not #result
     status_result_ready: (lat, lon) => `Result ready for ${lat}, ${lon}.`,
     status_window_changed: (n) => `Period changed to the last ${n} years.`,
+
+    // Task 7 — the point's own elevation, appended after the frost result
+    // (never blocks it, never 0, never the cell's elevation instead).
+    point_elev: (m) => `approximate elevation near the point: ≈ ${m} m`,
+    elev_note: "The two elevations come from different models and do not correct the dates.",
   },
 };

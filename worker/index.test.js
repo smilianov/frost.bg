@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import worker from "./index.js";
 import grid from "../grid/grid.json" with { type: "json" };
+import { resetCooldown } from "./elevation.js";
 
 const env = (over = {}) => ({
   GEOCODER: "openmeteo", MAP: "osm", GOOGLE_MAPS_KEY: "",
@@ -14,7 +15,7 @@ const get = (path, e = env(), ctx) => worker.fetch(new Request(`https://frost.bg
 // ЕФЕКТИВНИТЕ карта/геокодер (същите, които /config докладва). Нов deploy с
 // нова версия, нова мрежа или друга карта/геокодер = други ключове; старите
 // записи просто изтичат по TTL.
-const REV = (map = "osm", geocoder = "openmeteo") => encodeURIComponent(`0.3.0|${grid.computed}|${map}|${geocoder}`);
+const REV = (map = "osm", geocoder = "openmeteo") => encodeURIComponent(`0.3.1|${grid.computed}|${map}|${geocoder}`);
 
 // Заглавките, общи за всеки JSON отговор (успех или грешка) — CORS и content-type
 // не бива да изчезват тихо при бъдещи промени.
@@ -150,7 +151,7 @@ test("/api/v1/config: osm без ключ", async () => {
   const b = await r.json();
   assert.deepEqual(b, { map: "osm", google_maps_key: null, geocoder: "openmeteo", languages: ["bg", "en"],
     grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true, source_id: grid.source_id },
-    version: "1", app_version: "0.3.0" });
+    version: "1", app_version: "0.3.1", elevation: true });
 });
 test("/api/v1/config: GEOCODER=google с GOOGLE_KEY -> geocoder google, без да разкрива ключа", async () => {
   const r = await get("/api/v1/config", env({ GEOCODER: "google", GOOGLE_KEY: "SECRET123" }));
@@ -176,6 +177,87 @@ test("/api/v1/config: MAP=google без ключ пада обратно на os
   const b = await (await get("/api/v1/config", env({ MAP: "google", GOOGLE_MAPS_KEY: "" }))).json();
   assert.equal(b.map, "osm"); assert.equal(b.google_maps_key, null);
 });
+
+// --- Задача 7: /api/v1/elevation — височината на точката ---------------
+
+test("/api/v1/elevation: нормализира, кешира и връща метри", async () => {
+  resetCooldown();
+  const e = env({ FETCH: () => new Response(JSON.stringify({ elevation: [350.4] }), { status: 200 }) });
+  const r = await get("/api/v1/elevation?lat=42.18425&lon=24.92936", e);
+  assert.equal(r.status, 200);
+  assertSharedHeaders(r);
+  const b = await r.json();
+  assert.deepEqual(b.query, { lat: 42.184, lon: 24.929 });
+  assert.equal(b.elevation_m, 350);
+  assert.equal(b.version, "1");
+  assert.match(r.headers.get("cache-control"), /s-maxage=604800/);
+  assert.ok(b.source.attribution.includes("Copernicus"));
+});
+test("/api/v1/elevation: извън България -> 400, негодни координати -> 400", async () => {
+  const e = env({ FETCH: () => { throw new Error("не бива да се пита нагоре"); } });
+  assert.equal((await get("/api/v1/elevation?lat=48.85&lon=2.35", e)).status, 400);
+  assert.equal((await get("/api/v1/elevation?lat=abc&lon=2", e)).status, 400);
+});
+test("/api/v1/elevation: грешка на доставчика -> 502 no-store, не кеширан празен отговор", async () => {
+  resetCooldown();
+  const e = env({ FETCH: () => new Response("{}", { status: 500 }) });
+  const r = await get("/api/v1/elevation?lat=42.2&lon=24.9", e);
+  assert.equal(r.status, 502);
+  assertSharedHeaders(r); assertNoStore(r);
+});
+test("/api/v1/elevation: ELEVATION=off -> 404 и нищо нагоре", async () => {
+  const e = env({ ELEVATION: "off", FETCH: () => { throw new Error("не бива"); } });
+  const r = await get("/api/v1/elevation?lat=42.2&lon=24.9", e);
+  assert.equal(r.status, 404);
+  assertNoStore(r);
+});
+test("/api/v1/config казва дали височината е включена", async () => {
+  const on = await (await get("/api/v1/config")).json();
+  assert.equal(on.elevation, true);
+  const off = await (await get("/api/v1/config", env({ ELEVATION: "off" }))).json();
+  assert.equal(off.elevation, false);
+});
+
+// Правило на контролера отвъд брифа: локалният `cooldownUntil` в
+// elevation.js (Задача 6) пази само текущия isolate по коментара там —
+// Cloudflare разпределя заявките по много isolate-и и ги подменя свободно.
+// Маршрутът пази собствен маркер в споделения Cache API; `resetCooldown()`
+// тук симулира точно случая от прегледа: „свеж“ isolate, който локално не
+// помни нищо, докато маркерът в (стъбнатия) споделен кеш си стои от преди.
+test("/api/v1/elevation: маркерът в кеша координира отказа между isolate-и — свеж локален isolate пак не пита нагоре", async () => {
+  const store = stubCache();
+  try {
+    resetCooldown();
+    let calls = 0;
+    const e = env({ FETCH: () => { calls++; return new Response("{}", { status: 500 }); } });
+    const r1 = await getSettled("/api/v1/elevation?lat=42.2&lon=24.9", e, makeCtx());
+    assert.equal(r1.status, 502);
+    assert.equal(calls, 1);
+    resetCooldown(); // "нов" isolate — локалната памет е чиста
+    const r2 = await getSettled("/api/v1/elevation?lat=42.2&lon=24.9", e, makeCtx());
+    assert.equal(r2.status, 502);
+    assert.equal(calls, 1, "маркерът в кеша спира заявката, преди да се стигне до доставчика");
+  } finally {
+    clearCacheStub();
+    resetCooldown();
+  }
+});
+test("/api/v1/elevation: успешен отговор се кешира под нормализиран ключ, отделен от кратния отказ", async () => {
+  const store = stubCache();
+  try {
+    resetCooldown();
+    const e = env({ FETCH: () => new Response(JSON.stringify({ elevation: [99.4] }), { status: 200 }) });
+    const r1 = await getSettled("/api/v1/elevation?lat=42.18425&lon=24.92936", e, makeCtx());
+    assert.equal(r1.status, 200);
+    assert.equal(store.puts, 1);
+    assert.ok(store.has(`https://frost.bg/api/v1/elevation?rev=${encodeURIComponent("0.3.1|openmeteo-elevation")}&lat=42.184&lon=24.929`),
+      [...store.keys()].join(" "));
+  } finally {
+    clearCacheStub();
+    resetCooldown();
+  }
+});
+
 test("непознат /api/* -> 404 JSON not_found", async () => {
   const r = await get("/api/v1/nope");
   assert.equal(r.status, 404);
@@ -428,7 +510,7 @@ test("/api/v1/frost: нова мрежа (друг grid.computed) при зап�
     assert.notDeepEqual(b2, { sentinel: true }, "новата мрежа не бива да връща стария запис");
     assert.deepEqual(b2.query, { lat: 42.184, lon: 24.929 });
     assert.equal(store.puts, 2);
-    assert.ok(store.has(`https://frost.bg/api/v1/frost?rev=${encodeURIComponent("0.3.0|2031-01-05|osm|openmeteo")}&lat=42.184&lon=24.929`),
+    assert.ok(store.has(`https://frost.bg/api/v1/frost?rev=${encodeURIComponent("0.3.1|2031-01-05|osm|openmeteo")}&lat=42.184&lon=24.929`),
       [...store.keys()].join(" "));
   } finally {
     grid.computed = computed0;
