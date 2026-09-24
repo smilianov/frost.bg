@@ -212,11 +212,17 @@ function paintHistory(view) {
 // Единственото място, което вика historyView() — новите данни, смяната на
 // прозореца и калкулаторът за риска минават през него, затова рискът никога
 // не остава остарял: няма "последен показан отговор" за пазене никъде.
-function redraw() {
+// explicitRisk е true само при изрично "Сметни" (не при ново търсене или
+// смяна на прозореца) — тогава, и само тогава, фокусът отива върху
+// #risk-result (tabindex="-1" в HTML): #status е единствената aria-live
+// област, а рискът се обявява чрез преместен фокус, не чрез собствен
+// aria-live (преглед, кръг 3).
+function redraw({ explicitRisk = false } = {}) {
   if (!lastData) { lastView = null; $("history").hidden = true; return; }
-  lastView = historyView({ data: lastData, window: currentWindow, lang, t, riskInput: readRiskInput() });
+  lastView = historyView({ data: lastData, window: currentWindow, lang, t, riskInput: readRiskInput(), explicitRisk });
   paintPairs(lastView);
   paintHistory(lastView);
+  if (explicitRisk && lastView.visible && !lastView.empty && lastView.risk.focus) $("risk-result").focus();
 }
 
 let windowButtons = [];
@@ -255,7 +261,7 @@ $("csv").onclick = () => {
 
 // Прочита текущите ден/месец и прерисува всичко — рискът се смята наново
 // от historyView() всеки път, затова "Сметни" не пази собствено състояние.
-$("risk-go").onclick = () => { redraw(); };
+$("risk-go").onclick = () => { redraw({ explicitRisk: true }); };
 
 // Ф5/печат: <details>, затворен на екран, не показва съдържанието си при
 // печат само чрез CSS (моделът на рендиране не е обикновен display) —

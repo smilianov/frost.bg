@@ -36,21 +36,33 @@ export function inWindow(year, w) {
   return year >= w.from && year <= w.to;
 }
 
-// Ф4 + видимото съобщение за риска: без въведена дата -> "empty" (не
-// подканва с грешка, преди потребителят изобщо да е пипнал полетата);
-// невъзможна/извън обхвата -> "bad_date"; годна дата, нула използваеми
-// години -> "unavailable"; иначе резултатът, с бележката за малка извадка
-// и с видимото изречение за 29 февруари (Ф4: сгъването е видимо, не тихо).
-// Чист израз на (rows, riskInput) — никакво "последно показано" състояние
-// за пазене никъде, затова смяната на прозореца не може да остави стар отговор.
-export function classifyRisk(rows, withData, riskInput, t, lang) {
+// Ф4 + видимото съобщение за риска. `explicit` разграничава непипнати
+// полета (редовете при смяна на прозорец/ново търсене не бива да мълчат
+// с досадна грешка) от изрично натиснато "Сметни" с празни полета (тогава
+// мълчанието е бъг — трябва да обясни защо, точно като невъзможна дата):
+// - без дата, не изрично -> "empty" (нищо не се показва);
+// - без дата, изрично -> "bad_date" (същото обяснение като невъзможна дата);
+// - невъзможна/извън обхвата -> "bad_date"; годна дата, нула използваеми
+//   години -> "unavailable"; иначе резултатът, с бележката за малка извадка
+//   и с видимото изречение за 29 февруари (Ф4: сгъването е видимо, не тихо,
+//   и се пише независимо от изхода — resultOK или unavailable).
+// `focus: true` само при изрично изчисление (за фокус-прехвърлянето в
+// app.js — #status остава единствената aria-live област, риск-резултатът
+// се обявява чрез преместен фокус, не чрез собствен aria-live).
+// Чист израз на (rows, riskInput, explicit) — никакво "последно показано"
+// състояние за пазене никъде, затова смяната на прозореца не може да остави
+// стар отговор.
+export function classifyRisk(rows, withData, riskInput, t, lang, explicit = false) {
   const dayStr = String(riskInput?.day ?? "").trim();
   const monthStr = String(riskInput?.month ?? "").trim();
-  if (!dayStr && !monthStr) return { state: "empty", message: "" };
+  if (!dayStr && !monthStr) {
+    if (!explicit) return { state: "empty", message: "", focus: false };
+    return { state: "bad_date", message: t.risk_bad_date, focus: true };
+  }
   const day = Number(dayStr), month = Number(monthStr);
   const mmdd = `${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   const outcome = riskFor(rows, mmdd);
-  if (outcome === "bad_date") return { state: "bad_date", message: t.risk_bad_date };
+  if (outcome === "bad_date") return { state: "bad_date", message: t.risk_bad_date, focus: explicit };
   let message;
   if (outcome === "unavailable") {
     message = t.risk_unavailable;
@@ -59,7 +71,7 @@ export function classifyRisk(rows, withData, riskInput, t, lang) {
     if (withData < 10) message += ` ${t.risk_small_sample}`;
   }
   if (day === 29 && month === 2) message += ` ${t.risk_feb29_note}`;
-  return { state: outcome === "unavailable" ? "unavailable" : "result", message };
+  return { state: outcome === "unavailable" ? "unavailable" : "result", message, focus: explicit };
 }
 
 // Ф7: #lang-switch носи прозореца независимо от координатите — с координати
@@ -78,7 +90,7 @@ export function langSwitchQuery(lat, lon, window) {
 // [] показва секцията с обяснение (Ф2: "не е записана слана" != "нямаме
 // нищо"); редове без записана слана из графиката/таблицата, самите те, не
 // разчитат никаква скрита стъпка.
-export function historyView({ data, window, lang, t, riskInput }) {
+export function historyView({ data, window, lang, t, riskInput, explicitRisk }) {
   const years = Array.isArray(data?.years) ? data.years : [];
   const periodEnd = num(data?.period?.end);
   if (periodEnd === null) return { visible: false };
@@ -152,6 +164,6 @@ export function historyView({ data, window, lang, t, riskInput }) {
     },
     csv: toCsv(full.rows, { lat: cellLat, lon: cellLon, period: data?.period, source: data?.source?.[lang] }),
     csvFilename: `frost-bg-${cellLat}-${cellLon}.csv`,
-    risk: classifyRisk(w.rows, w.withData, riskInput, t, lang),
+    risk: classifyRisk(w.rows, w.withData, riskInput, t, lang, explicitRisk),
   };
 }

@@ -37,17 +37,42 @@ test("inWindow: годината е в прозореца, границите в
 
 // --- classifyRisk ---------------------------------------------------------
 
-test("classifyRisk: нито ден, нито месец въведени -> \"empty\", без съобщение (не подканва с грешка отрано)", () => {
+test("classifyRisk: непипнати полета мълчат (\"empty\", focus:false) — и без explicit, и без riskInput изобщо", () => {
   const rows = [[2020, "04-01", "10-01"]];
-  assert.deepEqual(classifyRisk(rows, 1, { day: "", month: "" }, T.bg, "bg"), { state: "empty", message: "" });
-  assert.deepEqual(classifyRisk(rows, 1, null, T.bg, "bg"), { state: "empty", message: "" });
+  assert.deepEqual(classifyRisk(rows, 1, { day: "", month: "" }, T.bg, "bg"), { state: "empty", message: "", focus: false });
+  assert.deepEqual(classifyRisk(rows, 1, null, T.bg, "bg"), { state: "empty", message: "", focus: false });
+  assert.deepEqual(classifyRisk(rows, 1, { day: "", month: "" }, T.bg, "bg", false), { state: "empty", message: "", focus: false });
 });
 
-test("classifyRisk: 29 февруари дава видимо изречение за сгъването към 1 март, независимо от изхода", () => {
+test("classifyRisk: изрично \"Сметни\" с празни полета обяснява защо (bad_date), не мълчи като непипнатите", () => {
   const rows = [[2020, "04-01", "10-01"]];
-  const r = classifyRisk(rows, 1, { day: "29", month: "2" }, T.bg, "bg");
-  assert.equal(r.state, "result");
-  assert.ok(r.message.includes(T.bg.risk_feb29_note), r.message);
+  const explicit = classifyRisk(rows, 1, { day: "", month: "" }, T.bg, "bg", true);
+  assert.equal(explicit.state, "bad_date");
+  assert.equal(explicit.message, T.bg.risk_bad_date);
+  assert.equal(explicit.focus, true);
+  // и без riskInput изобщо (null) — изрично натиснато си остава обяснение, не тишина
+  const explicitNull = classifyRisk(rows, 1, null, T.bg, "bg", true);
+  assert.equal(explicitNull.state, "bad_date");
+});
+
+test("classifyRisk: focus е true само при explicit — дори с годна дата и истински резултат", () => {
+  const rows = [[2020, "04-01", "10-01"]];
+  const passive = classifyRisk(rows, 1, { day: "15", month: "03" }, T.bg, "bg", false);
+  assert.equal(passive.state, "result");
+  assert.equal(passive.focus, false);
+  const explicit = classifyRisk(rows, 1, { day: "15", month: "03" }, T.bg, "bg", true);
+  assert.equal(explicit.state, "result");
+  assert.equal(explicit.focus, true);
+});
+
+test("classifyRisk: 29 февруари дава видимата бележка и когато излиза число, и когато е \"недостъпно\" — двата изхода, не само единия", () => {
+  const withResult = classifyRisk([[2020, "04-01", "10-01"]], 1, { day: "29", month: "2" }, T.bg, "bg");
+  assert.equal(withResult.state, "result");
+  assert.ok(withResult.message.includes(T.bg.risk_feb29_note), withResult.message);
+
+  const withUnavailable = classifyRisk([], 0, { day: "29", month: "2" }, T.bg, "bg");
+  assert.equal(withUnavailable.state, "unavailable");
+  assert.ok(withUnavailable.message.includes(T.bg.risk_feb29_note), withUnavailable.message);
 });
 
 test("classifyRisk: невъзможна дата -> \"bad_date\"; нула използваеми години с годна дата -> \"unavailable\"", () => {
@@ -111,15 +136,40 @@ test("historyView: под 10 години със записана слана -> 
   assert.equal(view.pairs.typicalSpring, "—");
 });
 
-test("historyView: графиката пази пълния 30-годишен обхват независимо от прозореца; selectedFrom/To следва прозореца", () => {
+// Тестът трябва да провери каквото app.js реално консумира — chart.model
+// (годините на модела, самите точки), chart.rows и CSV-то — не само
+// chart.from/to. "Строй графиката от избраните редове/обхват" и "дай на
+// таблицата само избраните редове" трябва да чупят точно този тест.
+test("historyView: графиката/таблицата/CSV-то се строят от ПЪЛНИЯ обхват (модела, точките, редовете) — прозорецът само открояна, не филтрира", () => {
   const rows = makeYears(1996, 2025, "04-01", "10-01");
   const data = { years: rows, period: { start: 1996, end: 2025 }, cell: { lat: 42, lon: 25 } };
   const v10 = historyView({ data, window: 10, lang: "bg", t: T.bg, riskInput: null });
   const v30 = historyView({ data, window: 30, lang: "bg", t: T.bg, riskInput: null });
+
+  // деклариран обхват: фиксиран, не се мести с прозореца
   assert.deepEqual([v10.chart.from, v10.chart.to], [1996, 2025]);
-  assert.deepEqual([v30.chart.from, v30.chart.to], [1996, 2025]); // фиксиран обхват — не се мести с прозореца
-  assert.deepEqual([v10.chart.selectedFrom, v10.chart.selectedTo], [2016, 2025]); // само откроеното следва прозореца
+  assert.deepEqual([v30.chart.from, v30.chart.to], [1996, 2025]);
+  // само открояването следва избрания прозорец
+  assert.deepEqual([v10.chart.selectedFrom, v10.chart.selectedTo], [2016, 2025]);
   assert.deepEqual([v30.chart.selectedFrom, v30.chart.selectedTo], [1996, 2025]);
+
+  // самият модел на графиката (годините му, точките му) — не само from/to
+  assert.deepEqual(v10.chart.model.years, { from: 1996, to: 2025 });
+  assert.deepEqual(v30.chart.model.years, { from: 1996, to: 2025 });
+  assert.equal(v10.chart.model.points.length, v30.chart.model.points.length); // еднакви точки, независимо от прозореца
+  assert.ok(
+    v10.chart.model.points.some((p) => p.year < v10.chart.selectedFrom),
+    "10-годишният прозорец не бива да маха точки за годините извън него — само да ги открои различно",
+  );
+
+  // таблицата (chart.rows) носи всичките 30 редa, не само избраните 10
+  assert.equal(v10.chart.rows.length, 30);
+  assert.equal(v30.chart.rows.length, 30);
+  assert.deepEqual(v10.chart.rows.map((r) => r[0]), v30.chart.rows.map((r) => r[0]));
+
+  // CSV-то (Ф5: "същите редове" като таблицата) носи и година извън прозореца
+  const v10Years = v10.csv.split("\n").map((l) => l.split(",")[0]);
+  assert.ok(v10Years.includes("1996"), "CSV-то пази годините извън избрания прозорец");
 });
 
 test("historyView: рискът се смята наново за текущия прозорец — никакво остаряло състояние за пазене", () => {
@@ -143,6 +193,26 @@ test("historyView: без въведена дата в риска -> risk.state 
     window: 30, lang: "bg", t: T.bg, riskInput: null,
   });
   assert.equal(view.risk.state, "empty");
+});
+
+// Ф4/преглед кръг 3: фокус-прехвърлянето (app.js прочита risk.focus и
+// премества фокуса само тогава) — explicitRisk е единственото, което го вдига.
+test("historyView: explicitRisk се подава до risk.focus — само изричното \"Сметни\", не смяна на прозорец/ново търсене", () => {
+  const rows = makeYears(1996, 2025, "04-01", "10-01");
+  const data = { years: rows, period: { start: 1996, end: 2025 }, cell: { lat: 42, lon: 25 } };
+  const riskInput = { day: "20", month: "04" };
+
+  const passive = historyView({ data, window: 30, lang: "bg", t: T.bg, riskInput });
+  assert.equal(passive.risk.focus, false);
+
+  const explicit = historyView({ data, window: 30, lang: "bg", t: T.bg, riskInput, explicitRisk: true });
+  assert.equal(explicit.risk.focus, true);
+
+  // и с празни полета — изрично "Сметни" върху непипнати полета показва
+  // обяснението (bad_date), не мълчание, и все пак вдига фокуса
+  const explicitBlank = historyView({ data, window: 30, lang: "bg", t: T.bg, riskInput: { day: "", month: "" }, explicitRisk: true });
+  assert.equal(explicitBlank.risk.state, "bad_date");
+  assert.equal(explicitBlank.risk.focus, true);
 });
 
 test("historyView: CSV носи пълния 30-годишен обхват (същите редове като таблицата), не избрания прозорец", () => {
