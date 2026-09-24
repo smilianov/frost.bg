@@ -253,7 +253,11 @@ endpoint keeps its own, stricter safeguard:
   page's row. It is part of `/config`'s `rev` (`configRev()`, see "The key
   carries a revision" above) — flipping it reaches the edge immediately.
   `/api/v1/elevation` itself carries its own, separate `rev` (below) — in
-  neither `cacheRev()` nor `configRev()`.
+  neither `cacheRev()` nor `configRev()`. **Honest about the browser:** the
+  edge stops new requests right away, but a browser that already has an
+  answer from `/config` or `/api/v1/elevation` (`max-age=300`) keeps
+  showing it for up to 5 minutes — the page's row disappears immediately
+  only after a hard reload, otherwise it waits out its 5 minutes.
 - The endpoint accepts only points in Bulgaria — the same rule as `/frost`
   (`outside_bulgaria` on 400) — there is no way through this API to ask
   the provider about an arbitrary point anywhere in the world.

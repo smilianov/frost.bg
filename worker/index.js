@@ -47,9 +47,9 @@ const effectiveMap = (env) => (env.MAP === "google" && !!env.GOOGLE_MAPS_KEY ? "
 const effectiveGeocoder = (env) => (env.GEOCODER === "google" && !!env.GOOGLE_KEY ? "google" : "openmeteo");
 
 // Превключвателят за /api/v1/elevation (Задача 7): "on" по подразбиране,
-// "off" изключва изцяло адреса и реда на екрана. Нарочно НЕ влиза в
-// cacheRev() по-долу — смяната му стига до ръба само при нов deploy с нова
-// версия, същият компромис като при GOOGLE_MAPS_KEY (operations.md).
+// "off" изключва изцяло адреса и реда на екрана. Влиза в configRev()
+// по-долу (fix round 1) — смяната стига до ръба веднага, не чак при нов
+// deploy; /frost и /geocode не го докладват и остават на общия cacheRev().
 const elevationOn = (env) => env.ELEVATION !== "off";
 
 // Ревизията в ключа на кеша (`rev=`, първи параметър): версията на
