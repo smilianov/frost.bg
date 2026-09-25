@@ -195,7 +195,8 @@ includes, as its first parameter `rev=`, four things:
 effective geocoder` (URL-encoded; effective = what `/api/v1/config`
 reports: `google` only with its key present, otherwise `osm` /
 `openmeteo`). Consequences — everywhere below, "a fresh cache" means:
-**edge — immediately on a new rev; browsers — within 5 minutes**:
+**edge — immediately on a new rev; a browser — on its next request, after its
+cached copy expires (up to 5 minutes)**:
 
 - a deploy with a **new version** (`APP_VERSION` in `worker/index.js`,
   `package.json`, the changelog) = a fresh cache;
@@ -218,8 +219,8 @@ reports: `google` only with its key present, otherwise `osm` /
   unlike `GOOGLE_MAPS_KEY` above: `/config` (and only `/config`) caches
   under its own revision, `configRev()` in `worker/index.js` — the same
   foursome plus the switch. The change reaches the edge immediately on a
-  new deploy (a new rev), and browsers within 5 minutes, exactly like a
-  `MAP`/`GEOCODER` change. `/frost` and `/geocode` don't report
+  new deploy (a new rev), and a browser on its next request after its copy
+  expires (up to 5 minutes), exactly like a `MAP`/`GEOCODER` change. `/frost` and `/geocode` don't report
   `elevation` and don't depend on it, so their `cacheRev()` stays
   unchanged — only `/config` carries the extra element. `/api/v1/elevation`
   itself carries its **own**, entirely separate `rev` (see the next
@@ -332,8 +333,8 @@ Before deploying: Node 24.21.0 and Python 3.12, with
 non-root. Continue only after the CDS tests actually run with zero failures and
 `check:links` passes — skipped CDS tests with exit code 0 are not sufficient
 (see "A completed run is not the same as a passing run" in `CONTRIBUTING.md`).
-The first command below checks exactly that: without `netCDF4` in the venv it
-stops the chain.
+The deploy chain starts with a check for `netCDF4`: without it in the venv the
+chain stops right there.
 
 ```bash
 export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"

@@ -257,13 +257,15 @@ secret. Exactly these keys:
   elevation. Just like the map/geocoder, this value **is** part of
   `/config`'s cache revision below (its own `configRev()`, separate from
   `/frost`/`/geocode`) — flipping the switch reaches the edge immediately
-  on a new deploy, browsers within 5 minutes (see
-  [`operations.md`](operations.md)).
+  on a new deploy. The browser receives the change on its next request after
+  the cached copy expires (5 minutes); an open page does not recheck
+  `/config` automatically (see [`operations.md`](operations.md)).
 
 Caching: `Cache-Control: public, max-age=300, s-maxage=86400`; the edge key
 carries a revision, so a change of map/geocoder or a new grid reaches the
-edge immediately on a new rev, and browsers within 5 minutes (see
-[`operations.md`](operations.md)).
+edge immediately on a new rev. The browser receives the change on its next
+request after the cached copy expires (5 minutes); an open page does not
+recheck `/config` automatically (see [`operations.md`](operations.md)).
 
 ## Errors
 
