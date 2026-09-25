@@ -578,11 +578,21 @@ function dotSegment(seg) {
   return decoded === "." || decoded === ".." ? decoded : null;
 }
 
-// Нормализира СУРОВИ сегменти върху начален стек. Връща null, ако ".."
-// излиза над корена — това е проблем, не тихо разрешаване.
-function normalizeSegments(base, rawSegments) {
+// Нормализира СУРОВИТЕ сегменти на адреса върху начален стек от сегменти на
+// файловата система. Връща null, ако ".." излиза над корена — това е проблем,
+// не тихо разрешаване.
+//
+// Две неща, всяко платено с дефект:
+//   - ПРАЗНИТЕ сегменти (от `//` вътре в адреса) се пазят през цялото
+//     нормализиране и падат чак при строенето на пътя: при URL нормализирането
+//     `..` изяжда празния сегмент, а ако той липсва — изяжда предходния.
+//     `/x//../api/missing.html` е `/x/api/missing.html`, не `/api/missing.html`;
+//   - сегментите носят флаг `decode`. Само дошлите от АДРЕСА се декодират;
+//     сегментите на базата са истински имена от файловата система и остават
+//     каквито са — иначе директория `docs/%20/` се слива с `docs/ /`.
+function normalizeSegments(base, addressSegments) {
   const out = [...base];
-  for (const seg of rawSegments) {
+  for (const seg of addressSegments) {
     const dot = dotSegment(seg);
     if (dot === ".") continue;
     if (dot === "..") {
@@ -590,7 +600,7 @@ function normalizeSegments(base, rawSegments) {
       out.pop();
       continue;
     }
-    out.push(seg);
+    out.push({ text: seg, decode: true });
   }
   return out;
 }
@@ -607,14 +617,20 @@ function resolveTarget(target, sourceFile, siteDir, root) {
 
   const siteAbsolute = t.startsWith("/");
   const trailing = t.endsWith("/") && t !== "/"; // флаг, не знак в низа
-  const rawSegments = t.split("/").filter((seg) => seg !== "");
+  const addressSegments = t.split("/");
+  if (siteAbsolute) addressSegments.shift(); // празният преди водещата "/"
+  if (trailing) addressSegments.pop(); // празният след крайната "/"
 
   // Базата: сайт-абсолютният адрес тръгва от корена на сайта, относителният —
   // от директорията на файла, изразена в сегменти спрямо корена на дървото.
+  // `decode: false` — това са имена от файловата система, не от адреса.
   const base = siteAbsolute
     ? []
-    : relative(root, dirname(sourceFile)).split(sep).filter(Boolean);
-  const out = normalizeSegments(base, rawSegments);
+    : relative(root, dirname(sourceFile))
+        .split(sep)
+        .filter(Boolean)
+        .map((text) => ({ text, decode: false }));
+  const out = normalizeSegments(base, addressSegments);
   if (out === null) {
     return {
       problem: siteAbsolute
@@ -626,12 +642,17 @@ function resolveTarget(target, sourceFile, siteDir, root) {
   // Маршрут на Worker-а, не файл — прескача се нарочно (проверка във
   // файловата система би излъгала). Условието е буквалният превод на
   // `pathname.startsWith("/api/")` върху сурови сегменти.
-  if (siteAbsolute && out[0] === "api" && (out.length > 1 || trailing)) {
+  if (siteAbsolute && out[0]?.text === "api" && (out.length > 1 || trailing)) {
     return { skip: "api route" };
   }
 
+  // Чак тук се декодира — и само това, което е дошло от адреса. Празните
+  // сегменти падат едва сега: дотук те участваха в нормализирането.
   const dir = siteAbsolute ? siteDir : root;
-  const path = join(dir, ...out.map(safeDecode)) + (trailing ? sep : "");
+  const names = out
+    .filter((seg) => seg.text !== "")
+    .map((seg) => (seg.decode ? safeDecode(seg.text) : seg.text));
+  const path = join(dir, ...names) + (trailing ? sep : "");
   return { path };
 }
 // --- главна проверка -----------------------------------------------------

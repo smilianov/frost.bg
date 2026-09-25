@@ -7,9 +7,12 @@
 // Ред се маха само съзнателно: ако нечия „поправка“ го обърне, това се вижда
 // по име и по произход, а не се случва в тишина.
 //
-// Всеки ред е { from, name, files, expect }. `expect` описва само това, което
-// го интересува; каквото не е споменато, се очаква празно (нула мъртви, нула
-// неразпознати) — така нов шум се вижда веднага.
+// Всеки ред е { from, name, files, expect, file? }. `expect` изисква `checked`
+// и приема `dead`, `unparsable`, `api`, `external`; каквото не е споменато, се
+// очаква ПРАЗНО (нула мъртви, нула неразпознати, нула пропуснати) — така нов
+// шум се вижда веднага, а не се натрупва тихо. `file` е файлът, от който се
+// очакват диагностиките (по подразбиране README.md); той също се проверява,
+// иначе мутация, която подменя докладвания файл, не поваля нито един ред.
 //
 // Всеки тест си строи собствена временна фикстура (mkdtempSync) — не пипа
 // истинското дърво и не оставя следа след себе си.
@@ -38,6 +41,9 @@ function cleanup(root) {
 // README.md с една жива базова връзка на ред 1 (за да не удари проверката
 // „файлове без нито една връзка“) и празен ред 2 — проверяваното започва от
 // РЕД 3. Номерата в `expect` се четат спрямо това.
+// Файлът, от който html()-фикстурите докладват диагностиките си.
+const SITE = join("site", "index.html");
+
 function md(lines, extra = {}) {
   return {
     "README.md": ["[база](docs/base.md)", "", ...(Array.isArray(lines) ? lines : [lines])].join("\n"),
@@ -93,6 +99,48 @@ const CASES = [
     expect: { checked: 2, api: 0, dead: ["3 /api/../a%2Fb/../api%2Fv1/missing.html"] },
   },
   {
+    from: "повторен преглед 4, ново счупване 1",
+    name: "/x//../api/missing.html — „..“ изяжда ПРАЗНИЯ сегмент, не „x“",
+    files: md("[x](/x//../api/missing.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /x//../api/missing.html"] },
+  },
+  {
+    from: "повторен преглед 4, ново счупване 1 (с кодирани точки)",
+    name: "/x//%2e%2e/api/missing.html — същото с %2e%2e",
+    files: md("[x](/x//%2e%2e/api/missing.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /x//%2e%2e/api/missing.html"] },
+  },
+  {
+    from: "повторен преглед 4 — контролата към ново счупване 1",
+    name: "/x/%2e%2e/api/missing.html БЕЗ празен сегмент Е маршрут",
+    files: md("[x](/x/%2e%2e/api/missing.html)"),
+    expect: { checked: 1, api: 1 },
+  },
+  {
+    from: "повторен преглед 4, ново счупване 2",
+    name: "базата от файловата система не се декодира заедно с адреса",
+    files: {
+      "README.md": "[база](docs/base.md)",
+      "docs/base.md": "x",
+      "docs/%20/page.md": "[x](real.md)",
+      "docs/ /real.md": "истинският файл е в друга директория",
+    },
+    file: join("docs", "%20", "page.md"),
+    expect: { checked: 2, dead: ["1 real.md"] },
+  },
+  {
+    from: "повторен преглед 4, ново счупване 2 (вариант с %2F)",
+    name: "%2F в името на директорията също не се декодира",
+    files: {
+      "README.md": "[база](docs/base.md)",
+      "docs/base.md": "x",
+      "docs/a%2Fb/page.md": "[x](real.md)",
+      "docs/a/b/real.md": "друг файл",
+    },
+    file: join("docs", "a%2Fb", "page.md"),
+    expect: { checked: 2, dead: ["1 real.md"] },
+  },
+  {
     from: "кръг 1, находка за /api/",
     name: "/api/v1/frost — истинският маршрут се пропуска",
     files: md("[x](/api/v1/frost)"),
@@ -116,6 +164,7 @@ const CASES = [
     files: html(['<a href="/api/v1/config">config</a>', '<a href="/apiary/">apiary</a>'], {
       "site/apiary/index.html": "<p>не е /api/</p>",
     }),
+    file: SITE,
     expect: { checked: 2, api: 1 },
   },
   {
@@ -182,12 +231,14 @@ const RECOGNITION_CASES = [
     from: "кръг 4, дефект 1 (същото в HTML файл)",
     name: "стойност на атрибут не прескача края на HTML коментар (в site/*.html)",
     files: html('<!-- href="https://example.com/ --> <a href="/missing.html">счупена</a>'),
+    file: SITE,
     expect: { checked: 2, dead: ["2 /missing.html"], unparsable: ["2 не изглежда като адрес"] },
   },
   {
     from: "кръг 4, дефект 3",
     name: "стойност на атрибут не прескача граница на друг атрибут",
     files: html("<a title=' href=\"https://example.com/' href=\"/missing.html\">x</a>"),
+    file: SITE,
     expect: { checked: 2, dead: ["2 /missing.html"], unparsable: ["2 не изглежда като адрес"] },
   },
   {
@@ -232,6 +283,7 @@ const RECOGNITION_CASES = [
     from: "кръг 3, находка 1",
     name: "връзка вътре в HTML коментар СЕ се проверява (в site/*.html)",
     files: html('<!-- <a href="/missing.html">старо</a> -->'),
+    file: SITE,
     expect: { checked: 2, dead: ["2 /missing.html"] },
   },
   {
@@ -244,6 +296,7 @@ const RECOGNITION_CASES = [
     from: "кръг 1, находка 2",
     name: "href на следващия ред спрямо тага — докладва се редът на СТОЙНОСТТА",
     files: html(["<a href=", '  "/css/missing.css">връзка</a>']),
+    file: SITE,
     expect: { checked: 2, dead: ["3 /css/missing.css"] },
   },
 
@@ -252,36 +305,42 @@ const RECOGNITION_CASES = [
     from: "кръг 4, дефект 5",
     name: "главни HREF= и SRC= се проверяват",
     files: html(['<a HREF="/missing.html">x</a>', '<img SRC="/missing.png">']),
+    file: SITE,
     expect: { checked: 3, dead: ["2 /missing.html", "3 /missing.png"] },
   },
   {
     from: "финален преглед, находка 4 (Minor)",
     name: "невалидна граница на атрибут се съобщава, не изчезва",
     files: html(['<a title="x"href="/missing.html">b</a>', '<a/href="/missing2.html">b</a>']),
+    file: SITE,
     expect: { checked: 1, unparsable: ["2 невалидна граница", "3 невалидна граница"] },
   },
   {
     from: "кръг 2 (тихо несъвпадение) → обърнато от финалния преглед, находка 4",
     name: "`href` веднага след кавичка е ПРОБЛЕМ, не тишина",
     files: html("<div title='href=\"/missing.html\"'>x</div>"),
+    file: SITE,
     expect: { checked: 1, unparsable: ["2 невалидна граница"] },
   },
   {
     from: "кръг 4 — фалшива тревога ПО ДОГОВОР, закрепена нарочно",
     name: "`href` след интервал в чужда стойност е мъртва връзка (шумно, допустимо)",
     files: html("<div title='see href=\"/missing.html\"'>x</div>"),
+    file: SITE,
     expect: { checked: 2, dead: ["2 /missing.html"] },
   },
   {
     from: "кръг 2, находка 2",
     name: "`data-href` не съвпада като `href`",
     files: html('<div data-href="/missing.html">x</div>'),
+    file: SITE,
     expect: { checked: 1 },
   },
   {
     from: "кръг 4, дефект 6",
     name: "href без кавички се съобщава, не се пропуска тихо",
     files: html("<a href=/missing.html>x</a>"),
+    file: SITE,
     expect: { checked: 1, unparsable: ["2 без кавички"] },
   },
 
@@ -551,6 +610,180 @@ const FENCE_CASES = [
   },
 ];
 
+// Репродукции от историята, които липсваха в първата версия на таблицата —
+// ревюерът ги изброи доклад по доклад в „Покритие спрямо историята“.
+const HISTORY_CASES = [
+  {
+    from: "кръг 1, находка 2 — ПОЛОЖИТЕЛНАТА половина, изгубена при преструктурирането",
+    name: "съществуваща HTML цел в Markdown минава",
+    files: md('<a href="docs/real.md">връзка</a>', { "docs/real.md": "x" }),
+    expect: { checked: 2 },
+  },
+  {
+    from: "кръг 1, находка 2 — ПОЛОЖИТЕЛНАТА половина, изгубена при преструктурирането",
+    name: "съществуващ многоредов href минава",
+    files: html(["<a href=", '  "/css/app.css">x</a>'], { "site/css/app.css": "/* стил */" }),
+    file: SITE,
+    expect: { checked: 2 },
+  },
+  {
+    from: "повторен преглед 1 — кодирани точки ПЛЮС счупено кодиране",
+    name: "/api/%2e%2e/missing%zz.html — счупеният съсед не отменя точковия сегмент",
+    files: md("[x](/api/%2e%2e/missing%zz.html)"),
+    expect: { checked: 2, dead: ["3 /api/%2e%2e/missing%zz.html"] },
+  },
+  {
+    from: "повторен преглед 1 — същото с %FF",
+    name: "/api/%2e%2e/missing%FF.html",
+    files: md("[x](/api/%2e%2e/missing%FF.html)"),
+    expect: { checked: 2, dead: ["3 /api/%2e%2e/missing%FF.html"] },
+  },
+  {
+    from: "повторен преглед 2 — вариантът без счупено кодиране",
+    name: "/api/a%2Fb/../../missing.html",
+    files: md("[x](/api/a%2Fb/../../missing.html)"),
+    expect: { checked: 2, dead: ["3 /api/a%2Fb/../../missing.html"] },
+  },
+  {
+    from: "повторен преглед 2 — счупено кодиране ИЗВЪН /api/",
+    name: "/missing%zz.html и /missing%FF.html се проверяват както са",
+    files: md(["[x](/missing%zz.html)", "[y](/missing%FF.html)"]),
+    expect: { checked: 3, dead: ["3 /missing%zz.html", "4 /missing%FF.html"] },
+  },
+  {
+    from: "повторен преглед 3 — вариантът с %FF",
+    name: "/api%2Fv1/missing%FF.html",
+    files: md("[x](/api%2Fv1/missing%FF.html)"),
+    expect: { checked: 2, dead: ["3 /api%2Fv1/missing%FF.html"] },
+  },
+  {
+    from: "повторен преглед 2 — коментарният анализ е само за Markdown",
+    name: "незатворен коментар в .html: връзката се проверява, диагностика няма",
+    files: html('<!-- <a href="/missing.html">x</a>'),
+    file: SITE,
+    expect: { checked: 2, dead: ["2 /missing.html"] },
+  },
+  {
+    from: "повторен преглед 2 — връзката във ВТОРИЯ блок при разделен коментар",
+    name: "коментар, разделен между два блока: връзката във втория СЕ проверява",
+    files: md(["```", "<!--", "```", "", "```", "-->", "[вътре](/missing.html)", "```"]),
+    expect: {
+      checked: 2,
+      dead: ["9 /missing.html"],
+      unparsable: ["10 незатворен ограден блок", "7 смесени огради"],
+    },
+  },
+  {
+    from: "повторен преглед 3 — вариантът CRLF на разминаващите се маски",
+    name: "разминаващи се маски и с CRLF окончания",
+    files: {
+      "README.md": ["[база](docs/base.md)", "", "<!--", "~~~", "-->", "[broken](/missing.html)", "<!--", "~~~", "-->"].join("\r\n"),
+      "docs/base.md": "x",
+    },
+    expect: { checked: 2, dead: ["6 /missing.html"], unparsable: ["4 смесени огради"] },
+  },
+  {
+    from: "task-3-rereview — котва в href",
+    name: "href=\"#x\" е котва на същата страница, не файл",
+    files: html('<a href="#x">котва</a>'),
+    file: SITE,
+    expect: { checked: 1 },
+  },
+  {
+    from: "task-3-rereview — още една URI схема",
+    name: "tel: е външен адрес",
+    files: md("[звънни](tel:+35921234567)"),
+    expect: { checked: 1, external: 1 },
+  },
+  {
+    from: "task-3-rereview — процентно кодиране в HTML атрибут",
+    name: "%20 в href се разрешава към името с интервал",
+    files: html('<a href="/css/real%20file.css">x</a>', { "site/css/real file.css": "/* стил */" }),
+    file: SITE,
+    expect: { checked: 2 },
+  },
+  {
+    from: "task-3-rereview — мъртва цел ПЛЮС низ за заявка",
+    name: "низът за заявка не крие мъртвата цел",
+    files: md("[x](docs/missing.md?v=1)"),
+    expect: { checked: 2, dead: ["3 docs/missing.md?v=1"] },
+  },
+  {
+    from: "task-3-rereview2 — двойни обратни кавички",
+    name: "двоен inline span не изяжда съседната връзка",
+    files: md("``код с ` вътре`` и после [x](/missing.html)"),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "task-3-rereview2 — истински малкобуквен src",
+    name: "<script src> се брои като връзка",
+    files: html('<script src="/js/missing.js"></script>'),
+    file: SITE,
+    expect: { checked: 2, dead: ["2 /js/missing.js"] },
+  },
+  {
+    from: "task-3-rereview3 — адрес, пренесен през редове",
+    name: "Markdown адрес, разкъсан на два реда, е неразпознат",
+    files: md(["[текст](docs/", "base.md)"]),
+    expect: { checked: 1, unparsable: ["3 но не се разпознава"] },
+  },
+  {
+    from: "task-3-rereview3 — атрибут след друг атрибут, разделени с нов ред",
+    name: "href на следващия ред след друг атрибут се разпознава",
+    files: html(['<a title="x"', '  href="/missing.html">x</a>']),
+    file: SITE,
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+];
+
+// ПРИЕТИ ОГРАНИЧЕНИЯ. Всеки ред тук закрепва поведение, което НЕ е желаното —
+// пази го от „поправка“ в тишина и го държи видимо в пакета, а не само в
+// текста. Ако някой го поправи, редът трябва да се обърне съзнателно.
+const LIMIT_CASES = [
+  {
+    from: "task-3-rereview — reference-style (приета граница)",
+    name: "ОГРАНИЧЕНИЕ: reference-style връзките не се разпознават И не дават диагностика",
+    files: md(["Виж [текста][ref] и [друг][b].", "", "[ref]: docs/missing.md", '[b]: <docs/space missing.md> "заглавие"']),
+    expect: { checked: 1 },
+  },
+  {
+    from: "task-3-rereview3 — ограда в blockquote (приета граница, шумна)",
+    name: "ОГРАНИЧЕНИЕ: ограда в blockquote не е ограда — съдържанието ѝ СЕ проверява",
+    files: md(["> ```html", '> <a href="/missing.html">x</a>', "> ```"]),
+    expect: { checked: 2, dead: ["4 /missing.html"] },
+  },
+  {
+    from: "кръг 4, дефект 4 (приета граница, шумна)",
+    name: "ОГРАНИЧЕНИЕ: четириинтервален код не е ограда — съдържанието му СЕ проверява",
+    files: md(["    [x](/missing.html)", "", "[след](/other-missing.html)"]),
+    expect: { checked: 3, dead: ["3 /missing.html", "5 /other-missing.html"] },
+  },
+  {
+    from: "кръг 5, притеснение 1 (приета граница, шумна)",
+    name: "ОГРАНИЧЕНИЕ: двойно вложена значка — средната се проверява, външната гърми",
+    files: md("[[![з](docs/i.png)](/средна.html)](/външна.html)", { "docs/i.png": "x" }),
+    expect: { checked: 3, dead: ["3 /средна.html"], unparsable: ["3 но не се разпознава"] },
+  },
+  {
+    from: "финален преглед + повторен преглед 4 — привидни огради в HTML блок",
+    name: "ОГРАНИЧЕНИЕ, ТИХО: привидни огради в HTML блок скриват връзка без диагностика",
+    files: md(["<div>", "~~~", '<a href="/missing.html">broken</a>', "~~~", "</div>"]),
+    expect: { checked: 1 },
+  },
+  {
+    from: "повторен преглед 4 — крайни точкови сегменти върху файл",
+    name: "ОГРАНИЧЕНИЕ, ТИХО: /css/app.css/. и /%2e върху файл се обявяват за живи",
+    files: md(["[x](/css/app.css/.)", "[y](/css/app.css/%2e)"], { "site/css/app.css": "/* стил */" }),
+    expect: { checked: 3 },
+  },
+  {
+    from: "повторен преглед 4 — /api/. и /api/x/..",
+    name: "ОГРАНИЧЕНИЕ, ШУМНО: /api/. и /api/x/.. се проверяват като файлове",
+    files: md(["[x](/api/.)", "[y](/api/x/..)"]),
+    expect: { checked: 3, dead: ["3 /api/.", "4 /api/x/.."] },
+  },
+];
+
 // --- пускането на таблицата ----------------------------------------------
 
 // Очакваните неразпознати се пишат като "<ред> <част от съобщението>" — за да
@@ -572,7 +805,7 @@ function unparsableMatches(actual, expected) {
 // Всеки ред е подтест със собствено име и произход — за да личи по име кой
 // точно случай е паднал и откъде идва, а не само че „таблицата“ е паднала.
 test("таблицата с репродукциите от цялата история на инструмента", async (t) => {
-  for (const kase of [...CASES, ...RECOGNITION_CASES, ...FENCE_CASES]) {
+  for (const kase of [...CASES, ...RECOGNITION_CASES, ...FENCE_CASES, ...HISTORY_CASES, ...LIMIT_CASES]) {
     await t.test(`${kase.name}  [${kase.from}]`, () => {
       const root = fixture(kase.files);
       try {
@@ -585,8 +818,16 @@ test("таблицата с репродукциите от цялата ист�
           unparsable: result.unparsable.map((u) => `${u.line} ${u.what}`).sort(),
         };
         const want = kase.expect;
-        for (const key of ["checked", "api", "external"]) {
-          if (want[key] !== undefined) assert.equal(got[key], want[key], `${key} (${kase.from})`);
+        // `api` и `external` се проверяват ВИНАГИ: липсващо очакване значи нула,
+        // а не „не ме интересува“ — иначе ред може тихо да престане да брои.
+        assert.equal(got.checked, want.checked, `прегледани (${kase.from})`);
+        assert.equal(got.api, want.api ?? 0, `пропуснати /api/ маршрути (${kase.from})`);
+        assert.equal(got.external, want.external ?? 0, `пропуснати външни (${kase.from})`);
+        // Файлът също е очакване: без него мутация, която подменя докладвания
+        // файл, не поваля нито един ред (доказано от ревюера с `WRONG.md`).
+        const wantFile = kase.file ?? "README.md";
+        for (const entry of [...result.dead, ...result.unparsable]) {
+          assert.equal(entry.file, wantFile, `докладваният файл (${kase.from})`);
         }
         assert.deepEqual(got.dead, [...(want.dead ?? [])].sort(), `мъртви връзки (${kase.from})`);
         assert.ok(

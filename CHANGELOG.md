@@ -41,17 +41,20 @@
   кавичните `href`/`src` и проверява дали пътят им съществува
   (относителните — спрямо файла, адресите с „/“ — спрямо `site/`, след
   нормализиране на `.`/`..`); пропуска `/api/*` (маршрут на Worker-а, не
-  файл) и външните връзки (без мрежа в CI). Обещанието е едно: връзка ИЗВЪН
-  ограден блок или се проверява, или излиза като проблем с файл и ред, и
-  проверката пада — пример, който не бива да се проверява, влиза в ограден
-  блок. Това не е гаранция: проверката е евристика, не parser — при
+  файл) и външните връзки (без мрежа в CI). По правило връзка ИЗВЪН ограден
+  блок или се проверява, или излиза като проблем с файл и ред, и проверката
+  пада — пример, който не бива да се проверява, влиза в ограден блок. Това
+  НЕ е гаранция: проверката е евристика, не parser — при
   преплетени огради и HTML коментари файлът пада шумно (разминаването между
   двата анализа на оградите е диагностика), но една връзка в него може да
   остане непроверена, а чист ограден блок не е достатъчен, ако съседният
   съдържа парче от HTML коментар. Приетите граници: reference-style връзките
   (`[текст][ref]`) не се разпознават и не дават диагностика; заглавие в
   кавички с квадратна скоба вътре е „Неразпознато“ (в кръгли скоби — не);
-  „#котва“ не се проверява, само целевият файл. Адрес в `<…>` се поддържа,
+  „#котва“ не се проверява, само целевият файл; измерени тихи случаи, които
+  остават описани, а не поправени — адрес, завършващ с точков сегмент върху
+  файл, и привидни оградни редове вътре в HTML блок. Адрес в `<…>` се
+  поддържа,
   включително с интервали и скоби; външни са адресите с URI схема и
   protocol-relative адресите (`//example.com/…`).
 
@@ -90,7 +93,7 @@
   (no network in CI). The promise is a single one: a link OUTSIDE a fenced
   block is either checked or comes out as a problem with file and line, and
   the check fails — an example that must not be checked goes in a fenced
-  block. This is not a guarantee: the check is a heuristic, not a parser —
+  block. This is NOT a guarantee: the check is a heuristic, not a parser —
   with interleaved fences and HTML comments the file fails noisily (a
   disagreement between the two fence analyses is itself a diagnostic), but
   one link in it may go unchecked, and a clean fenced block is not enough if
@@ -98,7 +101,9 @@
   boundaries: reference-style links (`[text][ref]`) are neither recognized
   nor reported; a quoted title with a square bracket in it is „Неразпознато“
   (one in parentheses is not); a "#fragment" is not checked, only the target
-  file. An address in `<…>` is supported, spaces and parentheses included;
+  file; and the measured silent cases that stay described rather than fixed —
+  an address ending in a dot segment on top of a file, and fence-looking
+  lines inside an HTML block. An address in `<…>` is supported, spaces and parentheses included;
   external are addresses with a URI scheme and protocol-relative ones
   (`//example.com/…`).
 

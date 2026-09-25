@@ -67,15 +67,20 @@ CDS инструментите. Същото се пуска в CI при все
 ```
 
 Относителните адреси се разрешават спрямо файла, започващите с „/“ — спрямо
-`site/`, след нормализиране на `.` и `..` (процентното кодиране никога не
-създава структура: `%2F` не е разделител); `/api/*` се пропуска като маршрут
-на Worker-а по суровия първи сегмент, точно както го сравнява и самият
-Worker. Външни — и затова недокоснати — са адресите с URI схема (`https:`,
-`mailto:`, `tel:`…) и protocol-relative адресите (`//example.com/…`).
+`site/`, след нормализиране на `.` и `..`. **При разделянето и при
+класификацията** процентното кодиране не създава структура: `%2F` не е
+разделител, `api%2Fv1` не е `api`. **При крайното файлово разрешаване вече
+е**: сегментите се декодират, затова `/css%2Fapp.css` намира
+`site/css/app.css`. `/api/*` се пропуска като маршрут на Worker-а по суровия
+първи сегмент — **по същия модел като Worker-а, но не съвпада с него
+навсякъде**: `/api/.` и `/api/x/..` се проверяват като файлове, макар
+Worker-ът да ги дава на API клона. Външни — и затова недокоснати — са
+адресите с URI схема (`https:`, `mailto:`, `tel:`…) и protocol-relative
+адресите (`//example.com/…`).
 
 **Какво съобщава като проблем** (излиза с файл и ред под „Неразпознато“ и
-проверката пада — тих пропуск е единственото недопустимо за този
-инструмент, шумен фалшив резултат е поносим): `href`/`src` без кавички, с
+проверката пада; шумен фалшив резултат е поносим, а тихият пропуск е това,
+което инструментът гони — без да може да го изключи, виж по-долу): `href`/`src` без кавички, с
 незатворена кавичка, със стойност, която не изглежда като адрес, или с
 невалидна граница на атрибута (кавичка или наклонена черта веднага пред
 `href`/`src`); нещо, което изглежда като Markdown връзка, но не е (интервал
@@ -115,6 +120,17 @@ Worker. Външни — и затова недокоснати — са адр�
   [текст](цел.md 'виж [бележка]')
   [текст](цел.md (виж [бележка]))
   ```
+
+**Измерените тихи случаи** — описани, не поправени; проверката ги подминава
+без нито една диагностика:
+
+- адрес, който завършва с точков сегмент върху файл (`/css/app.css/.` и
+  процентно кодираната му форма, както и относителните им варианти) се
+  обявява за жив, макар файловата система да би върнала ENOTDIR;
+- ред, който ПРИЛИЧА на ограда, вътре в HTML блок (между отварящ и затварящ
+  `<div>`) — два такива реда скриват връзката между себе си без диагностика;
+- `/api/.` и `/api/x/..` се проверяват като файлове, макар Worker-ът да ги
+  дава на API клона — това е шумно, но е разминаване, не съвпадение.
 
 Освен това: проверява се само че целевият ФАЙЛ съществува, не и дали
 „#котва“ в него съществува. Диагностиката „незатворен HTML коментар“ важи за
@@ -263,15 +279,21 @@ otherwise be checked:
 ```
 
 Relative addresses resolve against the file, `/`-prefixed ones against
-`site/`, after normalizing `.` and `..` (percent-encoding never creates
-structure: `%2F` is not a separator); `/api/*` is skipped as a Worker route
-by its raw first segment, exactly as the Worker itself compares it. External
-— and therefore untouched — are addresses with a URI scheme (`https:`,
-`mailto:`, `tel:`…) and protocol-relative addresses (`//example.com/…`).
+`site/`, after normalizing `.` and `..`. **When splitting and when
+classifying**, percent-encoding creates no structure: `%2F` is not a
+separator, `api%2Fv1` is not `api`. **At the final filesystem resolution it
+does**: the segments are decoded, so `/css%2Fapp.css` finds
+`site/css/app.css`. `/api/*` is skipped as a Worker route by its raw first
+segment — **on the same model as the Worker, but not matching it
+everywhere**: `/api/.` and `/api/x/..` are checked as files even though the
+Worker hands them to the API branch. External — and therefore untouched —
+are addresses with a URI scheme (`https:`, `mailto:`, `tel:`…) and
+protocol-relative addresses (`//example.com/…`).
 
 **What it reports as a problem** (printed with file and line under
-„Неразпознато“, and the check fails — a silent miss is the one outcome this
-tool does not allow; a noisy false positive is acceptable): an `href`/`src`
+„Неразпознато“, and the check fails; a noisy false positive is acceptable,
+and a silent miss is what the tool hunts — without being able to rule it
+out, see below): an `href`/`src`
 without quotes, with an unterminated quote, with a value that does not look
 like an address, or with an invalid attribute boundary (a quote or a slash
 immediately before `href`/`src`); something that looks like a Markdown link but
@@ -311,6 +333,18 @@ is checked, not reported.
   [text](target.md 'see [note]')
   [text](target.md (see [note]))
   ```
+
+**The measured silent cases** — described, not fixed; the check passes over
+them without a single diagnostic:
+
+- an address ending in a dot segment on top of a file (`/css/app.css/.` and
+  its percent-encoded form, and their relative variants) is declared alive,
+  even though the filesystem would return ENOTDIR;
+- a line that LOOKS like a fence, inside an HTML block (between an opening
+  and a closing `<div>`) — two such lines hide the link between them with no
+  diagnostic;
+- `/api/.` and `/api/x/..` are checked as files although the Worker hands
+  them to the API branch — noisy, but a divergence, not a match.
 
 Besides that: only the target FILE is checked for existence, not whether a
 "#fragment" inside it exists. The "unclosed HTML comment" diagnostic applies
