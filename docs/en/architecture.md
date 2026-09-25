@@ -60,33 +60,38 @@ change to one of those four produces a new key — a deploy that changes
 none of them (just code with no version bump, or a grid recomputed for the
 **same** date) keeps hitting the old entries until they expire by TTL,
 which is why every release bumps `APP_VERSION` (see
-[`operations.md`](operations.md)). `/api/v1/config` is the only endpoint
-whose response also depends on the `ELEVATION` toggle — so it carries its
-own revision on top, the same four values plus `ELEVATION`; `/frost` and
-`/geocode` don't report it and stay on the shared revision.
-`/api/v1/elevation` has a wholly separate revision (`APP_VERSION |
-"openmeteo-elevation"`) — it depends on neither the map, the geocoder, nor
-the grid. Errors are never written to the cache (`Cache-Control:
-no-store`).
+[`operations.md`](operations.md)). The `ELEVATION` toggle affects two
+different things: `/api/v1/config` reports its value and so carries its own
+revision on top — the same four values plus `ELEVATION` (`/frost` and
+`/geocode` don't report it and stay on the shared revision); while
+`/api/v1/elevation` never even reaches the cache when the toggle is "off"
+— the route returns `404` outright, before it checks `caches.default` at
+all. For its successful responses, `/api/v1/elevation` has a wholly
+separate revision of its own (`APP_VERSION | "openmeteo-elevation"`) — it
+depends on neither the map, the geocoder, nor the grid. Errors are never
+written to the cache (`Cache-Control: no-store`).
 
 ## The page
 
-`site/js/` is split into pure, DOM-free modules — `format.js` (formatting
-numbers, dates, URLs), `history.js` (decides **what** is shown), and
-`stats.js`. Only the core of `stats.js` — the median and percentile behind
-the typical/safe date — is copied word for word from
-`grid/frost_estimate.py`; the window (10/20/30 years), the season length,
-the risk-after-a-date figure and the window comparison exist only in
-`stats.js`, with no Python counterpart (`site/js/stats.parity.test.js`
-checks only the typical/safe dates and the yearly counts, for all 2,080
-cells — not the rest of the file's logic). `chart.js` mixes a pure model
-(`chartModel`, `toCsv`) with a thin SVG-rendering layer (`renderChart`,
-`renderTable`), explicitly separated inside the file. `paint.js` is the DOM
-layer for the two date cards at the top — its functions decide nothing,
-they only write whatever they are handed; the decisions live in
-`history.js`. `app.js` wires all of this to the real `document` — it reads
-the URL, calls the four API endpoints, sets up the map (`map.js`) — it
-computes nothing on its own, it only draws the result of the pure modules.
+`site/js/` is split into pure, DOM-free modules and a thin DOM layer on top.
+`format.js` formats numbers, dates and URLs; `history.js` decides **what**
+is shown; `stats.js` computes the dates behind the cards and the chart. The
+actual drawing lives in `chart.js` (`renderChart`/`renderTable` — the chart
+and the table, over a pure model `chartModel`/`toCsv` in the same file,
+explicitly separated) and in `paint.js` (the two typical/safe date cards at
+the top — it writes whatever it is handed, it decides nothing; the
+decisions live in `history.js`). `app.js` wires all of this to the real
+`document` — it reads the URL, calls the four API endpoints, sets up the
+map (`map.js`) — it computes nothing on its own, it only draws the result
+of the pure modules.
+
+Only the core of `stats.js` — the median and percentile behind the
+typical/safe date — is copied word for word from `grid/frost_estimate.py`;
+the window (10/20/30 years), the season length, the risk-after-a-date
+figure and the window comparison exist only in `stats.js`, with no Python
+counterpart. `site/js/stats.parity.test.js` checks only the typical/safe
+dates and the yearly counts, for all 2,080 cells — not the rest of the
+file's logic.
 
 ## The environments
 

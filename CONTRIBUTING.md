@@ -14,30 +14,36 @@ npm run dev
 
 ## Тестове
 
+Пълният пакет иска **Node 24.21.0**, **Python 3.12** и — за CDS частта —
+`grid/requirements-cds.txt`; в CI всичко се пуска non-root (`AGENTS.md`).
+
 ```bash
 npm test
 ```
 
 Пуска подред тестовете на Worker-а (`node --test "worker/*.test.js"`), на
 страницата (`node --test "site/js/*.test.js"`) и питоновите тестове на
-мрежата и на CDS инструментите. CI (`.github/workflows/ci.yml`) пуска
-същото на Node 24 и Python 3.12 при всеки push и pull request — PR не се
-приема с червено CI.
+мрежата и на CDS инструментите. Същото се пуска в CI при всеки push и pull
+request — PR не се приема с червено CI.
 
-**Само `npm install` не стига за CDS тестовете.** `grid/tests_cds.py`
-иска `netCDF4`/`cdsapi` от отделната venv `grid/.venv-cds`
-(`grid/requirements-cds.txt`); без нея тестът **пропуска тихо с изход 0**
-(„пропуснато: няма netCDF4“) — `npm test` пак излиза зелен, но без нито
-една реално пусната CDS проверка. За да ги пуснеш наистина:
+**CDS частта може да мине незабелязано пропусната.** `test:cds`
+(`package.json`) пуска `grid/tests_cds.py` през `grid/.venv-cds/bin/python`,
+ако е изпълним файл, иначе през системния `python3`. Самият тест
+**пропуска тихо с изход 0** („пропуснато: няма netCDF4“), щом
+интерпретаторът, който го е стартирал — без значение кой от двата — не
+може да внесе `netCDF4`; причината е способността на интерпретатора да го
+внесе, не самото съществуване на venv директорията. За да пуснеш CDS
+проверките наистина:
 
 ```bash
 python3 -m venv grid/.venv-cds
 grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
-npm test    # test:cds сега вижда venv-а и пуска tests_cds.py истински
+npm test
 ```
 
-Виж реда „пропуснато“ (или липсата му) в извеждането — това е единствената
-разлика между пропуснат и наистина пуснат CDS пробег.
+Истински пуснат пробег завършва с ред с бройки — „NN успешни, 0
+неуспешни“ (`grid/tests_cds.py`) — това е положителното доказателство,
+не само липсата на реда „пропуснато“.
 
 ## Правилото за промените
 
@@ -117,31 +123,36 @@ gets uploaded to Cloudflare. For the project's architecture, see
 
 ## Tests
 
+The full suite needs **Node 24.21.0**, **Python 3.12**, and — for the CDS
+part — `grid/requirements-cds.txt`; CI runs all of it non-root
+(`AGENTS.md`).
+
 ```bash
 npm test
 ```
 
 Runs, in order, the Worker's tests (`node --test "worker/*.test.js"`), the
 page's tests (`node --test "site/js/*.test.js"`) and the Python tests for
-the grid and the CDS tooling. CI (`.github/workflows/ci.yml`) runs the same
-on Node 24 and Python 3.12 on every push and pull request — a PR is not
-merged with red CI.
+the grid and the CDS tooling. The same runs in CI on every push and pull
+request — a PR is not merged with red CI.
 
-**`npm install` alone is not enough for the CDS tests.** `grid/tests_cds.py`
-needs `netCDF4`/`cdsapi` from the separate `grid/.venv-cds` venv
-(`grid/requirements-cds.txt`); without it, the test **skips silently with
-exit code 0** ("пропуснато: няма netCDF4") — `npm test` still comes back
-green, but without a single CDS check actually having run. To run them for
-real:
+**The CDS part can go unnoticed as skipped.** `test:cds` (`package.json`)
+runs `grid/tests_cds.py` through `grid/.venv-cds/bin/python` if that's an
+executable file, else through the system `python3`. The test itself
+**skips silently with exit code 0** ("пропуснато: няма netCDF4") whenever
+whichever interpreter ran it can't import `netCDF4` — the cause is that
+interpreter's ability to import it, not the venv directory's existence as
+such. To run the CDS checks for real:
 
 ```bash
 python3 -m venv grid/.venv-cds
 grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
-npm test    # test:cds now sees the venv and runs tests_cds.py for real
+npm test
 ```
 
-Watch for that "skipped" line (or its absence) in the output — that is the
-only difference between a skipped and a genuinely completed CDS run.
+A genuinely completed run ends with a totals line — "NN успешни, 0
+неуспешни" (`grid/tests_cds.py`) — that is the positive evidence to look
+for, not just the absence of the "skipped" line.
 
 ## The rule for changes
 
