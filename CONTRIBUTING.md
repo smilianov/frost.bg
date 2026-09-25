@@ -48,10 +48,16 @@ CDS инструментите. Същото се пуска в CI при все
 връзка и всеки кавичен `href`/`src`, включително вътре в `inline code` и
 вътре в `<!-- HTML коментари -->`** (тих пропуск е единственото недопустимо
 за този инструмент; шумен фалшив резултат е поносим). Единственото място,
-което скриптът наистина не пипа, е ```-ограден код — там, ако искаш пример,
-който да не се проверява. Не разпознава reference-style Markdown връзки
-(`[текст][ref]`), `href`/`src` без кавички, нито дали „#котва“ действително
-съществува в целевия файл (само че самият файл го прави).
+което скриптът наистина не пипа, е ограден блок (три обратни кавички или
+три тилди на своя си ред) — там влиза пример, който не бива да се
+проверява. **Проверката никога не мълчи:** каквото не може да разпознае —
+`href`/`src` без кавички или със стойност, която не изглежда като адрес;
+нещо, което изглежда като Markdown връзка, но не е (интервал в адреса
+например); незатворен ограден блок — излиза като „Неразпознато“ с файл и
+ред и проверката пада, вместо да бъде подминато. Не разпознава
+reference-style Markdown връзки (`[текст][ref]`), нито проверява дали
+„#котва“ действително съществува в целевия файл (само че самият файл го
+прави).
 
 ## Версия
 
@@ -172,11 +178,16 @@ internal links in the documentation and the site — **it checks every
 Markdown link and every quoted `href`/`src`, including inside `inline
 code` and inside `<!-- HTML comments -->`** (a silent miss is the one
 outcome this tool does not allow; a noisy false positive is acceptable).
-The only thing it truly leaves alone is fenced ```code``` blocks — put an
-example there if it must not be checked. It does not recognize
-reference-style Markdown links (`[text][ref]`), unquoted `href`/`src`, or
-whether a "#fragment" actually exists in the target file (only that the
-file itself does).
+The only thing it truly leaves alone is a fenced block (three backticks or
+three tildes on a line of their own) — put an example there if it must not
+be checked. **The check never goes quiet:** whatever it cannot recognize —
+an `href`/`src` without quotes or with a value that does not look like an
+address; something that looks like a Markdown link but isn't (a space in
+the address, say); an unclosed fenced block — comes out as „Неразпознато“
+with file and line and the check fails, instead of being passed over. It
+does not recognize reference-style Markdown links (`[text][ref]`), nor does
+it check whether a "#fragment" actually exists in the target file (only
+that the file itself does).
 
 ## Version
 
