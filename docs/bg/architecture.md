@@ -46,7 +46,7 @@ type: "json" }`), тя се вгражда в bundle-а при `deploy`/`dev` и
   източника.
 
 Никакви runtime зависимости — `package.json` държи само `wrangler` като dev
-dependency. Защо е нарочно: вижте „Нови зависимости“ в
+dependency. Защо е нарочно: виж „Нови зависимости“ в
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md).
 
 ## Кешът
