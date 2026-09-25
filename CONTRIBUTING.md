@@ -20,9 +20,24 @@ npm test
 
 Пуска подред тестовете на Worker-а (`node --test "worker/*.test.js"`), на
 страницата (`node --test "site/js/*.test.js"`) и питоновите тестове на
-мрежата и на CDS инструментите. Същото се пуска в CI
-(`.github/workflows/ci.yml`) при всеки push и pull request — PR не се приема
-с червено CI.
+мрежата и на CDS инструментите. CI (`.github/workflows/ci.yml`) пуска
+същото на Node 24 и Python 3.12 при всеки push и pull request — PR не се
+приема с червено CI.
+
+**Само `npm install` не стига за CDS тестовете.** `grid/tests_cds.py`
+иска `netCDF4`/`cdsapi` от отделната venv `grid/.venv-cds`
+(`grid/requirements-cds.txt`); без нея тестът **пропуска тихо с изход 0**
+(„пропуснато: няма netCDF4“) — `npm test` пак излиза зелен, но без нито
+една реално пусната CDS проверка. За да ги пуснеш наистина:
+
+```bash
+python3 -m venv grid/.venv-cds
+grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
+npm test    # test:cds сега вижда venv-а и пуска tests_cds.py истински
+```
+
+Виж реда „пропуснато“ (или липсата му) в извеждането — това е единствената
+разлика между пропуснат и наистина пуснат CDS пробег.
 
 ## Правилото за промените
 
@@ -59,9 +74,14 @@ npm test
 [`docs/bg/operations.md`](docs/bg/operations.md)). Промяна в число в него
 директно, без да мине през скрипта и истинските данни, ще бъде презаписана
 при следващото опресняване на мрежата — а дотогава ще лъже. Промяна в
-статистиката минава през `grid/frost_estimate.py` (и през паралелното ѝ
-копие на страницата, `site/js/stats.js` — двете трябва да останат
-еднакви, виж `site/js/stats.parity.test.js`), не през самия `grid.json`.
+самата статистика (медианата, персентилът зад типичната/сигурната дата)
+минава през `grid/frost_estimate.py` **и** през сърцевината на нейното
+копие на страницата, `site/js/stats.js` — двете там трябва да останат
+еднакви, виж `site/js/stats.parity.test.js` (сверява само датите и
+годишните бройки, не цялата логика на `stats.js` — прозорецът, сезонът и
+рискът съществуват само в JS, виж
+[`docs/bg/architecture.md`](docs/bg/architecture.md)); нищо от това не
+минава през самия `grid.json`.
 
 ## Нови зависимости в Worker-а не се приемат
 
@@ -70,8 +90,8 @@ npm test
 внесен от `npm`, е ред, който не си написал и не си прегледал — на ръба, на
 всяка заявка, за публично API без бекенд зад него. Ако имаш нужда от нещо,
 което изглежда като зависимост — увери се, че не се решава с малко чист
-код, преди да предложиш `npm install`; PR с нова зависимост в `worker/`
-вероятно ще се върне с молба за алтернатива без такава.
+код, преди да предложиш `npm install`. Правилото не е по преценка: PR с
+нова зависимост в `worker/` се връща с молба за алтернатива без такава.
 
 ## Въпроси и лиценз
 
@@ -103,9 +123,25 @@ npm test
 
 Runs, in order, the Worker's tests (`node --test "worker/*.test.js"`), the
 page's tests (`node --test "site/js/*.test.js"`) and the Python tests for
-the grid and the CDS tooling. The same runs in CI
-(`.github/workflows/ci.yml`) on every push and pull request — a PR is not
+the grid and the CDS tooling. CI (`.github/workflows/ci.yml`) runs the same
+on Node 24 and Python 3.12 on every push and pull request — a PR is not
 merged with red CI.
+
+**`npm install` alone is not enough for the CDS tests.** `grid/tests_cds.py`
+needs `netCDF4`/`cdsapi` from the separate `grid/.venv-cds` venv
+(`grid/requirements-cds.txt`); without it, the test **skips silently with
+exit code 0** ("пропуснато: няма netCDF4") — `npm test` still comes back
+green, but without a single CDS check actually having run. To run them for
+real:
+
+```bash
+python3 -m venv grid/.venv-cds
+grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
+npm test    # test:cds now sees the venv and runs tests_cds.py for real
+```
+
+Watch for that "skipped" line (or its absence) in the output — that is the
+only difference between a skipped and a genuinely completed CDS run.
 
 ## The rule for changes
 
@@ -143,9 +179,14 @@ hides a bug more easily; split it up if you can.
 and [`docs/en/operations.md`](docs/en/operations.md)). Changing a number in
 it directly, without going through the script and the real data, will be
 overwritten at the next grid refresh — and until then it will lie. A change
-to the statistics goes through `grid/frost_estimate.py` (and its parallel
-copy on the page, `site/js/stats.js` — the two must stay identical, see
-`site/js/stats.parity.test.js`), not through `grid.json` itself.
+to the statistics themselves (the median, the percentile behind the
+typical/safe date) goes through `grid/frost_estimate.py` **and** through the
+core of its counterpart on the page, `site/js/stats.js` — those two must
+stay identical there, see `site/js/stats.parity.test.js` (it checks only
+the dates and the yearly counts, not the rest of `stats.js`'s logic — the
+window, the season and the risk figure exist only in JS, see
+[`docs/en/architecture.md`](docs/en/architecture.md)); none of this goes
+through `grid.json` itself.
 
 ## New dependencies in the Worker are not accepted
 
@@ -154,9 +195,9 @@ copy on the page, `site/js/stats.js` — the two must stay identical, see
 deploying it). Every line of code pulled in from `npm` is a line you did
 not write and did not review — at the edge, on every request, for a public
 API with no backend behind it. If something looks like it needs a
-dependency, make sure it can't be solved with a little plain code first; a
-PR that adds a new dependency to `worker/` will likely come back with a
-request for an alternative that doesn't.
+dependency, make sure it can't be solved with a little plain code first.
+The rule isn't discretionary: a PR that adds a new dependency to `worker/`
+comes back with a request for an alternative that doesn't.
 
 ## Questions and licence
 
