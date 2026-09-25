@@ -361,10 +361,16 @@ test("сезонът без слана се смята от избрания п�
 test("ръководството обяснява дължината и когато липсва сезонна дата", () => {
   assert.match(bg, /няма записана пролетна слана, сезонът се брои от 1 януари/, "bg: липсваща пролетна дата");
   assert.match(bg, /до 31 декември/, "bg: липсваща есенна дата");
-  assert.ok(includesExact(paragraphContaining(bg, "31 декември"), "365"), "bg: и двете липсващи дават 365 дни");
+  // Числото стои в едно очакване с изречението си. Проверка само за „365“ в
+  // абзаца минаваше с „…дава 364 дни“, защото същият абзац казва и
+  // „365-дневен“ за календара — два пъти „365“ в един абзац, и тестът мълчи за
+  // сменения. (Доказано от прегледа с точно тази мутация.)
+  assert.ok(includesExactPhraseWithTrailingUnit(bg, "сметката дава 365 дни"), "bg: и двете липсващи дават 365 дни");
+  assert.ok(includesExactPhraseWithTrailingUnit(bg, "Календарът е 365-дневен"), "bg: календарът е 365-дневен");
   assert.match(en, /no recorded spring frost, the season is counted from January 1/, "en: липсваща пролетна дата");
   assert.match(en, /through December 31/, "en: липсваща есенна дата");
-  assert.ok(includesExact(paragraphContaining(en, "December 31"), "365"), "en: и двете липсващи дават 365 дни");
+  assert.ok(includesExactPhraseWithTrailingUnit(en, "the calculation gives 365 days"), "en: и двете липсващи дават 365 дни");
+  assert.ok(includesExactPhraseWithTrailingUnit(en, "The calendar has 365 days"), "en: календарът е 365-дневен");
 });
 
 // L1: българското обобщение казва „Прагът от 10 години СО СЛАНА“, английското
@@ -388,10 +394,22 @@ test("височината на точката в api.md е същата кат�
   assert.ok(enElev && enElev[1] === guideElev[1], "двата езика на ръководството носят едно и също число");
   for (const path of ["../../docs/bg/api.md", "../../docs/en/api.md"]) {
     const doc = read(path);
-    const shown = [...doc.matchAll(/"elevation_m":\s*(\d+)/g)].map((m) => m[1]);
-    assert.ok(shown.length > 0, `${path}: примерът за /elevation носи elevation_m`);
-    for (const value of shown) {
-      assert.equal(value, guideElev[1], `${path}: elevation_m трябва да е ${guideElev[1]}, както в ръководството`);
-    }
+    // Примерът се ВРЪЗВА за координатите: същите, с които документът озаглавява
+    // примера за /frost и ги нарича Маноле. Иначе тестът пази число, без да
+    // знае чие е.
+    const manoleQuery = doc.match(/\/api\/v1\/frost\?lat=([\d.]+)&lon=([\d.]+)`\s*\((?:Маноле|Manole)\)/);
+    assert.ok(manoleQuery, `${path}: примерът за /frost назовава Маноле с координати`);
+    const elevationExample = doc.match(
+      new RegExp(`/api/v1/elevation\\?lat=${manoleQuery[1]}&lon=${manoleQuery[2]}\`:\\s*\n+\`\`\`json\n([\\s\\S]*?)\n\`\`\``),
+    );
+    assert.ok(elevationExample, `${path}: примерът за /elevation е за същите координати като Маноле`);
+    // Цялата стойност, не водещите цифри: `152.5` и `152e3` минаваха, докато
+    // изразът четеше само `\d+` (доказано от прегледа).
+    const body = JSON.parse(elevationExample[1]);
+    assert.equal(
+      body.elevation_m,
+      Number(guideElev[1]),
+      `${path}: elevation_m трябва да е точно ${guideElev[1]}, както в ръководството`,
+    );
   }
 });
