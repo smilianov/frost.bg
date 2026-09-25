@@ -46,15 +46,13 @@ CDS инструментите. Същото се пуска в CI при все
 `npm run check:links` (пуска се и в CI, след `npm test`) проверява
 вътрешните връзки в документацията и сайта. Границата му е точно тази:
 
-**Обещанието, с неговата граница.** Markdown връзка или кавичен `href`/`src`
-извън ограден блок или се проверява, или излиза като проблем с файл и ред.
-Тих пропуск е единственото недопустимо за този инструмент, шумен фалшив
-резултат е поносим. Но проверката е **евристична, не parser**: при
-патологично преплетени огради и HTML коментари разпознаването не е сигурно и
-връзка може да остане непроверена. Затова това не се гарантира, а се
-СЪОБЩАВА — разминаването между двата анализа на оградите дава диагностика
-„смесени огради и HTML коментари — разпознаването не е сигурно“ и проверката
-пада. Целият клас е шумен, не тих.
+**Какво е и какво НЕ е това.** Markdown връзка или кавичен `href`/`src` извън
+ограден блок по правило или се проверява, или излиза като проблем с файл и
+ред. Това **не е гаранция**: проверката е евристика, не parser. При
+преплетени огради и HTML коментари разпознаването не е сигурно — файлът пада
+шумно (диагностика „смесени огради и HTML коментари — разпознаването не е
+сигурно“), но **една връзка в него може да остане непроверена**. Шумният
+провал е това, което се обещава; пълнотата на разпознаването — не.
 
 **Какво проверява.** Markdown връзките и кавичните `href`/`src` на реална
 позиция, включително вътре в `inline code` и вътре в `<!-- HTML коментари
@@ -69,8 +67,11 @@ CDS инструментите. Същото се пуска в CI при все
 ```
 
 Относителните адреси се разрешават спрямо файла, започващите с „/“ — спрямо
-`site/`, след нормализиране на `.` и `..`; `/api/*` се пропуска като
-маршрут на Worker-а, а външните адреси не се докосват.
+`site/`, след нормализиране на `.` и `..` (процентното кодиране никога не
+създава структура: `%2F` не е разделител); `/api/*` се пропуска като маршрут
+на Worker-а по суровия първи сегмент, точно както го сравнява и самият
+Worker. Външни — и затова недокоснати — са адресите с URI схема (`https:`,
+`mailto:`, `tel:`…) и protocol-relative адресите (`//example.com/…`).
 
 **Какво съобщава като проблем** (излиза с файл и ред под „Неразпознато“ и
 проверката пада — тих пропуск е единственото недопустимо за този
@@ -78,9 +79,11 @@ CDS инструментите. Същото се пуска в CI при все
 незатворена кавичка, със стойност, която не изглежда като адрес, или с
 невалидна граница на атрибута (кавичка или наклонена черта веднага пред
 `href`/`src`); нещо, което изглежда като Markdown връзка, но не е (интервал
-или скоби в адреса, двойна вложеност в етикета); незатворен ограден блок;
-незатворен HTML коментар; адрес, който излиза над корена; файл, в който
-двата анализа на оградите не са съгласни.
+или скоби в адрес БЕЗ `<…>`, двойна вложеност в етикета); незатворен ограден
+блок; незатворен HTML коментар; адрес, който излиза над корена; файл, в
+който двата анализа на оградите не са съгласни. Адрес в `<…>` е поддържан,
+включително с интервали и със скоби вътре — той се проверява, не се
+съобщава.
 
 **Какво остава непроверено — всяка граница е приета, не пропуск.**
 
@@ -89,9 +92,13 @@ CDS инструментите. Същото се пуска в CI при все
   БЕЗУСЛОВНО: блок, съдържащ само отварящ HTML коментар без затварящ, пак
   дава диагностика „незатворен HTML коментар“; а ако първият блок съдържа
   отварящ коментар, а вторият — затварящ, връзката във ВТОРИЯ блок се
-  проверява и излиза мъртва. Правило, на което може да се разчита: пример,
-  който не бива да се проверява, влиза в ограден блок БЕЗ парчета от HTML
-  коментар в него.
+  проверява (и излиза мъртва, ако целта ѝ не съществува). **Дори напълно
+  чист блок не е достатъчен**: ограден блок, в който има отварящ HTML
+  коментар, кара следващия — съвсем чист — блок също да бъде проверен.
+  Надеждността
+  зависи от контекста на целия файл, не само от съдържанието на конкретната
+  ограда — затова, ако примерът гръмне, решението е да се махнат парчетата
+  от HTML коментар наоколо, не само да се огради.
 - **Reference-style връзки** (`[текст][ref]`) не се разпознават И не дават
   диагностика. Приета граница: в хранилището няма нито една такава връзка, а
   коректното им разпознаване иска истински CommonMark parser.
@@ -234,15 +241,14 @@ tests actually **ran** (as opposed to being skipped); whether they also
 internal links in the documentation and the site. Its boundary is exactly
 this:
 
-**The promise, with its boundary.** A Markdown link or a quoted `href`/`src`
-outside a fenced block is either checked or comes out as a problem with file
-and line. A silent miss is the one outcome this tool does not allow; a noisy
-false positive is acceptable. But the check is **heuristic, not a parser**:
-with pathologically interleaved fences and HTML comments the recognition is
-not certain and a link can go unchecked. So this is not guaranteed — it is
-REPORTED: a disagreement between the two fence analyses yields the
-diagnostic "смесени огради и HTML коментари — разпознаването не е сигурно"
-and the check fails. The whole class is noisy, not silent.
+**What this is and what it is NOT.** As a rule, a Markdown link or a quoted
+`href`/`src` outside a fenced block is either checked or comes out as a
+problem with file and line. This is **not a guarantee**: the check is a
+heuristic, not a parser. With interleaved fences and HTML comments the
+recognition is not certain — the file fails noisily (the diagnostic "смесени
+огради и HTML коментари — разпознаването не е сигурно"), but **one link in
+it may go unchecked**. The noisy failure is what is promised; completeness of
+the recognition is not.
 
 **What it checks.** Markdown links and quoted `href`/`src` in a real
 attribute position, including inside `inline code` and inside `<!-- HTML
@@ -257,8 +263,11 @@ otherwise be checked:
 ```
 
 Relative addresses resolve against the file, `/`-prefixed ones against
-`site/`, after normalizing `.` and `..`; `/api/*` is skipped as a Worker
-route, and external addresses are left alone.
+`site/`, after normalizing `.` and `..` (percent-encoding never creates
+structure: `%2F` is not a separator); `/api/*` is skipped as a Worker route
+by its raw first segment, exactly as the Worker itself compares it. External
+— and therefore untouched — are addresses with a URI scheme (`https:`,
+`mailto:`, `tel:`…) and protocol-relative addresses (`//example.com/…`).
 
 **What it reports as a problem** (printed with file and line under
 „Неразпознато“, and the check fails — a silent miss is the one outcome this
@@ -266,9 +275,11 @@ tool does not allow; a noisy false positive is acceptable): an `href`/`src`
 without quotes, with an unterminated quote, with a value that does not look
 like an address, or with an invalid attribute boundary (a quote or a slash
 immediately before `href`/`src`); something that looks like a Markdown link but
-isn't (a space or parentheses in the address, double nesting in the label);
-an unclosed fenced block; an unclosed HTML comment; an address that escapes
-the root; a file where the two fence analyses disagree.
+isn't (a space or parentheses in an address WITHOUT `<…>`, double nesting in
+the label); an unclosed fenced block; an unclosed HTML comment; an address
+that escapes the root; a file where the two fence analyses disagree. An
+address in `<…>` is supported, including spaces and parentheses inside — it
+is checked, not reported.
 
 **What stays unchecked — every boundary is accepted, not an oversight.**
 
@@ -277,9 +288,13 @@ the root; a file where the two fence analyses disagree.
   however, exclude UNCONDITIONALLY: a block containing only an opening HTML
   comment marker with no closing one still yields an "unclosed HTML comment"
   diagnostic; and if the first block holds an opening comment marker and the
-  second a closing one, a link in the SECOND block is checked and comes out
-  dead. The rule you can rely on: an example that must not be checked goes
-  in a fenced block WITHOUT pieces of an HTML comment in it.
+  second a closing one, a link in the SECOND block is checked (and comes out
+  dead if its target does not exist). **Even a completely clean block is not
+  enough**: a fenced block that holds an opening HTML comment makes the next
+  — entirely clean — block be checked too. Reliability depends on the context
+  of the whole file, not only on the contents of that one fence: if an
+  example fires, remove the pieces of the HTML comment around it rather than
+  only fencing it.
 - **Reference-style links** (`[text][ref]`) are neither recognized NOR
   reported. An accepted boundary: the repository has no such link, and
   recognizing them properly needs a real CommonMark parser.

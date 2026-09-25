@@ -1,27 +1,15 @@
 // Регресионни тестове за scripts/check_links.mjs.
 //
-// Кръг 1: директорията получава еднаква присъда в трите форми на адреса
-// ("/css", "/css/", относително "css/"); reference-style Markdown, HTML в
-// Markdown и многоредов href бяха невидими за парсъра.
+// СЪРЦЕТО НА ФАЙЛА Е ТАБЛИЦАТА `CASES`. Този инструмент мина през седем кръга
+// поправки и почти всеки от тях счупи съседа си незабелязано — защото
+// репродукциите живееха в докладите на ревюера, а не в пакета. Затова всяка
+// репродукция от цялата история е ред в таблицата, с коментар откъде идва.
+// Ред се маха само съзнателно: ако нечия „поправка“ го обърне, това се вижда
+// по име и по произход, а не се случва в тишина.
 //
-// Кръг 2: HTML в Markdown продължава да се брои; `data-href` вече не
-// съвпада с `href`; адрес с крайно "/" към файл (не директория) е мъртъв
-// (ENOTDIR); процентно кодирани адреси се разрешават правилно; липсващ
-// корен или дърво без нито една връзка провалят проверката, вместо да
-// минат тихо през 0/0. Reference-style Markdown е махнат изцяло —
-// хранилището няма нито един такъв случай, а коректното му разпознаване
-// иска истински parser.
-//
-// Кръг 2 добави и редакция на inline code span-ове/HTML коментари, за да
-// не се броят примери в проза — но кръг 3 я МАХНА: `<!-- ` --> [счупена
-// връзка](...) `код` ` показа, че единична обратна кавичка в коментар се
-// сдвоява с обратната кавичка на съвсем друг inline code span по-надолу и
-// изяжда истинска връзка между тях — тих фалшив негатив, единственото
-// недопустимо нещо за този инструмент. Сега се редактират само ```-огради
-// (котвени за реда, без такъв риск); всичко друго, включително вътре в
-// `inline code` и <!-- коментари -->, се брои. `href`/`src` вече изисква
-// истинска позиция на атрибут (предхожда го `\s`), не само "не буква/тире"
-// — `<div title='href="/x"'>` вече не съвпада.
+// Всеки ред е { from, name, files, expect }. `expect` описва само това, което
+// го интересува; каквото не е споменато, се очаква празно (нула мъртви, нула
+// неразпознати) — така нов шум се вижда веднага.
 //
 // Всеки тест си строи собствена временна фикстура (mkdtempSync) — не пипа
 // истинското дърво и не оставя следа след себе си.
@@ -47,248 +35,573 @@ function cleanup(root) {
   rmSync(root, { recursive: true, force: true });
 }
 
-// --- Находка 1 (кръг 1): директория, три форми, една и съща присъда -----
-
-test("директория без index.html е мъртва и в трите форми на адреса", () => {
-  const root = fixture({
-    "README.md": [
-      "[сайт-абсолютна без наклонена черта](/empty)",
-      "[сайт-абсолютна с наклонена черта](/empty/)",
-      "[относителна с наклонена черта](site/empty/)",
-    ].join("\n\n"),
-    "site/empty/.gitkeep": "", // директорията съществува, но няма index.html
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 3);
-    assert.equal(dead.length, 3, JSON.stringify(dead));
-    const targets = dead.map((d) => d.target).sort();
-    assert.deepEqual(targets, ["/empty", "/empty/", "site/empty/"]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("директория с index.html минава и в трите форми на адреса", () => {
-  const root = fixture({
-    "README.md": [
-      "[сайт-абсолютна без наклонена черта](/guide)",
-      "[сайт-абсолютна с наклонена черта](/guide/)",
-      "[относителна с наклонена черта](site/guide/)",
-    ].join("\n\n"),
-    "site/guide/index.html": "<p>ръководство</p>",
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 3);
-    assert.deepEqual(dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- Находка 2 (кръг 1): форми, невидими преди поправката ----------------
-// (reference-style е премахнат в кръг 2 — виж бележката най-горе; тук
-// остават само двете форми, които продължават да се проверяват.)
-
-test("HTML връзка, вградена в Markdown файл, се разпознава", () => {
-  // базата носи една истинска връзка (не нула), за да не удари новата
-  // проверка "файлове без нито една връзка" от кръг 2.
-  const base = fixture({
-    "README.md": "[база](docs/base.md)",
-    "docs/base.md": "истински файл",
-  });
-  const withGoodHtml = fixture({
-    "README.md": '[база](docs/base.md)\n\n<a href="docs/real.md">връзка</a>',
-    "docs/base.md": "истински файл",
-    "docs/real.md": "истински файл",
-  });
-  const withBadHtml = fixture({
-    "README.md": '[база](docs/base.md)\n\n<a href="docs/missing.md">връзка</a>',
-    "docs/base.md": "истински файл",
-  });
-  try {
-    const baseResult = checkTree(base);
-    const good = checkTree(withGoodHtml);
-    const bad = checkTree(withBadHtml);
-    assert.equal(good.checked, baseResult.checked + 1, "HTML връзката в Markdown трябва да се преброи");
-    assert.deepEqual(good.dead, []);
-    assert.equal(bad.dead.length, 1);
-    assert.equal(bad.dead[0].target, "docs/missing.md");
-  } finally {
-    cleanup(base);
-    cleanup(withGoodHtml);
-    cleanup(withBadHtml);
-  }
-});
-
-test("href, чиято стойност е на следващия ред спрямо тага, се разпознава", () => {
-  const base = fixture({ "site/index.html": '<a href="/">начало</a>' });
-  const withGoodMultiline = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<a href=\n  "/css/app.css">връзка</a>',
-    "site/css/app.css": "/* стил */",
-  });
-  const withBadMultiline = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<a href=\n  "/css/missing.css">връзка</a>',
-  });
-  try {
-    const baseResult = checkTree(base);
-    const good = checkTree(withGoodMultiline);
-    const bad = checkTree(withBadMultiline);
-    assert.equal(good.checked, baseResult.checked + 1, "многоредовият href трябва да се преброи");
-    assert.deepEqual(good.dead, []);
-    assert.equal(bad.dead.length, 1);
-    assert.equal(bad.dead[0].target, "/css/missing.css");
-    assert.equal(bad.dead[0].line, 3, "докладваният ред трябва да е този на самата стойност, не на 'href='");
-  } finally {
-    cleanup(base);
-    cleanup(withGoodMultiline);
-    cleanup(withBadMultiline);
-  }
-});
-
-// --- Находки от кръг 3: без inline-code/коментар редакция ----------------
-
-test("inline code span СЕ брои като връзка — счупена цел вътре в `код` се хваща", () => {
-  const root = fixture({
-    "README.md": '[база](docs/base.md)\n\nПрозата споменава `<a href="/missing.html">пример</a>` в текста.',
+// README.md с една жива базова връзка на ред 1 (за да не удари проверката
+// „файлове без нито една връзка“) и празен ред 2 — проверяваното започва от
+// РЕД 3. Номерата в `expect` се четат спрямо това.
+function md(lines, extra = {}) {
+  return {
+    "README.md": ["[база](docs/base.md)", "", ...(Array.isArray(lines) ? lines : [lines])].join("\n"),
     "docs/base.md": "x",
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.equal(dead.length, 1, JSON.stringify(dead));
-    assert.equal(dead[0].target, "/missing.html");
-  } finally {
-    cleanup(root);
-  }
-});
+    ...extra,
+  };
+}
 
-test("```-ограден код не се брои като връзка (единствената редакция, останала в кръг 3)", () => {
-  const base = fixture({ "README.md": "[база](docs/base.md)", "docs/base.md": "x" });
-  const withFence = fixture({
-    "README.md": [
-      "[база](docs/base.md)",
-      "",
+// site/index.html с една жива връзка на ред 1 — същата роля като `md`.
+function html(lines, extra = {}) {
+  return {
+    "site/index.html": ['<a href="/">начало</a>', ...(Array.isArray(lines) ? lines : [lines])].join("\n"),
+    ...extra,
+  };
+}
+
+const CASES = [
+  // --- адресът: /api/, процентно кодиране, нормализиране ------------------
+  {
+    from: "повторен преглед 2, находка 2 (декодиране по сегменти)",
+    name: "/api/a%2Fb/../../missing%zz.html — %2F не е разделител, значи не е маршрут",
+    files: md("[x](/api/a%2Fb/../../missing%zz.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api/a%2Fb/../../missing%zz.html"] },
+  },
+  {
+    from: "повторен преглед 2, находка 2 (вариантът с %FF)",
+    name: "/api/a%2Fb/../../missing%FF.html — същото със счупен UTF-8 сегмент",
+    files: md("[x](/api/a%2Fb/../../missing%FF.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api/a%2Fb/../../missing%FF.html"] },
+  },
+  {
+    from: "повторен преглед 3, ново счупване 1",
+    name: "/api%2Fv1/missing%zz.html — суровият първи сегмент не е „api“",
+    files: md("[x](/api%2Fv1/missing%zz.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api%2Fv1/missing%zz.html"] },
+  },
+  {
+    from: "повторен преглед 2, находка 3 / преглед 3",
+    name: "/api%2Fv1/frost — Worker-ът го дава на ASSETS, значи се проверява",
+    files: md("[x](/api%2Fv1/frost)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api%2Fv1/frost"] },
+  },
+  {
+    from: "повторен преглед 2, раздел „Проби“ — потвърдено с изпълнение на Worker-а",
+    name: "/api/..%2Fmissing.html — pathname запазва %2F, значи Е маршрут",
+    files: md("[x](/api/..%2Fmissing.html)"),
+    expect: { checked: 1, api: 1 },
+  },
+  {
+    from: "повторен преглед 3, ново счупване 1 (регресията от вълна 3)",
+    name: "/api/../a%2Fb/../api%2Fv1/missing.html — „api“ е изяден от ..",
+    files: md("[x](/api/../a%2Fb/../api%2Fv1/missing.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api/../a%2Fb/../api%2Fv1/missing.html"] },
+  },
+  {
+    from: "кръг 1, находка за /api/",
+    name: "/api/v1/frost — истинският маршрут се пропуска",
+    files: md("[x](/api/v1/frost)"),
+    expect: { checked: 1, api: 1 },
+  },
+  {
+    from: "финален преглед, находка 3",
+    name: "/api/../missing.html — нормализира се извън /api/",
+    files: md("[x](/api/../missing.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api/../missing.html"] },
+  },
+  {
+    from: "финален преглед, находка 3 (процентно кодиран dot segment)",
+    name: "/api/%2e%2e/missing.html — %2e%2e е точков сегмент",
+    files: md("[x](/api/%2e%2e/missing.html)"),
+    expect: { checked: 2, api: 0, dead: ["3 /api/%2e%2e/missing.html"] },
+  },
+  {
+    from: "кръг 1 — да не пострадат съседите на /api/",
+    name: "/apiary/ не е /api/",
+    files: html(['<a href="/api/v1/config">config</a>', '<a href="/apiary/">apiary</a>'], {
+      "site/apiary/index.html": "<p>не е /api/</p>",
+    }),
+    expect: { checked: 2, api: 1 },
+  },
+  {
+    from: "повторен преглед 3, „Обещанията“ — външните адреси",
+    name: "//example.com/… е protocol-relative, не локален файл",
+    files: md("[x](//example.com/missing.html)"),
+    expect: { checked: 1, external: 1 },
+  },
+  {
+    from: "кръг 2 — външните схеми",
+    name: "mailto: е външен адрес",
+    files: md("[поща](mailto:info@frost.bg)"),
+    expect: { checked: 1, external: 1 },
+  },
+  {
+    from: "финален преглед, находка 3 (излизане над корена)",
+    name: "адрес над корена на сайта е проблем, не тихо разрешаване",
+    files: md("[x](/../outside.html)"),
+    expect: { checked: 1, unparsable: ["3 над корена на сайта"] },
+  },
+  {
+    from: "финален преглед, находка 3 (излизане над корена)",
+    name: "адрес над корена на дървото е проблем",
+    files: md("[x](../../outside.md)"),
+    expect: { checked: 1, unparsable: ["3 над корена на дървото"] },
+  },
+
+  // --- крайна наклонена черта и директории --------------------------------
+  {
+    from: "повторен преглед 3, ново счупване 2",
+    name: "относителен адрес с крайно „/“ към файл е мъртъв (ENOTDIR)",
+    files: md("[x](site/css/app.css/)", { "site/css/app.css": "/* стил */" }),
+    expect: { checked: 2, dead: ["3 site/css/app.css/"] },
+  },
+  {
+    from: "кръг 2, находка 3",
+    name: "сайт-абсолютен адрес с крайно „/“ към файл е мъртъв (ENOTDIR)",
+    files: md(["[добра](/css/app.css)", "[лоша](/css/app.css/)"], { "site/css/app.css": "/* стил */" }),
+    expect: { checked: 3, dead: ["4 /css/app.css/"] },
+  },
+  {
+    from: "кръг 1, находка 1",
+    name: "директория без index.html е мъртва и в трите форми",
+    files: md(["[a](/empty)", "[b](/empty/)", "[c](site/empty/)"], { "site/empty/.gitkeep": "" }),
+    expect: { checked: 4, dead: ["3 /empty", "4 /empty/", "5 site/empty/"] },
+  },
+  {
+    from: "кръг 1, находка 1",
+    name: "директория с index.html минава и в трите форми",
+    files: md(["[a](/guide)", "[b](/guide/)", "[c](site/guide/)"], { "site/guide/index.html": "<p>x</p>" }),
+    expect: { checked: 4 },
+  },
+];
+
+const RECOGNITION_CASES = [
+  // --- прескачане на граници: коментари, тагове, атрибути -----------------
+  {
+    from: "кръг 4, дефект 1",
+    name: "стойност на атрибут не прескача края на HTML коментар (в Markdown)",
+    files: md('<!-- href="https://example.com/ --> <a href="/missing.html">счупена</a>'),
+    expect: { checked: 2, dead: ["3 /missing.html"], unparsable: ["3 не изглежда като адрес"] },
+  },
+  {
+    from: "кръг 4, дефект 1 (същото в HTML файл)",
+    name: "стойност на атрибут не прескача края на HTML коментар (в site/*.html)",
+    files: html('<!-- href="https://example.com/ --> <a href="/missing.html">счупена</a>'),
+    expect: { checked: 2, dead: ["2 /missing.html"], unparsable: ["2 не изглежда като адрес"] },
+  },
+  {
+    from: "кръг 4, дефект 3",
+    name: "стойност на атрибут не прескача граница на друг атрибут",
+    files: html("<a title=' href=\"https://example.com/' href=\"/missing.html\">x</a>"),
+    expect: { checked: 2, dead: ["2 /missing.html"], unparsable: ["2 не изглежда като адрес"] },
+  },
+  {
+    from: "кръг 4, дефект 2",
+    name: "„](“ в коментар не изяжда съседната Markdown връзка",
+    files: md("Текст <!-- ](https://example.com/ --> [счупена](/missing.html)"),
+    expect: { checked: 2, dead: ["3 /missing.html"], unparsable: ["3 но не се разпознава"] },
+  },
+  {
+    from: "кръг 3, репродукцията от ревюто",
+    name: "обратна кавичка в коментар не изяжда съседната връзка",
+    files: md("Текст <!-- ` --> [счупена](/missing.html) `код`"),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "финален преглед, находка 1 (първата репродукция)",
+    name: "Markdown заглавие не пренася съвпадението през края на коментар",
+    files: md('Текст <!-- [old](https://example.com " --> [broken](/missing.html) <!-- ") -->'),
+    expect: { checked: 2, dead: ["3 /missing.html"], unparsable: ["3 но не се разпознава"] },
+  },
+  {
+    from: "финален преглед, находка 1 (втората репродукция)",
+    name: "неподдържаният адрес на изображение в значка се съобщава",
+    files: md("[![alt](/a(b).png)](https://example.com)"),
+    expect: { checked: 1, external: 1, unparsable: ["3 но не се разпознава"] },
+  },
+
+  // --- какво СЕ брои: inline code, коментари, HTML в Markdown -------------
+  {
+    from: "кръг 3, находка 1",
+    name: "връзка вътре в `inline code` СЕ се проверява",
+    files: md('Прозата споменава `<a href="/missing.html">пример</a>` в текста.'),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "кръг 3, находка 1",
+    name: "връзка вътре в HTML коментар СЕ се проверява (в Markdown)",
+    files: md('<!-- <a href="/missing.html">старо</a> -->'),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "кръг 3, находка 1",
+    name: "връзка вътре в HTML коментар СЕ се проверява (в site/*.html)",
+    files: html('<!-- <a href="/missing.html">старо</a> -->'),
+    expect: { checked: 2, dead: ["2 /missing.html"] },
+  },
+  {
+    from: "кръг 1, находка 2",
+    name: "HTML връзка, вградена в Markdown файл, се разпознава",
+    files: md('<a href="docs/missing.md">връзка</a>'),
+    expect: { checked: 2, dead: ["3 docs/missing.md"] },
+  },
+  {
+    from: "кръг 1, находка 2",
+    name: "href на следващия ред спрямо тага — докладва се редът на СТОЙНОСТТА",
+    files: html(["<a href=", '  "/css/missing.css">връзка</a>']),
+    expect: { checked: 2, dead: ["3 /css/missing.css"] },
+  },
+
+  // --- атрибути: граници, регистър, кавички -------------------------------
+  {
+    from: "кръг 4, дефект 5",
+    name: "главни HREF= и SRC= се проверяват",
+    files: html(['<a HREF="/missing.html">x</a>', '<img SRC="/missing.png">']),
+    expect: { checked: 3, dead: ["2 /missing.html", "3 /missing.png"] },
+  },
+  {
+    from: "финален преглед, находка 4 (Minor)",
+    name: "невалидна граница на атрибут се съобщава, не изчезва",
+    files: html(['<a title="x"href="/missing.html">b</a>', '<a/href="/missing2.html">b</a>']),
+    expect: { checked: 1, unparsable: ["2 невалидна граница", "3 невалидна граница"] },
+  },
+  {
+    from: "кръг 2 (тихо несъвпадение) → обърнато от финалния преглед, находка 4",
+    name: "`href` веднага след кавичка е ПРОБЛЕМ, не тишина",
+    files: html("<div title='href=\"/missing.html\"'>x</div>"),
+    expect: { checked: 1, unparsable: ["2 невалидна граница"] },
+  },
+  {
+    from: "кръг 4 — фалшива тревога ПО ДОГОВОР, закрепена нарочно",
+    name: "`href` след интервал в чужда стойност е мъртва връзка (шумно, допустимо)",
+    files: html("<div title='see href=\"/missing.html\"'>x</div>"),
+    expect: { checked: 2, dead: ["2 /missing.html"] },
+  },
+  {
+    from: "кръг 2, находка 2",
+    name: "`data-href` не съвпада като `href`",
+    files: html('<div data-href="/missing.html">x</div>'),
+    expect: { checked: 1 },
+  },
+  {
+    from: "кръг 4, дефект 6",
+    name: "href без кавички се съобщава, не се пропуска тихо",
+    files: html("<a href=/missing.html>x</a>"),
+    expect: { checked: 1, unparsable: ["2 без кавички"] },
+  },
+
+  // --- Markdown форми ------------------------------------------------------
+  {
+    from: "кръг 5, притеснение 1 (върнато като капацитет)",
+    name: "значка: проверяват се И двете цели — външната и на изображението",
+    files: md("[![значка](docs/missing.png)](/цел.html)"),
+    expect: { checked: 3, dead: ["3 /цел.html", "3 docs/missing.png"] },
+  },
+  {
+    from: "кръг 5 — позицията на външната връзка",
+    name: "значка с етикет на два реда: външната се докладва на реда на своята „[“",
+    files: md(["[![значка](docs/missing.png)", "](/цел.html)"]),
+    expect: { checked: 3, dead: ["3 /цел.html", "3 docs/missing.png"] },
+  },
+  {
+    from: "кръг 5 — една нива вложеност",
+    name: "етикет с една нива вложени скоби се проверява",
+    files: md("[а [б] в](/missing.html)"),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "кръг 5 — границата на вложеността",
+    name: "двойна вложеност и скоби в адреса остават неразпознати",
+    files: md(["[а [б [в] г] д](/target.html)", "[x](/a(b).html)"]),
+    expect: { checked: 1, unparsable: ["3 но не се разпознава", "4 но не се разпознава"] },
+  },
+  {
+    from: "финален преглед, находка 1 → границата на заглавието",
+    name: "заглавие в кавички с квадратна скоба е неразпознато (и двата вида кавички)",
+    files: md(['[a](docs/base.md "виж [бележка]")', "[b](docs/base.md 'виж [бележка]')"]),
+    expect: { checked: 1, unparsable: ["3 но не се разпознава", "4 но не се разпознава"] },
+  },
+  {
+    from: "повторен преглед 3, „Обещанията“ — уточнението",
+    name: "заглавие в КРЪГЛИ скоби с квадратна скоба вътре се приема",
+    files: md("[a](docs/base.md (виж [бележка]))"),
+    expect: { checked: 2 },
+  },
+  {
+    from: "повторен преглед 3, „Обещанията“ — подценената поддръжка",
+    name: "адрес в <…> с интервал и със скоби СЕ проверява",
+    files: md(["[x](<docs/space file.md>)", "[y](<docs/a(b).md>)"], {
+      "docs/space file.md": "x",
+      "docs/a(b).md": "x",
+    }),
+    expect: { checked: 3 },
+  },
+  {
+    from: "кръг 4 — интервал в адреса БЕЗ <…>",
+    name: "[x](/a b.html) е неразпознат, а не разбран наполовина",
+    files: md("[x](/a b.html)"),
+    expect: { checked: 1, unparsable: ["3 но не се разпознава"] },
+  },
+  {
+    from: "кръг 4 — етикет през редове",
+    name: "етикет на два реда се разпознава",
+    files: md(["[текст", "на два реда](/missing.html)"]),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "кръг 4 — заглавието не влиза в целта",
+    name: "обикновено заглавие след адреса не влиза в целта",
+    files: md(['[a](docs/base.md "заглавие")', "[b](docs/base.md 'заглавие')"]),
+    expect: { checked: 3 },
+  },
+  {
+    from: "кръг 2, находка 4",
+    name: "процентно кодиран адрес се разрешава към пътя с интервал",
+    files: md("[текст](docs/real%20file.md)", { "docs/real file.md": "x" }),
+    expect: { checked: 2 },
+  },
+  {
+    from: "кръг 0 — регистърът",
+    name: "разминаване само в регистъра е мъртва връзка",
+    files: md("[текст](docs/Real.md)", { "docs/real.md": "x" }),
+    expect: { checked: 2, dead: ["3 docs/Real.md"] },
+  },
+  {
+    from: "кръг 1 — котвата",
+    name: "котвата се маха, но базовият файл се проверява",
+    files: md(["[a](docs/base.md#section)", "[b](docs/missing.md#section)"]),
+    expect: { checked: 3, dead: ["4 docs/missing.md#section"] },
+  },
+  {
+    from: "кръг 2 — низът за заявка",
+    name: "низът за заявка (?…) се маха преди разрешаването",
+    files: md("[текст](docs/base.md?utm_source=x)"),
+    expect: { checked: 2 },
+  },
+  {
+    from: "кръг 2 — изображения и единични кавички",
+    name: "![alt](цел) и единични кавички в HTML се броят",
+    files: md(["[изображение](docs/pic.png)", "![alt текст](docs/pic.png)"], {
+      "docs/pic.png": "x",
+      "site/index.html": "<a href='/'>начало</a>",
+    }),
+    expect: { checked: 4 },
+  },
+];
+
+const FENCE_CASES = [
+  // --- огради: CommonMark-lite -------------------------------------------
+  {
+    from: "кръг 3 — единствената редакция",
+    name: "```-ограден код не се проверява",
+    files: md(["```html", '<a href="/missing.html">пример</a>', "```"]),
+    expect: { checked: 1 },
+  },
+  {
+    from: "кръг 4, дефект 4 (първо тире)",
+    name: "четворна ограда: троен ред вътре не я затваря",
+    files: md(["````", "```html", '<a href="/inside.html">пример</a>', "````", "", "[след](/missing.html)"]),
+    expect: { checked: 2, dead: ["8 /missing.html"] },
+  },
+  {
+    from: "кръг 4, дефект 4 (пето тире)",
+    name: "~~~ ограда се разпознава",
+    files: md(["~~~html", '<a href="/inside.html">x</a>', "~~~"]),
+    expect: { checked: 1 },
+  },
+  {
+    from: "кръг 4, дефект 4 (второ тире)",
+    name: "четириинтервален код не е ограда — съдържанието му СЕ проверява",
+    files: md(["    ```", '    <a href="/inside.html">x</a>', "", "[след](/missing.html)"]),
+    expect: { checked: 3, dead: ["4 /inside.html", "6 /missing.html"] },
+  },
+  {
+    from: "кръг 4, дефект 4 (трето тире)",
+    name: "ред, започващ с inline span, не е ограда",
+    files: md("```код``` и после [x](/missing.html)"),
+    expect: { checked: 2, dead: ["3 /missing.html"] },
+  },
+  {
+    from: "паркирано от финалния преглед",
+    name: "CRLF ограда се разпознава",
+    files: {
+      "README.md":
+        '[база](docs/base.md)\r\n\r\n```\r\n<a href="/inside.html">x</a>\r\n```\r\n\r\n[след](/missing.html)\r\n',
+      "docs/base.md": "x",
+    },
+    expect: { checked: 2, dead: ["7 /missing.html"] },
+  },
+  {
+    from: "кръг 4, дефект 4 (четвърто тире)",
+    name: "незатворена ограда не изяжда остатъка от файла — съобщава се",
+    files: md(["```html", '<a href="/inside.html">пример</a>', "", "[след](/missing.html)"]),
+    expect: {
+      checked: 3,
+      dead: ["4 /inside.html", "6 /missing.html"],
+      unparsable: ["3 незатворен ограден блок"],
+    },
+  },
+  {
+    from: "кръг 5, точка 2 (шумът остава локален)",
+    name: "незатворената ограда не отменя зачеркването на затворените преди нея",
+    files: md([
       "```html",
-      '<a href="/missing.html">пример</a>',
+      '<a href="/one.html">x</a>',
       "```",
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const baseResult = checkTree(base);
-    const result = checkTree(withFence);
-    assert.equal(result.checked, baseResult.checked, "код в ```-ограда не трябва да вдига броя");
-    assert.deepEqual(result.dead, []);
-  } finally {
-    cleanup(base);
-    cleanup(withFence);
+      "",
+      "~~~",
+      '<a href="/two.html">x</a>',
+      "~~~",
+      "",
+      "```js",
+      '<a href="/three.html">x</a>',
+    ]),
+    expect: { checked: 2, dead: ["12 /three.html"], unparsable: ["11 незатворен ограден блок"] },
+  },
+
+  // --- огради и HTML коментари: сечението на двата анализа -----------------
+  {
+    from: "финален преглед, находка 2",
+    name: "маркер за ограда вътре в HTML коментар не започва зачеркване",
+    files: md(["<!--", "~~~", "-->", "[broken](/missing.html)", "<!--", "~~~", "-->"]),
+    expect: { checked: 2, dead: ["6 /missing.html"], unparsable: ["4 смесени огради"] },
+  },
+  {
+    from: "повторен преглед 1 (обходът на лексикалния анализ)",
+    name: "`<!--` в един ограден блок и `-->` в друг не зачеркват истинска връзка",
+    files: md([
+      "~~~html",
+      "<!--",
+      "~~~",
+      "~~~html",
+      "-->",
+      "~~~",
+      "",
+      "[broken](/missing.html)",
+      "",
+      "<!--",
+      "~~~",
+      "-->",
+    ]),
+    expect: { checked: 2, dead: ["10 /missing.html"], unparsable: ["6 смесени огради"] },
+  },
+  {
+    from: "повторен преглед 2, „Може ли още да пропусне тихо връзка?“, точка 1",
+    name: "обща грешка на двете маски: връзката НЕ се проверява, но файлът крещи",
+    files: {
+      "README.md": [
+        "~~~html", // 1
+        "<!--", // 2
+        "~~~", // 3
+        "~~~html", // 4
+        "-->", // 5
+        "~~~", // 6
+        "<!--", // 7
+        "```", // 8
+        "-->", // 9
+        "[broken](/missing.html)", // 10 — приета граница: не се проверява
+        "<!--", // 11
+        "~~~", // 12
+        "```", // 13
+        "-->", // 14
+        "", // 15
+        "[база](docs/base.md)", // 16
+      ].join("\n"),
+      "docs/base.md": "x",
+    },
+    expect: { checked: 1, unparsable: ["4 смесени огради"] },
+  },
+  {
+    from: "повторен преглед 3, контрапримерът срещу „чистият блок е достатъчен“",
+    name: "предходен блок влияе на следващия, макар вторият да е чист",
+    files: {
+      "README.md": [
+        "```html", // 1
+        "<!--", // 2
+        "```", // 3
+        "```text", // 4
+        "[x](/missing.html)", // 5 — проверява се въпреки оградата
+        "```", // 6
+        "-->", // 7
+        "", // 8
+        "[база](docs/base.md)", // 9
+      ].join("\n"),
+      "docs/base.md": "x",
+    },
+    expect: { checked: 2, dead: ["5 /missing.html"], unparsable: ["4 смесени огради"] },
+  },
+  {
+    from: "повторен преглед 2 — правилото да не стане шумно за всичко",
+    name: "огради и коментари със СЪВПАДАЩИ маски не вдигат диагностика",
+    files: md(["```html", "<!-- пример -->", '<a href="/inside.html">x</a>', "```", "", "[след](/missing.html)"]),
+    expect: { checked: 2, dead: ["8 /missing.html"] },
+  },
+  {
+    from: "финален преглед, находка 2 (незатворен коментар)",
+    name: "незатворен HTML коментар е проблем; вътре в него не се разпознават огради",
+    files: md(["<!--", "```", "[broken](/missing.html)"]),
+    expect: { checked: 2, dead: ["5 /missing.html"], unparsable: ["3 незатворен HTML коментар"] },
+  },
+  {
+    from: "повторен преглед 2, „Проби“",
+    name: "ограден блок само с отварящ коментар пак дава диагностика",
+    files: md(["```", "<!--", "```", "", "[след](/missing.html)"]),
+    expect: { checked: 2, dead: ["7 /missing.html"], unparsable: ["4 незатворен HTML коментар"] },
+  },
+  {
+    from: "финален преглед, находка 2",
+    name: "обикновена ограда СЛЕД затворен коментар пак зачерква",
+    files: md(["<!-- бележка -->", "", "```", '<a href="/inside.html">x</a>', "```", "", "[след](/missing.html)"]),
+    expect: { checked: 2, dead: ["9 /missing.html"] },
+  },
+];
+
+// --- пускането на таблицата ----------------------------------------------
+
+// Очакваните неразпознати се пишат като "<ред> <част от съобщението>" — за да
+// не се налага целият текст на диагностиката да се повтаря във всеки ред.
+function unparsableMatches(actual, expected) {
+  if (actual.length !== expected.length) return false;
+  const left = [...actual];
+  for (const want of expected) {
+    const space = want.indexOf(" ");
+    const line = Number(want.slice(0, space));
+    const fragment = want.slice(space + 1);
+    const at = left.findIndex((u) => u.line === line && u.what.includes(fragment));
+    if (at === -1) return false;
+    left.splice(at, 1);
+  }
+  return true;
+}
+
+// Всеки ред е подтест със собствено име и произход — за да личи по име кой
+// точно случай е паднал и откъде идва, а не само че „таблицата“ е паднала.
+test("таблицата с репродукциите от цялата история на инструмента", async (t) => {
+  for (const kase of [...CASES, ...RECOGNITION_CASES, ...FENCE_CASES]) {
+    await t.test(`${kase.name}  [${kase.from}]`, () => {
+      const root = fixture(kase.files);
+      try {
+        const result = checkTree(root);
+        const got = {
+          checked: result.checked,
+          api: result.apiSkipped,
+          external: result.externalSkipped,
+          dead: result.dead.map((d) => `${d.line} ${d.target}`).sort(),
+          unparsable: result.unparsable.map((u) => `${u.line} ${u.what}`).sort(),
+        };
+        const want = kase.expect;
+        for (const key of ["checked", "api", "external"]) {
+          if (want[key] !== undefined) assert.equal(got[key], want[key], `${key} (${kase.from})`);
+        }
+        assert.deepEqual(got.dead, [...(want.dead ?? [])].sort(), `мъртви връзки (${kase.from})`);
+        assert.ok(
+          unparsableMatches(result.unparsable, want.unparsable ?? []),
+          `неразпознати: ${JSON.stringify(got.unparsable)}, а се очаква ` +
+            `${JSON.stringify(want.unparsable ?? [])} (${kase.from})`,
+        );
+      } finally {
+        cleanup(root);
+      }
+    });
   }
 });
 
-test("HTML коментар СЕ брои като връзка — нито в Markdown, нито в HTML файл не се прескача", () => {
-  const withCommentInMd = fixture({
-    "README.md": '[база](docs/base.md)\n\n<!-- <a href="/missing.html">старо</a> -->',
-    "docs/base.md": "x",
-  });
-  const withCommentInHtml = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<!-- <a href="/missing.html">старо</a> -->',
-  });
-  try {
-    const md = checkTree(withCommentInMd);
-    assert.equal(md.dead.length, 1, JSON.stringify(md.dead));
-    assert.equal(md.dead[0].target, "/missing.html");
-    const html = checkTree(withCommentInHtml);
-    assert.equal(html.dead.length, 1, JSON.stringify(html.dead));
-    assert.equal(html.dead[0].target, "/missing.html");
-  } finally {
-    cleanup(withCommentInMd);
-    cleanup(withCommentInHtml);
-  }
-});
-
-test("коментар с обратна кавичка не изяжда съседна Markdown връзка (репродукцията от ревюто)", () => {
-  // <!-- ` --> [счупена](...) `код` — единичната обратна кавичка в
-  // коментара по-рано се сдвояваше с тази на `код` и изяждаше връзката
-  // между тях, докато скриптът докладваше "0 мъртви връзки".
-  const root = fixture({
-    "README.md": "Текст <!-- ` --> [счупена](/missing.html) `код`\n",
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.equal(dead.length, 1, JSON.stringify(dead));
-    assert.equal(dead[0].target, "/missing.html");
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("`href` веднага след кавичка е ПРОБЛЕМ, не тиха несъвпадналост", () => {
-  // ОБЪРНАТ след финалния преглед: досега `<div title='href="/x"'>` просто не
-  // съвпадаше — тихо. Кавичка (или наклонена черта) пред името значи или
-  // невалиден маркъп (`<a title="x"href=…>`), или стойност на друг атрибут:
-  // и в двата случая инструментът дължи диагностика, не тишина. Целта пак НЕ
-  // се проверява — броячът остава 1.
-  const root = fixture({
-    "site/index.html": [
-      '<a href="/">начало</a>',
-      '<div title=\'href="/missing.html"\'>x</div>',
-    ].join("\n"),
-  });
-  try {
-    const { checked, dead, unparsable } = checkTree(root);
-    assert.equal(checked, 1, "само истинският href, не подниз в друг атрибут");
-    assert.deepEqual(dead, []);
-    assert.deepEqual(unparsable.map((u) => u.line), [2], JSON.stringify(unparsable));
-    assert.match(unparsable[0].what, /невалидна граница на атрибут/);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("`data-href` не съвпада като `href`", () => {
-  const root = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<div data-href="/missing.html">x</div>',
-  });
-  try {
-    const { checked, dead } = checkTree(root);
-    assert.equal(checked, 1, "само истинският href, не data-href");
-    assert.deepEqual(dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("адрес с крайно „/“ към файл (не директория) е мъртъв — ENOTDIR", () => {
-  const root = fixture({
-    "site/index.html": [
-      '<a href="/css/app.css">добра, без наклонена черта</a>',
-      '<a href="/css/app.css/">лоша, файл с наклонена черта накрая</a>',
-    ].join("\n"),
-    "site/css/app.css": "/* стил */",
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 2);
-    assert.equal(dead.length, 1, JSON.stringify(dead));
-    assert.equal(dead[0].target, "/css/app.css/");
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("процентно кодиран адрес се разрешава към истинския път с интервал", () => {
-  const root = fixture({
-    "README.md": "[текст](docs/real%20file.md)",
-    "docs/real file.md": "истински файл с интервал в името",
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.deepEqual(dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
+// --- това, което таблицата не може да изрази ------------------------------
 
 test("липсващ корен проваля проверката, не минава тихо през 0/0", () => {
   const missingRoot = join(tmpdir(), "check-links-does-not-exist-" + Date.now());
@@ -299,858 +612,6 @@ test("файлове без нито една връзка провалят пр
   const root = fixture({ "README.md": "обикновен текст, никакви връзки тук" });
   try {
     assert.throws(() => checkTree(root));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("единични кавички, изображения и mailto: се обработват правилно", () => {
-  const root = fixture({
-    "README.md": [
-      "[изображение](docs/pic.png)",
-      "![alt текст](docs/pic.png)",
-      "[поща](mailto:info@frost.bg)",
-    ].join("\n\n"),
-    "docs/pic.png": "x",
-    "site/index.html": "<a href='/'>начало (единични кавички)</a>",
-  });
-  try {
-    const { dead, checked, externalSkipped } = checkTree(root);
-    assert.deepEqual(dead, []);
-    assert.equal(checked, 3, "изображението (х2, обикновено и ![]) плюс единичните кавички в HTML");
-    assert.equal(externalSkipped, 1, "mailto: е външно");
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("низът за заявка (?...) се маха преди разрешаването", () => {
-  const root = fixture({
-    "README.md": "[текст](docs/real.md?utm_source=x)",
-    "docs/real.md": "истински файл",
-  });
-  try {
-    assert.deepEqual(checkTree(root).dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- регресия за проверката на регистъра (кръг 0) ------------------------
-
-test("разминаване само в регистъра на пътя е мъртва връзка", () => {
-  const root = fixture({
-    "README.md": "[текст](docs/Real.md)",
-    "docs/real.md": "истински файл, различен регистър в първата буква",
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.equal(dead.length, 1);
-    assert.equal(dead[0].target, "docs/Real.md");
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- находки, които трябва да продължат да работят (без регресия) -------
-
-test("/api/* се пропуска, без /apiary/ или /api-something да пострадат", () => {
-  const root = fixture({
-    "site/index.html": [
-      '<a href="/api/v1/config">config</a>',
-      '<a href="/apiary/">apiary</a>',
-    ].join("\n"),
-    "site/apiary/index.html": "<p>не е /api/</p>",
-  });
-  try {
-    const { dead, apiSkipped, checked } = checkTree(root);
-    assert.equal(apiSkipped, 1);
-    assert.equal(checked, 1);
-    assert.deepEqual(dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("котвата се маха, но базовият файл все още се проверява", () => {
-  const good = fixture({
-    "README.md": "[текст](docs/real.md#section)",
-    "docs/real.md": "истински файл",
-  });
-  const bad = fixture({ "README.md": "[текст](docs/missing.md#section)" });
-  try {
-    assert.deepEqual(checkTree(good).dead, []);
-    assert.equal(checkTree(bad).dead.length, 1);
-  } finally {
-    cleanup(good);
-    cleanup(bad);
-  }
-});
-
-// --- Находки от кръг 4: „разпознай или се оплаши“ ------------------------
-// Общото при всичките шест дефекта долу е едно: регулярен израз без граници
-// прескачаше край на таг, на коментар или на ограда и изяждаше истинската
-// връзка след себе си, докато скриптът докладваше „Всички са живи.“. Тих
-// пропуск е единственото недопустимо; шумна фалшива тревога — не е.
-
-test("четворна ограда: тройният ред вътре не я затваря, връзката след нея се проверява", () => {
-  // Преди: `/^\s*```/` се превключваше на всеки такъв ред — тройният ред
-  // вътре „затваряше“ четворната, `<a href>` отвътре се проверяваше (шумно),
-  // а четворната накрая отваряше нова ограда и изяждаше остатъка от файла.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)",
-      "",
-      "````",
-      "```html",
-      '<a href="/inside.html">пример</a>',
-      "````",
-      "",
-      "[след оградата](/missing.html)",
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 2, "базата и връзката след оградата, нищо отвътре");
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("четириинтервален код с буквални огради вътре не е ограда — връзката след него се проверява", () => {
-  // Отстъп от 4+ интервала не отваря ограда (CommonMark: `{0,3}`). Преди
-  // „    ```“ отваряше ограда и всичко след нея изчезваше тихо.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)",
-      "",
-      "    ```",
-      '    <a href="/inside.html">пример</a>',
-      "",
-      "[след кода](/missing.html)",
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead } = checkTree(root);
-    // Четириинтервалният код СЕ проверява — шумно, но не тихо: това е
-    // границата, която заглавният коментар на скрипта назовава.
-    assert.deepEqual(dead.map((d) => d.target).sort(), ["/inside.html", "/missing.html"]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("ред, започващ с inline span, не е ограда — връзката на същия ред се проверява", () => {
-  // CommonMark: при обратни кавички info string-ът не бива да съдържа
-  // обратна кавичка. Преди целият ред се зануляваше и връзката на него
-  // изчезваше тихо, а остатъкът от файла оставаше „в ограда“.
-  const root = fixture({
-    "README.md": ["[база](docs/base.md)", "", "```код``` и после [x](/missing.html)"].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("незатворена ограда се съобщава като неразпозната, а не изяжда остатъка от файла", () => {
-  // Преди: отварящата ограда без затваряща зануляваше всичко до края на
-  // файла — тих пропуск. Сега нищо не се зачерква, съдържанието се проверява
-  // шумно, а редът на отварящата излиза в `unparsable`. CLI-ят излиза с 1
-  // точно когато dead.length + unparsable.length > 0.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)",
-      "",
-      "```html",
-      '<a href="/inside.html">пример</a>',
-      "",
-      "[след](/missing.html)",
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
-    assert.equal(unparsable[0].file, "README.md");
-    assert.equal(unparsable[0].line, 3, "редът на отварящата ограда");
-    assert.deepEqual(dead.map((d) => d.target).sort(), ["/inside.html", "/missing.html"]);
-    assert.ok(dead.length + unparsable.length > 0, "условието, по което CLI-ят излиза с 1");
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("~~~ ограда се разпознава — съдържанието ѝ не се проверява", () => {
-  const base = fixture({ "README.md": "[база](docs/base.md)", "docs/base.md": "x" });
-  const withTilde = fixture({
-    "README.md": [
-      "[база](docs/base.md)",
-      "",
-      "~~~html",
-      '<a href="/inside.html">пример</a>',
-      "~~~",
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const baseResult = checkTree(base);
-    const result = checkTree(withTilde);
-    assert.equal(result.checked, baseResult.checked, "код в ~~~-ограда не трябва да вдига броя");
-    assert.deepEqual(result.dead, []);
-  } finally {
-    cleanup(base);
-    cleanup(withTilde);
-  }
-});
-
-test("стойност на атрибут не прескача края на HTML коментар", () => {
-  // Преди: `[^"]*` поглъщаше `https://example.com/ --> <a href=`, това
-  // минаваше за „външен адрес“ и истинският href никога не се разглеждаше —
-  // 0 мъртви връзки, exit 0. Сега стойност с празно пространство, `<` или
-  // `>` е проблем, а сканирането продължава веднага след „=“ и намира
-  // истинския href на същия ред.
-  const inMd = fixture({
-    "README.md": '[база](docs/base.md)\n\n<!-- href="https://example.com/ --> <a href="/missing.html">счупена</a>\n',
-    "docs/base.md": "x",
-  });
-  const inHtml = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<!-- href="https://example.com/ --> <a href="/missing.html">счупена</a>\n',
-  });
-  try {
-    const md = checkTree(inMd);
-    assert.deepEqual(md.dead.map((d) => d.target), ["/missing.html"], JSON.stringify(md));
-    assert.equal(md.unparsable.length, 1, JSON.stringify(md.unparsable));
-    const html = checkTree(inHtml);
-    assert.deepEqual(html.dead.map((d) => d.target), ["/missing.html"], JSON.stringify(html));
-    assert.equal(html.unparsable.length, 1, JSON.stringify(html.unparsable));
-  } finally {
-    cleanup(inMd);
-    cleanup(inHtml);
-  }
-});
-
-test("стойност на атрибут не прескача граница на друг атрибут", () => {
-  // `title=' href="https://example.com/'` — преди `[^"]*` вземаше
-  // `https://example.com/' href=` за адрес и изяждаше истинския href.
-  const root = fixture({
-    "site/index.html": [
-      '<a href="/">начало</a>',
-      "<a title=' href=\"https://example.com/' href=\"/missing.html\">x</a>",
-    ].join("\n"),
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
-    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("главни HREF= и SRC= се проверяват", () => {
-  const root = fixture({
-    "site/index.html": ['<a href="/">начало</a>', '<a HREF="/missing.html">x</a>', '<img SRC="/missing.png">'].join("\n"),
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 3);
-    assert.deepEqual(dead.map((d) => d.target).sort(), ["/missing.html", "/missing.png"]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("href без кавички се съобщава като неразпознат, не се пропуска тихо", () => {
-  // Скриптът нарочно не разрешава адрес без кавички (границата му е неясна
-  // без истински HTML parser), но „не проверявам“ вече не значи „мълча“.
-  const root = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<a href=/missing.html>x</a>\n',
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead, []);
-    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
-    assert.equal(unparsable[0].file, join("site", "index.html"));
-    assert.equal(unparsable[0].line, 2);
-    assert.match(unparsable[0].what, /без кавички/);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("`href` в стойността на друг атрибут след празно пространство е ФАЛШИВА ТРЕВОГА (нарочно)", () => {
-  // `<div title='see href="/missing.html"'>` изглежда точно като атрибут на
-  // реална позиция (предхожда го интервал) и излиза като мъртва връзка,
-  // каквато няма. ЗАКРЕПЕНО нарочно: шумната фалшива тревога се вижда и се
-  // решава с ограден блок за минута; тихият пропуск не се вижда никога.
-  // Ако някой „поправи“ това с по-хлабав regex, този тест трябва да падне и
-  // да го накара да мине пак през трите кръга, които вече платихме.
-  const root = fixture({
-    "site/index.html": '<a href="/">начало</a>\n<div title=\'see href="/missing.html"\'>x</div>\n',
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("коментар с „](“ не изяжда съседната Markdown връзка", () => {
-  // Преди: `\]\(([^)]+)\)` хващаше първото `](` — това в коментара — и
-  // поглъщаше `https://example.com/ --> [счупена](/missing.html`, което
-  // минаваше за външен адрес. 0 мъртви връзки, exit 0. Сега MD_INLINE иска
-  // истински `[етикет]` и адрес без празно пространство, а всяко `](`, което
-  // не попада в прието съвпадение, излиза като проблем.
-  const root = fixture({
-    "README.md": "[база](docs/base.md)\n\nТекст <!-- ](https://example.com/ --> [счупена](/missing.html)\n",
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
-    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
-    assert.equal(unparsable[0].line, 3);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("[x](/a b.html) се съобщава като неразпознат, а не се разбира наполовина", () => {
-  // Интервал в адреса не е Markdown връзка (в CommonMark адрес с интервал се
-  // пише в `<…>`). Преди целият низ „/a b.html“ се вземаше за адрес и се
-  // докладваше като мъртва връзка с невярна цел — сега е неразпознато.
-  const root = fixture({
-    "README.md": "[база](docs/base.md)\n\n[x](/a b.html)\n",
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead, []);
-    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
-    assert.equal(unparsable[0].line, 3);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("адрес в <…> се разпознава, включително с интервал вътре", () => {
-  const root = fixture({
-    "README.md": "[текст](<docs/real file.md>)",
-    "docs/real file.md": "истински файл с интервал в името",
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 1);
-    assert.deepEqual(dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("етикет на два реда се разпознава като връзка", () => {
-  const root = fixture({
-    "README.md": "[база](docs/base.md)\n\n[текст\nна два реда](/missing.html)\n",
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead } = checkTree(root);
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("заглавие след адреса не влиза в целта", () => {
-  const root = fixture({
-    "README.md": '[текст](docs/real.md "заглавие")\n[друг](docs/real.md \'заглавие\')\n',
-    "docs/real.md": "истински файл",
-  });
-  try {
-    const { dead, checked } = checkTree(root);
-    assert.equal(checked, 2);
-    assert.deepEqual(dead, []);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("двойна вложеност в етикета и скоби в адреса остават неразпознати — шумно, не тихо", () => {
-  // ОБЪРНАТ в кръг 5 спрямо кръг 4: тогава и `[![значка](img)](цел)`, и
-  // `[а [б] в](цел)` бяха „Неразпознато“. Сега етикетът допуска ЕДНА нива
-  // вложеност (виж теста за значката), а тук остава това, което НЕ се
-  // поддържа: двойна вложеност и скоби в адреса. И двете са шумни, не тихи.
-  // Ако някой реши да поддържа и тях, това иска истински CommonMark parser —
-  // и този тест трябва да се обърне нарочно, не да падне мълчаливо.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "[а [б [в] г] д](/target.html)", // 3 — двойна вложеност
-      "[x](/a(b).html)", // 4 — скоби в адреса
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead, []);
-    assert.deepEqual(
-      unparsable.map((u) => u.line),
-      [3, 4],
-      JSON.stringify(unparsable),
-    );
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- Кръг 5: затворените огради си остават зачеркнати --------------------
-
-test("незатворената ограда не отменя зачеркването на затворените преди нея", () => {
-  // Кръг 4 не зачеркваше НИЩО, щом файлът завършва с незатворена ограда —
-  // един истински дефект гърмеше цял файл с фалшиви тревоги. Сега шумът е
-  // локален: затворените огради се зачеркват нормално, само незатворената се
-  // проверява и редът ѝ излиза като проблем.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "```html", // 3
-      '<a href="/one.html">x</a>', // 4
-      "```", // 5
-      "", // 6
-      "~~~", // 7
-      '<a href="/two.html">x</a>', // 8
-      "~~~", // 9
-      "", // 10
-      "```js", // 11 — остава незатворена
-      '<a href="/three.html">x</a>', // 12
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead.map((d) => d.target), ["/three.html"], JSON.stringify(dead));
-    assert.deepEqual(unparsable, [
-      { file: "README.md", line: 11, what: "незатворен ограден блок" },
-    ]);
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- Кръг 5: една нива вложеност в етикета -------------------------------
-
-test("изображение като връзка се проверява — и външната цел, и самото изображение", () => {
-  // `[![значка](img)](цел)` е стандартната форма за значка. Кръг 4 я
-  // съобщаваше като „Неразпознато“ (шумно, но загубен капацитет); сега
-  // етикетът допуска една нива вложеност и се проверяват ДВЕТЕ цели —
-  // външната и на самото изображение, за да не изчезне вътрешната тихо.
-  const root = fixture({
-    "README.md": ["[база](docs/base.md)", "", "[![значка](docs/missing.png)](/цел.html)"].join("\n"),
-    "docs/base.md": "x",
-  });
-  // Етикет, който минава през два реда: докладваната позиция на външната
-  // връзка трябва да е редът на отварящата `[`, не този на „](“.
-  const wrapped = fixture({
-    "README.md": ["[база](docs/base.md)", "", "[![значка](docs/missing.png)", "](/цел.html)"].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable, checked } = checkTree(root);
-    assert.deepEqual(unparsable, []);
-    assert.equal(checked, 3, "базата, външната цел и самото изображение");
-    assert.deepEqual(
-      dead.map((d) => `${d.line} ${d.target}`).sort(),
-      ["3 /цел.html", "3 docs/missing.png"],
-      JSON.stringify(dead),
-    );
-    const w = checkTree(wrapped);
-    assert.deepEqual(w.unparsable, []);
-    const outer = w.dead.find((d) => d.target === "/цел.html");
-    assert.equal(outer.line, 3, "външната връзка се докладва на реда на своята отваряща скоба");
-  } finally {
-    cleanup(root);
-    cleanup(wrapped);
-  }
-});
-
-// --- Финален преглед: броим РАЗПОЗНАВАНЕ, не покритие --------------------
-
-test("невалидна граница на атрибут се съобщава, а не изчезва без диагностика", () => {
-  // `<a title="x"href=…>` и `<a/href=…>` са невалиден маркъп, но инструментът
-  // обещава шумен отказ при неразпознаване — досега изчезваха тихо.
-  const root = fixture({
-    "site/index.html": [
-      '<a href="/">начало</a>', // 1
-      '<a title="x"href="/missing.html">broken</a>', // 2 — кавичка преди href
-      '<a/href="/missing2.html">broken</a>', // 3 — наклонена черта преди href
-    ].join("\n"),
-  });
-  try {
-    const { dead, unparsable, checked } = checkTree(root);
-    assert.equal(checked, 1, "само истинският href");
-    assert.deepEqual(dead, []);
-    assert.deepEqual(unparsable.map((u) => u.line), [2, 3], JSON.stringify(unparsable));
-    assert.match(unparsable[0].what, /невалидна граница на атрибут/);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("/api/ се решава след нормализиране — dot segments не крият мъртва връзка", () => {
-  // `/api/../missing.html` и `/api/%2e%2e/missing.html` се нормализират до
-  // `/missing.html`, значи НЕ са маршрути на Worker-а. Досега се пропускаха по
-  // суровия префикс и броячът на пропуснатите API маршрути растеше.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "[x](/api/../missing.html)", // 2
-      "[x](/api/%2e%2e/missing.html)", // 3
-      "[истински](/api/v1/frost)", // 4 — маршрут, пропуска се
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, apiSkipped, unparsable } = checkTree(root);
-    assert.equal(apiSkipped, 1, "само истинският /api/v1/frost");
-    assert.deepEqual(unparsable, []);
-    assert.deepEqual(dead.map((d) => d.line), [2, 3], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("адрес, който излиза над корена, е проблем, не тихо разрешаване", () => {
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "[x](/../outside.html)", // 2 — над корена на сайта
-      "[x](../../outside.md)", // 3 — над корена на дървото
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead, []);
-    assert.deepEqual(unparsable.map((u) => u.line), [2, 3], JSON.stringify(unparsable));
-    assert.match(unparsable[0].what, /над корена/);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("маркер за ограда вътре в HTML коментар не започва зачеркване", () => {
-  // Двата `~~~` са в ОТДЕЛНИ HTML коментара, а връзката между тях е
-  // обикновена Markdown връзка извън код. Досега redactFences ги сдвояваше и
-  // изтриваше всичко между тях — 0 проблеми, exit 0, истинската връзка
-  // изчезваше тихо. Коментарният контекст се ползва САМО за решението дали
-  // маркерът е истински: съдържанието на коментарите пак СЕ проверява.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "<!--", // 3
-      "~~~", // 4
-      "-->", // 5
-      "[broken](/missing.html)", // 6
-      "<!--", // 7
-      "~~~", // 8
-      "-->", // 9
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(
-      dead.map((d) => `${d.line} ${d.target}`),
-      ["6 /missing.html"],
-      JSON.stringify(dead),
-    );
-    // ДОПЪЛНЕНО в закриващата вълна: тук двете маски се разминават (слепият
-    // анализ вижда ограда от ред 4 до ред 8, осведоменият — никаква), затова
-    // файлът получава и диагностика „разпознаването не е сигурно“. Връзката
-    // пак СЕ проверява — това е същината; диагностиката е добавен шум, не
-    // замяна.
-    assert.deepEqual(
-      unparsable.map((u) => `${u.line} ${u.what}`),
-      ["4 смесени огради и HTML коментари — разпознаването не е сигурно"],
-      JSON.stringify(unparsable),
-    );
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("незатворен HTML коментар е проблем и вътре в него не се разпознават огради", () => {
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "<!--", // 3 — не се затваря до края на файла
-      "```", // 4 — маркер вътре в коментара, значи не е ограда
-      "[broken](/missing.html)", // 5
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(
-      unparsable,
-      [{ file: "README.md", line: 3, what: "незатворен HTML коментар" }],
-      JSON.stringify(unparsable),
-    );
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("обикновена ограда СЛЕД затворен коментар пак зачерква", () => {
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "<!-- бележка -->", // 3
-      "", // 4
-      "```", // 5
-      '<a href="/inside.html">x</a>', // 6
-      "```", // 7
-      "", // 8
-      "[след](/missing.html)", // 9
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(unparsable, []);
-    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["9 /missing.html"], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("CRLF ограда се разпознава — съдържанието ѝ не се проверява", () => {
-  // Маркерът след `\r` не се разпознаваше: съдържанието се проверяваше шумно.
-  const root = fixture({
-    "README.md": "[база](docs/base.md)\r\n\r\n```\r\n<a href=\"/inside.html\">x</a>\r\n```\r\n\r\n[след](/missing.html)\r\n",
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable, checked } = checkTree(root);
-    assert.deepEqual(unparsable, []);
-    assert.equal(checked, 2, "базата и връзката след оградата, нищо отвътре");
-    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("Markdown заглавие не пренася съвпадението през края на коментар", () => {
-  // Репродукцията на ревюера: заглавието в кавички поглъщаше
-  // ` --> [broken](/missing.html) <!-- `, външният адрес минаваше за
-  // разпозната връзка, а `](` на истинската попадаше В диапазона на приетото
-  // съвпадение, тоест минаваше за „вече обработено“. 115 проверени, 0
-  // проблеми, exit 0. Сега заглавието не може да съдържа квадратна скоба, а
-  // отчитането е по ПОЗИЦИЯ на разпознатото `](`, не по диапазон.
-  const root = fixture({
-    "README.md":
-      '[база](docs/base.md)\n\nТекст <!-- [old](https://example.com " --> [broken](/missing.html) <!-- ") -->\n',
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["3 /missing.html"], JSON.stringify(dead));
-    assert.deepEqual(unparsable.map((u) => u.line), [3], JSON.stringify(unparsable));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("неподдържаният адрес на изображение в значка се съобщава, а не се заглушава", () => {
-  // `[![alt](/a(b).png)](https://example.com)` — външната връзка се разпознава,
-  // но адресът на изображението има скоби (неподдържана форма). Досега неговото
-  // `](` попадаше в диапазона на външното съвпадение и изчезваше без следа.
-  const root = fixture({
-    "README.md": "[база](docs/base.md)\n\n[![alt](/a(b).png)](https://example.com)\n",
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable, externalSkipped } = checkTree(root);
-    assert.deepEqual(dead, []);
-    assert.equal(externalSkipped, 1, "външната връзка пак се разпознава");
-    assert.deepEqual(unparsable.map((u) => u.line), [3], JSON.stringify(unparsable));
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- Повторен преглед: зачерква се само сечението на двата анализа -------
-
-test("`<!--` в един ограден блок и `-->` в друг не зачеркват истинска връзка", () => {
-  // Обходът на ревюера: лексикалният коментарен анализ свързва `<!--` от
-  // първия блок с `-->` от втория, потиска истинското отваряне на ред 6,
-  // приема затварянето на ред 8 за ново отваряне и изяжда връзката на ред 10.
-  // Затова се зачерква СЕЧЕНИЕТО на двата анализа — слепия за коментари и
-  // коментарно осведомения: сечението може само да НАМАЛИ зачеркнатото.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "~~~html", // 3
-      "<!--", // 4
-      "~~~", // 5
-      "~~~html", // 6
-      "-->", // 7
-      "~~~", // 8
-      "", // 9
-      "[broken](/missing.html)", // 10 — извън всяка действителна ограда
-      "", // 11
-      "<!--", // 12
-      "~~~", // 13
-      "-->", // 14
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["10 /missing.html"], JSON.stringify(dead));
-    // ДОПЪЛНЕНО в закриващата вълна: слепият анализ отваря ограда на ред 6,
-    // осведоменият не — разминаване, значи и диагностика. Връзката пак се
-    // проверява.
-    assert.deepEqual(
-      unparsable.map((u) => `${u.line} ${u.what}`),
-      ["6 смесени огради и HTML коментари — разпознаването не е сигурно"],
-      JSON.stringify(unparsable),
-    );
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("счупено процентно кодиране в съседен сегмент не отменя нормализирането", () => {
-  // `decodeURIComponent` хвърля заради лошия сегмент, а старият safeDecode
-  // връщаше целия СУРОВ адрес — `%2e%2e` оставаше ненормализирано и `/api/`
-  // пак изключваше проверката. Сега пътят се декодира сегмент по сегмент:
-  // счупеният остава суров, съседите му се декодират нормално.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "[x](/api/%2e%2e/missing%zz.html)", // 2
-      "[x](/api/%2e%2e/missing%FF.html)", // 3
-      "[истински](/api/v1/frost)", // 4
-      "[x](/missing%zz.html)", // 5 — счупено кодиране ИЗВЪН /api/
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, apiSkipped, unparsable } = checkTree(root);
-    assert.equal(apiSkipped, 1, "само истинският /api/v1/frost");
-    assert.deepEqual(unparsable, []);
-    assert.deepEqual(dead.map((d) => d.line), [2, 3, 5], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-// --- Закриваща вълна ------------------------------------------------------
-
-test("/api/ се пропуска само когато суровият и нормализираният път са съгласни", () => {
-  // Декодирането по сегменти внесе регресия: `%2F` се декодираше до наклонена
-  // черта, слепеният низ се разделяше наново и `..` изяждаха погрешните
-  // сегменти. Сега `%2F` остава ВЪТРЕ в сегмента си (в адрес то не е
-  // разделител), а изключението за `/api/` иска съгласие на двата вида път.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "[x](/api/a%2Fb/../../missing%zz.html)", // 2 — нормализира се до /missing%zz.html
-      "[x](/api%2Fv1/frost)", // 3 — суровият път не започва с /api/
-      "[истински](/api/v1/frost)", // 4 — единственият безспорен маршрут
-      "[x](/api/%2e%2e/missing.html)", // 5 — нормализира се до /missing.html
-      "[x](/api/..%2Fmissing.html)", // 6 — виж коментара под теста
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, apiSkipped, unparsable } = checkTree(root);
-    assert.deepEqual(unparsable, []);
-    // Ред 6 СЕ пропуска, и това е вярното: Worker-ът решава по `URL.pathname`,
-    // който запазва `%2F`, значи `/api/..%2Fmissing.html` наистина влиза в API
-    // клона. Досега скриптът го обявяваше за мъртъв файл — шумна, но погрешна
-    // класификация. Закрепено тук, за да не се „поправи“ обратно.
-    assert.equal(apiSkipped, 2, "истинският маршрут и този с %2F в сегмента");
-    assert.deepEqual(dead.map((d) => d.line), [2, 3, 5], JSON.stringify(dead));
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("разминаване между двете маски е диагностика, не тишина", () => {
-  // Репродукцията на ревюера: при патологично преплетени огради и коментари
-  // ОБЩАТА грешка на двете маски оцелява в сечението — и двете зачеркват ред
-  // 10 и връзката там не се проверява. Пълното решение иска истински
-  // CommonMark + HTML parser и е отказано съзнателно. Но щом двете маски се
-  // различават където и да е във файла, разпознаването не е сигурно — и това
-  // се съобщава. Целият клас става шумен вместо тих.
-  const root = fixture({
-    "README.md": [
-      "~~~html", // 1
-      "<!--", // 2
-      "~~~", // 3
-      "~~~html", // 4 — слепият анализ я отваря, осведоменият я потиска
-      "-->", // 5
-      "~~~", // 6
-      "<!--", // 7
-      "```", // 8
-      "-->", // 9
-      "[broken](/missing.html)", // 10 — зачерква се и от двете маски
-      "<!--", // 11
-      "~~~", // 12
-      "```", // 13
-      "-->", // 14
-      "", // 15
-      "[база](docs/base.md)", // 16
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(dead, [], "връзката на ред 10 наистина не се проверява — това е приетата граница");
-    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
-    assert.equal(unparsable[0].line, 4, "първият ред, на който двете маски се разминават");
-    assert.match(unparsable[0].what, /смесени огради и HTML коментари/);
-  } finally {
-    cleanup(root);
-  }
-});
-
-test("огради и коментари, където двете маски съвпадат, не вдигат диагностика", () => {
-  // Обичайният случай — HTML коментар ВЪТРЕ в ограден блок. Правилото не бива
-  // да става шумно за всичко.
-  const root = fixture({
-    "README.md": [
-      "[база](docs/base.md)", // 1
-      "", // 2
-      "```html", // 3
-      "<!-- пример -->", // 4
-      '<a href="/inside.html">x</a>', // 5
-      "```", // 6
-      "", // 7
-      "[след](/missing.html)", // 8
-    ].join("\n"),
-    "docs/base.md": "x",
-  });
-  try {
-    const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(unparsable, []);
-    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["8 /missing.html"], JSON.stringify(dead));
   } finally {
     cleanup(root);
   }
