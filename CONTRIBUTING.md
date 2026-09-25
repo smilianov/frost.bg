@@ -15,9 +15,12 @@ npm run dev
 ## Тестове
 
 Пълният пакет иска **Node 24.21.0**, **Python 3.12** и — за CDS частта —
-`grid/requirements-cds.txt`; в CI всичко се пуска non-root (`AGENTS.md`).
+`grid/requirements-cds.txt` в собствена venv; пускай ги **non-root**
+(`AGENTS.md`):
 
 ```bash
+python3 -m venv grid/.venv-cds
+grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
 npm test
 ```
 
@@ -26,24 +29,17 @@ npm test
 мрежата и на CDS инструментите. Същото се пуска в CI при всеки push и pull
 request — PR не се приема с червено CI.
 
-**CDS частта може да мине незабелязано пропусната.** `test:cds`
-(`package.json`) пуска `grid/tests_cds.py` през `grid/.venv-cds/bin/python`,
-ако е изпълним файл, иначе през системния `python3`. Самият тест
-**пропуска тихо с изход 0** („пропуснато: няма netCDF4“), щом
-интерпретаторът, който го е стартирал — без значение кой от двата — не
-може да внесе `netCDF4`; причината е способността на интерпретатора да го
-внесе, не самото съществуване на venv директорията. За да пуснеш CDS
-проверките наистина:
+**Без venv-а CDS частта минава незабелязано пропусната, не проверена.**
+`test:cds` (`package.json`) пуска `grid/tests_cds.py` през
+`grid/.venv-cds/bin/python`, ако е изпълним файл, иначе през системния
+`python3`; самият тест **пропуска тихо с изход 0** („пропуснато: няма
+netCDF4“), щом стартиралият го интерпретатор — без значение кой от двата —
+не може да внесе `netCDF4`.
 
-```bash
-python3 -m venv grid/.venv-cds
-grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
-npm test
-```
-
-Истински пуснат пробег завършва с ред с бройки — „NN успешни, 0
-неуспешни“ (`grid/tests_cds.py`) — това е положителното доказателство,
-не само липсата на реда „пропуснато“.
+Завършен пробег не е същото като успешен пробег: редът с бройки в края —
+„NN успешни, M неуспешни“ (`grid/tests_cds.py`) — доказва, че CDS тестовете
+наистина са **пуснати** (за разлика от пропуснатите с „пропуснато“); дали
+са и **минали**, личи по `M` — нула неуспешни.
 
 ## Правилото за промените
 
@@ -124,10 +120,12 @@ gets uploaded to Cloudflare. For the project's architecture, see
 ## Tests
 
 The full suite needs **Node 24.21.0**, **Python 3.12**, and — for the CDS
-part — `grid/requirements-cds.txt`; CI runs all of it non-root
-(`AGENTS.md`).
+part — `grid/requirements-cds.txt` in its own venv; run them **non-root**
+(`AGENTS.md`):
 
 ```bash
+python3 -m venv grid/.venv-cds
+grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
 npm test
 ```
 
@@ -136,23 +134,17 @@ page's tests (`node --test "site/js/*.test.js"`) and the Python tests for
 the grid and the CDS tooling. The same runs in CI on every push and pull
 request — a PR is not merged with red CI.
 
-**The CDS part can go unnoticed as skipped.** `test:cds` (`package.json`)
-runs `grid/tests_cds.py` through `grid/.venv-cds/bin/python` if that's an
-executable file, else through the system `python3`. The test itself
-**skips silently with exit code 0** ("пропуснато: няма netCDF4") whenever
-whichever interpreter ran it can't import `netCDF4` — the cause is that
-interpreter's ability to import it, not the venv directory's existence as
-such. To run the CDS checks for real:
+**Without the venv, the CDS part goes unnoticed as skipped, not checked.**
+`test:cds` (`package.json`) runs `grid/tests_cds.py` through
+`grid/.venv-cds/bin/python` if that's an executable file, else through the
+system `python3`; the test itself **skips silently with exit code 0**
+("пропуснато: няма netCDF4") whenever the interpreter that ran it —
+whichever of the two — can't import `netCDF4`.
 
-```bash
-python3 -m venv grid/.venv-cds
-grid/.venv-cds/bin/pip install -r grid/requirements-cds.txt
-npm test
-```
-
-A genuinely completed run ends with a totals line — "NN успешни, 0
-неуспешни" (`grid/tests_cds.py`) — that is the positive evidence to look
-for, not just the absence of the "skipped" line.
+A completed run is not the same as a passing run: the totals line at the
+end — "NN успешни, M неуспешни" (`grid/tests_cds.py`) — proves the CDS
+tests actually **ran** (as opposed to being skipped); whether they also
+**passed** shows in `M` — zero failures.
 
 ## The rule for changes
 
