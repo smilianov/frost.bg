@@ -46,12 +46,17 @@ CDS инструментите. Същото се пуска в CI при все
 `npm run check:links` (пуска се и в CI, след `npm test`) проверява
 вътрешните връзки в документацията и сайта. Границата му е точно тази:
 
-**Какво проверява.** Всяка Markdown връзка и всеки кавичен `href`/`src` на
-реална позиция, включително вътре в `inline code` и вътре в `<!-- HTML
-коментари -->`. Етикетът може да съдържа една нива вложени скоби, колкото
-стига за значка (изображение, което само по себе си е връзка) — тогава се
-проверяват и двете цели. Двете форми, в ограден блок именно защото иначе
-щяха да бъдат проверени:
+**Твърдото обещание.** Markdown връзка или кавичен `href`/`src` ИЗВЪН
+ограден блок или се проверява, или излиза като проблем с файл и ред. Няма
+трети изход — тих пропуск е единственото недопустимо за този инструмент,
+шумен фалшив резултат е поносим.
+
+**Какво проверява.** Markdown връзките и кавичните `href`/`src` на реална
+позиция, включително вътре в `inline code` и вътре в `<!-- HTML коментари
+-->`. Етикетът може да съдържа една нива вложени скоби, колкото стига за
+значка (изображение, което само по себе си е връзка) — тогава се проверяват
+и двете цели. Двете форми, в ограден блок именно защото иначе щяха да бъдат
+проверени:
 
 ```markdown
 [текст](цел.md)
@@ -71,13 +76,28 @@ CDS инструментите. Същото се пуска в CI при все
 вложеност в етикета); незатворен ограден блок; незатворен HTML коментар;
 адрес, който излиза над корена.
 
-**Какво остава непроверено.** Ограден блок (три обратни кавички или три
-тилди на своя си ред) — **там влиза пример, който не бива да се
-проверява**; reference-style Markdown връзки (`[текст][ref]`); дали
-„#котва“ действително съществува в целевия файл (проверява се само че
-самият файл го прави). Примери в `inline code`, в HTML коментари, в
-блокцитат и в четириинтервален код СЕ проверяват — ако целта им не
-съществува, това е шумна фалшива тревога и мястото ѝ е ограден блок.
+**Какво остава непроверено — и трите граници са приети, не пропуск.**
+
+- **Ограден блок** (три обратни кавички или три тилди на своя си ред) —
+  **там влиза пример, който не бива да се проверява.** Той изключва
+  проверката на връзките вътре, но не изключва всичко: блок, съдържащ само
+  отварящ HTML коментар без затварящ, пак дава диагностика „незатворен HTML
+  коментар“.
+- **Reference-style връзки** (`[текст][ref]`) не се разпознават И не дават
+  диагностика — единственото място, където инструментът мълчи. Приета
+  граница: в хранилището няма нито една такава връзка, а коректното им
+  разпознаване иска истински CommonMark parser.
+- **Заглавието на връзка не може да съдържа квадратна скоба**, макар
+  CommonMark да го позволява: такава връзка излиза като „Неразпознато“
+  (шумно, не тихо). Цената е платена нарочно — заглавие, което може да
+  съдържа скоби, поглъща истинската връзка след себе си.
+
+Освен това: проверява се само че целевият ФАЙЛ съществува, не и дали
+„#котва“ в него съществува. Диагностиката „незатворен HTML коментар“ важи за
+Markdown файловете; в `site/**/*.html` не се зачерква нищо, затова там няма
+и такъв анализ. Примери в `inline code`, в HTML коментари, в блокцитат и в
+четириинтервален код СЕ проверяват — ако целта им не съществува, това е
+шумна фалшива тревога и мястото ѝ е ограден блок.
 
 ## Версия
 
@@ -197,12 +217,17 @@ tests actually **ran** (as opposed to being skipped); whether they also
 internal links in the documentation and the site. Its boundary is exactly
 this:
 
-**What it checks.** Every Markdown link and every quoted `href`/`src` in a
-real attribute position, including inside `inline code` and inside
-`<!-- HTML comments -->`. The label may contain one level of nested
-brackets, enough for a badge (an image that is itself a link) — then both
-targets are checked. The two forms, in a fenced block precisely because
-they would otherwise be checked:
+**The firm promise.** A Markdown link or a quoted `href`/`src` OUTSIDE a
+fenced block is either checked or comes out as a problem with file and
+line. There is no third outcome — a silent miss is the one outcome this
+tool does not allow; a noisy false positive is acceptable.
+
+**What it checks.** Markdown links and quoted `href`/`src` in a real
+attribute position, including inside `inline code` and inside `<!-- HTML
+comments -->`. The label may contain one level of nested brackets, enough
+for a badge (an image that is itself a link) — then both targets are
+checked. The two forms, in a fenced block precisely because they would
+otherwise be checked:
 
 ```markdown
 [text](target.md)
@@ -223,13 +248,30 @@ isn't (a space or parentheses in the address, double nesting in the label);
 an unclosed fenced block; an unclosed HTML comment; an address that escapes
 the root.
 
-**What stays unchecked.** A fenced block (three backticks or three tildes
-on a line of their own) — **put an example there if it must not be
-checked**; reference-style Markdown links (`[text][ref]`); whether a
-"#fragment" actually exists in the target file (only that the file itself
-does). Examples in `inline code`, in HTML comments, in a blockquote and in
-four-space indented code ARE checked — if their target does not exist that
-is a noisy false alarm, and its place is a fenced block.
+**What stays unchecked — all three are accepted boundaries, not
+oversights.**
+
+- **A fenced block** (three backticks or three tildes on a line of their
+  own) — **put an example there if it must not be checked.** It turns off
+  link checking inside it, but not everything: a block containing only an
+  opening HTML comment marker with no closing one still yields an
+  "unclosed HTML comment" diagnostic.
+- **Reference-style links** (`[text][ref]`) are neither recognized NOR
+  reported — the one place where the tool stays quiet. An accepted
+  boundary: the repository has no such link, and recognizing them properly
+  needs a real CommonMark parser.
+- **A link title may not contain a square bracket**, even though CommonMark
+  allows it: such a link comes out as „Неразпознато“ (noisy, not silent).
+  The price is paid on purpose — a title that may contain brackets swallows
+  the real link after it.
+
+Besides that: only the target FILE is checked for existence, not whether a
+"#fragment" inside it exists. The "unclosed HTML comment" diagnostic applies
+to Markdown files; nothing is redacted in `site/**/*.html`, so there is no
+such analysis there. Examples in `inline code`, in HTML comments, in a
+blockquote and in four-space indented code ARE checked — if their target
+does not exist that is a noisy false alarm, and its place is a fenced
+block.
 
 ## Version
 

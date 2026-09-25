@@ -41,9 +41,12 @@
   кавичните `href`/`src` и проверява дали пътят им съществува
   (относителните — спрямо файла, адресите с „/“ — спрямо `site/`, след
   нормализиране на `.`/`..`); пропуска `/api/*` (маршрут на Worker-а, не
-  файл) и външните връзки (без мрежа в CI). Каквото не може да разпознае —
-  и адрес, който излиза над корена — го съобщава с файл и ред и проверката
-  пада; пример, който не бива да се проверява, влиза в ограден блок.
+  файл) и външните връзки (без мрежа в CI). Обещанието е едно: връзка ИЗВЪН
+  ограден блок или се проверява, или излиза като проблем с файл и ред, и
+  проверката пада — пример, който не бива да се проверява, влиза в ограден
+  блок. Приетите граници: reference-style връзките (`[текст][ref]`) не се
+  разпознават и не дават диагностика; заглавие на връзка с квадратна скоба
+  вътре е „Неразпознато“; „#котва“ не се проверява, само целевият файл.
 
 ### 🇬🇧 English
 
@@ -77,9 +80,12 @@
   quoted `href`/`src` and checks whether their path exists (relative ones
   against the file, `/`-prefixed ones against `site/`, after normalizing
   `.`/`..`); skips `/api/*` (a Worker route, not a file) and external links
-  (no network in CI). Whatever it cannot recognize — and an address that
-  escapes the root — it reports with file and line and the check fails; an
-  example that must not be checked goes in a fenced block.
+  (no network in CI). The promise is a single one: a link OUTSIDE a fenced
+  block is either checked or comes out as a problem with file and line, and
+  the check fails — an example that must not be checked goes in a fenced
+  block. The accepted boundaries: reference-style links (`[text][ref]`) are
+  neither recognized nor reported; a link title with a square bracket in it
+  is „Неразпознато“; a "#fragment" is not checked, only the target file.
 
 ---
 

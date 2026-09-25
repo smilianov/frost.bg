@@ -982,3 +982,64 @@ test("неподдържаният адрес на изображение в з�
     cleanup(root);
   }
 });
+
+// --- Повторен преглед: зачерква се само сечението на двата анализа -------
+
+test("`<!--` в един ограден блок и `-->` в друг не зачеркват истинска връзка", () => {
+  // Обходът на ревюера: лексикалният коментарен анализ свързва `<!--` от
+  // първия блок с `-->` от втория, потиска истинското отваряне на ред 6,
+  // приема затварянето на ред 8 за ново отваряне и изяжда връзката на ред 10.
+  // Затова се зачерква СЕЧЕНИЕТО на двата анализа — слепия за коментари и
+  // коментарно осведомения: сечението може само да НАМАЛИ зачеркнатото.
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "", // 2
+      "~~~html", // 3
+      "<!--", // 4
+      "~~~", // 5
+      "~~~html", // 6
+      "-->", // 7
+      "~~~", // 8
+      "", // 9
+      "[broken](/missing.html)", // 10 — извън всяка действителна ограда
+      "", // 11
+      "<!--", // 12
+      "~~~", // 13
+      "-->", // 14
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(unparsable, [], JSON.stringify(unparsable));
+    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["10 /missing.html"], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("счупено процентно кодиране в съседен сегмент не отменя нормализирането", () => {
+  // `decodeURIComponent` хвърля заради лошия сегмент, а старият safeDecode
+  // връщаше целия СУРОВ адрес — `%2e%2e` оставаше ненормализирано и `/api/`
+  // пак изключваше проверката. Сега пътят се декодира сегмент по сегмент:
+  // счупеният остава суров, съседите му се декодират нормално.
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "[x](/api/%2e%2e/missing%zz.html)", // 2
+      "[x](/api/%2e%2e/missing%FF.html)", // 3
+      "[истински](/api/v1/frost)", // 4
+      "[x](/missing%zz.html)", // 5 — счупено кодиране ИЗВЪН /api/
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, apiSkipped, unparsable } = checkTree(root);
+    assert.equal(apiSkipped, 1, "само истинският /api/v1/frost");
+    assert.deepEqual(unparsable, []);
+    assert.deepEqual(dead.map((d) => d.line), [2, 3, 5], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
