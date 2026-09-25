@@ -74,7 +74,8 @@ CDS инструментите. Същото се пуска в CI при все
 `site/css/app.css`. `/api/*` се пропуска като маршрут на Worker-а по суровия
 първи сегмент — **по същия модел като Worker-а, но не съвпада с него
 навсякъде**: `/api/.` и `/api/x/..` се проверяват като файлове, макар
-Worker-ът да ги дава на API клона. Външни — и затова недокоснати — са
+Worker-ът да ги дава на API клона (какво излиза от това зависи от дървото —
+виж „Измерените тихи случаи“). Външни — и затова недокоснати — са
 адресите с URI схема (`https:`, `mailto:`, `tel:`…) и protocol-relative
 адресите (`//example.com/…`).
 
@@ -86,7 +87,10 @@ Worker-ът да ги дава на API клона. Външни — и зато
 `href`/`src`); нещо, което изглежда като Markdown връзка, но не е (интервал
 или скоби в адрес БЕЗ `<…>`, двойна вложеност в етикета); незатворен ограден
 блок; незатворен HTML коментар; адрес, който излиза над корена; файл, в
-който двата анализа на оградите не са съгласни. Адрес в `<…>` е поддържан,
+който двата анализа на оградите не са съгласни. Изключение: адрес, в който
+наклонената черта е процентно кодирана (`/..%2Fpackage.json`), НЕ излиза над
+корена при разделянето — декодира се чак при файловото разрешаване и може да
+стигне до файл извън `site/`, без диагностика. Адрес в `<…>` е поддържан,
 включително с интервали и със скоби вътре — той се проверява, не се
 съобщава.
 
@@ -128,9 +132,14 @@ Worker-ът да ги дава на API клона. Външни — и зато
   процентно кодираната му форма, както и относителните им варианти) се
   обявява за жив, макар файловата система да би върнала ENOTDIR;
 - ред, който ПРИЛИЧА на ограда, вътре в HTML блок (между отварящ и затварящ
-  `<div>`) — два такива реда скриват връзката между себе си без диагностика;
-- `/api/.` и `/api/x/..` се проверяват като файлове, макар Worker-ът да ги
-  дава на API клона — това е шумно, но е разминаване, не съвпадение.
+  `<div>`) **в Markdown файл** — два такива реда скриват връзката между себе
+  си без диагностика. В истински `.html` файл същият блок не я скрива:
+  оградите се зачеркват само в Markdown;
+- `/api/.` и `/api/x/..` се проверяват като файлове вместо да са маршрути, а
+  изходът зависи от дървото: **без** локален `site/api` излизат като мъртви
+  връзки (шумно), **с** `site/api/index.html` минават за живи — нула
+  диагностики, докато Worker-ът нормализира до `/api/` и връща API 404. Тоест
+  този случай е тих точно когато сайтът има локална папка `api`.
 
 Освен това: проверява се само че целевият ФАЙЛ съществува, не и дали
 „#котва“ в него съществува. Диагностиката „незатворен HTML коментар“ важи за
@@ -286,7 +295,8 @@ does**: the segments are decoded, so `/css%2Fapp.css` finds
 `site/css/app.css`. `/api/*` is skipped as a Worker route by its raw first
 segment — **on the same model as the Worker, but not matching it
 everywhere**: `/api/.` and `/api/x/..` are checked as files even though the
-Worker hands them to the API branch. External — and therefore untouched —
+Worker hands them to the API branch (what comes of that depends on the tree —
+see "The measured silent cases"). External — and therefore untouched —
 are addresses with a URI scheme (`https:`, `mailto:`, `tel:`…) and
 protocol-relative addresses (`//example.com/…`).
 
@@ -299,8 +309,11 @@ like an address, or with an invalid attribute boundary (a quote or a slash
 immediately before `href`/`src`); something that looks like a Markdown link but
 isn't (a space or parentheses in an address WITHOUT `<…>`, double nesting in
 the label); an unclosed fenced block; an unclosed HTML comment; an address
-that escapes the root; a file where the two fence analyses disagree. An
-address in `<…>` is supported, including spaces and parentheses inside — it
+that escapes the root; a file where the two fence analyses disagree. One
+exception: an address whose slash is percent-encoded (`/..%2Fpackage.json`)
+does NOT escape the root at the splitting stage — it is decoded only at the
+filesystem resolution and can reach a file outside `site/`, with no
+diagnostic. An address in `<…>` is supported, including spaces and parentheses inside — it
 is checked, not reported.
 
 **What stays unchecked — every boundary is accepted, not an oversight.**
@@ -341,10 +354,15 @@ them without a single diagnostic:
   its percent-encoded form, and their relative variants) is declared alive,
   even though the filesystem would return ENOTDIR;
 - a line that LOOKS like a fence, inside an HTML block (between an opening
-  and a closing `<div>`) — two such lines hide the link between them with no
-  diagnostic;
-- `/api/.` and `/api/x/..` are checked as files although the Worker hands
-  them to the API branch — noisy, but a divergence, not a match.
+  and a closing `<div>`) **in a Markdown file** — two such lines hide the link
+  between them with no diagnostic. In a real `.html` file the same block does
+  not hide it: fences are only redacted in Markdown;
+- `/api/.` and `/api/x/..` are checked as files instead of being routes, and
+  the outcome depends on the tree: **without** a local `site/api` they come
+  out as dead links (noisy), **with** `site/api/index.html` they pass as
+  alive — zero diagnostics, while the Worker normalizes to `/api/` and
+  returns an API 404. So this case is silent exactly when the site has a
+  local `api` folder.
 
 Besides that: only the target FILE is checked for existence, not whether a
 "#fragment" inside it exists. The "unclosed HTML comment" diagnostic applies

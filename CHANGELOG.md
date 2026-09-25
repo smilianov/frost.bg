@@ -90,10 +90,10 @@
   quoted `href`/`src` and checks whether their path exists (relative ones
   against the file, `/`-prefixed ones against `site/`, after normalizing
   `.`/`..`); skips `/api/*` (a Worker route, not a file) and external links
-  (no network in CI). The promise is a single one: a link OUTSIDE a fenced
-  block is either checked or comes out as a problem with file and line, and
-  the check fails — an example that must not be checked goes in a fenced
-  block. This is NOT a guarantee: the check is a heuristic, not a parser —
+  (no network in CI). As a rule, a link OUTSIDE a fenced block is either
+  checked or comes out as a problem with file and line, and the check fails —
+  an example that must not be checked goes in a fenced block. This is NOT a
+  guarantee: the check is a heuristic, not a parser —
   with interleaved fences and HTML comments the file fails noisily (a
   disagreement between the two fence analyses is itself a diagnostic), but
   one link in it may go unchecked, and a clean fenced block is not enough if
