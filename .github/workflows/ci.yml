@@ -12,3 +12,5 @@ jobs:
       - run: pip install -r grid/requirements-cds.txt
       - run: npm ci
       - run: npm test
+      - name: Връзките в документацията
+        run: npm run check:links

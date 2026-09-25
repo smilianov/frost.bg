@@ -8,6 +8,71 @@
 
 ---
 
+## [0.3.2] — 2026-09-25
+
+### 🇧🇬 Български
+
+#### Ръководство на сайта
+
+- **`/guide` и `/en/guide`** — осем кратки раздела: двете двойки дати,
+  графиката, периодите 10/20/30 години, рискът след дата, сезонът без
+  слана, двете височини, откъде са числата, защо не съвпада с
+  наблюденията. Статични страници, без JavaScript; връзка от футъра на
+  двете начални страници (и обратно), двуезично.
+- **Контрастът на футъра там** — навсякъде другаде `.foot` е с намалена
+  непрозрачност (`opacity: 0.75`), което дава ≈3.05:1 на светла тема,
+  под изискваните 4.5:1 за нормален текст. Футърът на ръководството е
+  само връзки, затова е с пълна непрозрачност: ≈4.80:1 на светла тема,
+  ≈8.40:1 на тъмна.
+
+#### За разработчици
+
+- **`docs/bg/architecture.md`, `docs/en/architecture.md`** — как е
+  устроен проектът: мрежата, Worker-ът, кешът, страницата, средите,
+  тестовете и пътят на една заявка `GET /api/v1/frost`.
+- **`CONTRIBUTING.md`** — локален пуск, тестове, правилото за промените,
+  прегледите, езиковите правила, мрежата не се редактира на ръка, нови
+  зависимости в Worker-а не се приемат.
+- **Проверка на връзките в CI** (`npm run check:links`,
+  `scripts/check_links.mjs`) — минава през README-тата, `CONTRIBUTING.md`,
+  `docs/**/*.md` и `site/**/*.html` и проверява, че всеки вътрешен път
+  реално съществува (относителните — спрямо файла, адресите с „/“ —
+  спрямо `site/`); пропуска `/api/*` (маршрут на Worker-а, не файл) и
+  външните връзки (без мрежа в CI).
+
+### 🇬🇧 English
+
+#### Site guide
+
+- **`/guide` and `/en/guide`** — eight short sections: the two pairs of
+  dates, the chart, the 10/20/30-year periods, the risk after a date, the
+  frost-free season, the two elevations, where the numbers come from, why
+  it doesn't match what you see. Static pages, no JavaScript; linked from
+  both home pages' footers (and back), bilingual.
+- **The guide's footer contrast** — elsewhere `.foot` runs at reduced
+  opacity (`opacity: 0.75`), which measures ≈3.05:1 in the light theme,
+  below the 4.5:1 required for normal text. The guide's footer is links
+  only, so it runs at full opacity: ≈4.80:1 in the light theme, ≈8.40:1
+  in dark.
+
+#### For contributors
+
+- **`docs/bg/architecture.md`, `docs/en/architecture.md`** — how the
+  project is put together: the grid, the Worker, the cache, the page, the
+  environments, the tests, and the path of one `GET /api/v1/frost`
+  request.
+- **`CONTRIBUTING.md`** — running locally, tests, the rule for changes,
+  reviews, language rules, the grid is not hand-edited, new dependencies
+  in the Worker are not accepted.
+- **Link checker in CI** (`npm run check:links`,
+  `scripts/check_links.mjs`) — walks the READMEs, `CONTRIBUTING.md`,
+  `docs/**/*.md` and `site/**/*.html` and checks that every internal path
+  actually exists (relative ones against the file, `/`-prefixed ones
+  against `site/`); skips `/api/*` (a Worker route, not a file) and
+  external links (no network in CI).
+
+---
+
 ## [0.3.1] — 2026-09-24
 
 ### 🇧🇬 Български
