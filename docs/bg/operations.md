@@ -138,6 +138,12 @@ grid/.venv-cds/bin/python grid/compute_grid.py --from-cds grid/cds --cross-check
 
 ### Помощният път: Open-Meteo (проби и кръстосана проверка)
 
+Командите по-долу са АЛТЕРНАТИВИ, не последователни стъпки. Без `--out` те
+работят в папката `grid/`: `--synthetic` заменя `grid/grid.json` с пробна
+мрежа, а `--finish` — с наличните клетки от `cells.jsonl`, дори когато не са
+всичките 2 080. За отделна проба подай предварително създадена папка с
+`--out`; сайтът продължава да чете `grid/grid.json`.
+
 ```bash
 python3 grid/compute_grid.py                  # точка по точка, продължава след прекъсване
 python3 grid/compute_grid.py --synthetic       # правдоподобна мрежа без мрежа, за разработка

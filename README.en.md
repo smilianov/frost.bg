@@ -63,8 +63,10 @@ The daily minimum at 2 m from the
 reanalysis (ECMWF), downloaded from the
 [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) (the
 `derived-era5-land-daily-statistics` dataset, a 0.1° ≈ 9 km grid).
-[Open-Meteo](https://open-meteo.com/) stays in the project for two things:
-place names (the default geocoder) and the cross-check of the grid.
+[Open-Meteo](https://open-meteo.com/) stays in the project for three things:
+place names (the default geocoder), the elevation of the selected point itself
+(the Elevation API — a real runtime dependency, with its own budget and its own
+failures) and the cross-check of the grid.
 
 ## The grid
 
@@ -121,6 +123,13 @@ stores them with `null` dates; `read_elevation` still returns a number for
 them (the geopotential is defined everywhere). Expected, not a reading bug.
 
 ### Via Open-Meteo (no venv, no registration)
+
+The commands below are ALTERNATIVES, not consecutive steps. Without `--out`
+they work in the `grid/` directory: `--synthetic` replaces `grid/grid.json`
+with a sample grid, while `--finish` replaces it with the cells available in
+`cells.jsonl`, even when fewer than all 2,080 are there. For a separate
+experiment, pass an existing directory with `--out`; the site keeps reading
+`grid/grid.json`.
 
 ```bash
 python3 grid/compute_grid.py                  # point by point: ~64 points per hour, ~128 per day from one IP; resumes after interruption

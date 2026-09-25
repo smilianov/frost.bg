@@ -140,6 +140,13 @@ still present, defined everywhere. Expected, not a bug.
 
 ### The helper path: Open-Meteo (probes and cross-check)
 
+The commands below are ALTERNATIVES, not consecutive steps. Without `--out`
+they work in the `grid/` directory: `--synthetic` replaces `grid/grid.json`
+with a sample grid, while `--finish` replaces it with the cells available in
+`cells.jsonl`, even when fewer than all 2,080 are there. For a separate
+experiment, pass an existing directory with `--out`; the site keeps reading
+`grid/grid.json`.
+
 ```bash
 python3 grid/compute_grid.py                  # point by point, resumes after interruption
 python3 grid/compute_grid.py --synthetic       # a plausible grid without network access, for development

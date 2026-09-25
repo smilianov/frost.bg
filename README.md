@@ -62,8 +62,10 @@ npm test
 [ERA5-Land](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
 (ECMWF), теглен от [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/)
 (наборът `derived-era5-land-daily-statistics`, мрежа 0,1° ≈ 9 км).
-[Open-Meteo](https://open-meteo.com/) остава в проекта за две неща: имената
-на местата (геокодерът по подразбиране) и кръстосаната проверка на мрежата.
+[Open-Meteo](https://open-meteo.com/) остава в проекта за три неща: имената
+на местата (геокодерът по подразбиране), височината на самата избрана точка
+(Elevation API — реална зависимост по време на работа, със свой бюджет и свои
+откази) и кръстосаната проверка на мрежата.
 
 ## Мрежата
 
@@ -119,6 +121,12 @@ grid/.venv-cds/bin/python grid/compute_grid.py --from-cds grid/cds --cross-check
 дефиниран навсякъде). Очаквано, не грешка в четенето.
 
 ### През Open-Meteo (без venv, без регистрация)
+
+Командите по-долу са АЛТЕРНАТИВИ, не последователни стъпки. Без `--out` те
+работят в папката `grid/`: `--synthetic` заменя `grid/grid.json` с пробна
+мрежа, а `--finish` — с наличните клетки от `cells.jsonl`, дори когато не са
+всичките 2 080. За отделна проба подай предварително създадена папка с
+`--out`; сайтът продължава да чете `grid/grid.json`.
 
 ```bash
 python3 grid/compute_grid.py                  # точка по точка: ~64 точки на час, ~128 на ден от един IP; продължава след прекъсване
