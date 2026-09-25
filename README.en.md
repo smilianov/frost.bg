@@ -39,9 +39,14 @@ npm test
 |---|---|
 | [`docs/en/README.md`](docs/en/README.md) | what frost.bg is, where the data comes from, what "typical"/"safe" mean |
 | [`docs/en/api.md`](docs/en/api.md) | API v1 — the three endpoints, parameters, example responses, errors, caching and CORS |
+| [`docs/en/architecture.md`](docs/en/architecture.md) | how the project is built: the grid, the Worker, the cache, the page, the environments and the tests |
 | [`docs/en/operations.md`](docs/en/operations.md) | how the grid is computed and refreshed, running locally, testing, the cache, what's missing for deploy |
+| [The site guide](https://frost.bg/en/guide/) | how to read the dates, the chart and the risk figure — for people, not developers |
 
-Their Bulgarian twins: [`docs/bg/`](docs/bg/README.md).
+Their Bulgarian twins: [`docs/bg/`](docs/bg/README.md) and
+[the Bulgarian guide](https://frost.bg/guide/).
+
+Want to propose a change — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Spec
 
