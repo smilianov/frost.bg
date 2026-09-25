@@ -177,8 +177,10 @@ s-maxage=86400` (`/frost`, `/config`) and `…, s-maxage=604800`
 (`/geocode`): `s-maxage` is for the edge (the Cache API honours it) — a
 day, respectively a week; `max-age` is for the browser — **5 minutes**.
 The browser knows nothing about the revision in the key below, so its
-lifetime is deliberately short: after a configuration or grid change the
-edge is fresh immediately, and browsers revalidate within 5 minutes.
+lifetime is deliberately short: with a new revision, the next request to the
+edge already uses the new key. A browser may use its old copy until its own 5
+minutes expire, but **expiry does not send a request by itself** — an open page
+loads `/config` again when reloaded.
 
 **The key carries a revision.** The cache survives deploys, so the key
 includes, as its first parameter `rev=`, four things:
@@ -229,8 +231,11 @@ doesn't specifically protect this budget upstream to Open-Meteo — so the
 endpoint keeps its own, stricter safeguard:
 
 - **A short refusal after a 429 or 5xx from the provider**: 10 minutes,
-  during which the endpoint returns `502 elevation_failed` without asking
-  Open-Meteo at all. Kept at **two levels**:
+  during which the endpoint returns `502 elevation_failed` **on a cache miss**,
+  without asking Open-Meteo at all. A successful cache entry is checked BEFORE
+  the refusal marker, so an already cached point keeps returning 200 — when
+  diagnosing, a mix of successful and failing responses is expected, not a sign
+  of something else. Kept at **two levels**:
   - `worker/elevation.js` keeps a fast local safeguard — a plain module
     variable (`cooldownUntil`), checked before every request;
   - the route in `worker/index.js` also keeps **its own marker in the
@@ -315,10 +320,18 @@ Tokens.
 
 ### How to deploy
 
+Before deploying: Node 24.21.0 and Python 3.12, with
+`grid/requirements-cds.txt` installed in the venv, and run the checks as
+non-root. Continue only after the CDS tests actually run with zero failures and
+`check:links` passes — skipped CDS tests with exit code 0 are not sufficient
+(see "A completed run is not the same as a passing run" in `CONTRIBUTING.md`).
+The first command below checks exactly that: without `netCDF4` in the venv it
+stops the chain.
+
 ```bash
 export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"
 npx wrangler whoami     # shows the account → the token works
-npm test && npx wrangler deploy   # only a green tree gets deployed
+grid/.venv-cds/bin/python -c 'import netCDF4' && npm test && npm run check:links && npx wrangler deploy
 ```
 
 - All of `site/` is uploaded as static assets except what
