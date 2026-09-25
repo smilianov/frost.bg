@@ -223,7 +223,12 @@ test("коментар с обратна кавичка не изяжда със
   }
 });
 
-test("`href` вътре в стойността на друг атрибут не съвпада (не е реална позиция)", () => {
+test("`href` веднага след кавичка е ПРОБЛЕМ, не тиха несъвпадналост", () => {
+  // ОБЪРНАТ след финалния преглед: досега `<div title='href="/x"'>` просто не
+  // съвпадаше — тихо. Кавичка (или наклонена черта) пред името значи или
+  // невалиден маркъп (`<a title="x"href=…>`), или стойност на друг атрибут:
+  // и в двата случая инструментът дължи диагностика, не тишина. Целта пак НЕ
+  // се проверява — броячът остава 1.
   const root = fixture({
     "site/index.html": [
       '<a href="/">начало</a>',
@@ -231,9 +236,11 @@ test("`href` вътре в стойността на друг атрибут н�
     ].join("\n"),
   });
   try {
-    const { checked, dead } = checkTree(root);
+    const { checked, dead, unparsable } = checkTree(root);
     assert.equal(checked, 1, "само истинският href, не подниз в друг атрибут");
     assert.deepEqual(dead, []);
+    assert.deepEqual(unparsable.map((u) => u.line), [2], JSON.stringify(unparsable));
+    assert.match(unparsable[0].what, /невалидна граница на атрибут/);
   } finally {
     cleanup(root);
   }
@@ -772,5 +779,206 @@ test("изображение като връзка се проверява — �
   } finally {
     cleanup(root);
     cleanup(wrapped);
+  }
+});
+
+// --- Финален преглед: броим РАЗПОЗНАВАНЕ, не покритие --------------------
+
+test("невалидна граница на атрибут се съобщава, а не изчезва без диагностика", () => {
+  // `<a title="x"href=…>` и `<a/href=…>` са невалиден маркъп, но инструментът
+  // обещава шумен отказ при неразпознаване — досега изчезваха тихо.
+  const root = fixture({
+    "site/index.html": [
+      '<a href="/">начало</a>', // 1
+      '<a title="x"href="/missing.html">broken</a>', // 2 — кавичка преди href
+      '<a/href="/missing2.html">broken</a>', // 3 — наклонена черта преди href
+    ].join("\n"),
+  });
+  try {
+    const { dead, unparsable, checked } = checkTree(root);
+    assert.equal(checked, 1, "само истинският href");
+    assert.deepEqual(dead, []);
+    assert.deepEqual(unparsable.map((u) => u.line), [2, 3], JSON.stringify(unparsable));
+    assert.match(unparsable[0].what, /невалидна граница на атрибут/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("/api/ се решава след нормализиране — dot segments не крият мъртва връзка", () => {
+  // `/api/../missing.html` и `/api/%2e%2e/missing.html` се нормализират до
+  // `/missing.html`, значи НЕ са маршрути на Worker-а. Досега се пропускаха по
+  // суровия префикс и броячът на пропуснатите API маршрути растеше.
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "[x](/api/../missing.html)", // 2
+      "[x](/api/%2e%2e/missing.html)", // 3
+      "[истински](/api/v1/frost)", // 4 — маршрут, пропуска се
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, apiSkipped, unparsable } = checkTree(root);
+    assert.equal(apiSkipped, 1, "само истинският /api/v1/frost");
+    assert.deepEqual(unparsable, []);
+    assert.deepEqual(dead.map((d) => d.line), [2, 3], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("адрес, който излиза над корена, е проблем, не тихо разрешаване", () => {
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "[x](/../outside.html)", // 2 — над корена на сайта
+      "[x](../../outside.md)", // 3 — над корена на дървото
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(dead, []);
+    assert.deepEqual(unparsable.map((u) => u.line), [2, 3], JSON.stringify(unparsable));
+    assert.match(unparsable[0].what, /над корена/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("маркер за ограда вътре в HTML коментар не започва зачеркване", () => {
+  // Двата `~~~` са в ОТДЕЛНИ HTML коментара, а връзката между тях е
+  // обикновена Markdown връзка извън код. Досега redactFences ги сдвояваше и
+  // изтриваше всичко между тях — 0 проблеми, exit 0, истинската връзка
+  // изчезваше тихо. Коментарният контекст се ползва САМО за решението дали
+  // маркерът е истински: съдържанието на коментарите пак СЕ проверява.
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "", // 2
+      "<!--", // 3
+      "~~~", // 4
+      "-->", // 5
+      "[broken](/missing.html)", // 6
+      "<!--", // 7
+      "~~~", // 8
+      "-->", // 9
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(unparsable, []);
+    assert.deepEqual(
+      dead.map((d) => `${d.line} ${d.target}`),
+      ["6 /missing.html"],
+      JSON.stringify(dead),
+    );
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("незатворен HTML коментар е проблем и вътре в него не се разпознават огради", () => {
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "", // 2
+      "<!--", // 3 — не се затваря до края на файла
+      "```", // 4 — маркер вътре в коментара, значи не е ограда
+      "[broken](/missing.html)", // 5
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(
+      unparsable,
+      [{ file: "README.md", line: 3, what: "незатворен HTML коментар" }],
+      JSON.stringify(unparsable),
+    );
+    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("обикновена ограда СЛЕД затворен коментар пак зачерква", () => {
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "", // 2
+      "<!-- бележка -->", // 3
+      "", // 4
+      "```", // 5
+      '<a href="/inside.html">x</a>', // 6
+      "```", // 7
+      "", // 8
+      "[след](/missing.html)", // 9
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(unparsable, []);
+    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["9 /missing.html"], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("CRLF ограда се разпознава — съдържанието ѝ не се проверява", () => {
+  // Маркерът след `\r` не се разпознаваше: съдържанието се проверяваше шумно.
+  const root = fixture({
+    "README.md": "[база](docs/base.md)\r\n\r\n```\r\n<a href=\"/inside.html\">x</a>\r\n```\r\n\r\n[след](/missing.html)\r\n",
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable, checked } = checkTree(root);
+    assert.deepEqual(unparsable, []);
+    assert.equal(checked, 2, "базата и връзката след оградата, нищо отвътре");
+    assert.deepEqual(dead.map((d) => d.target), ["/missing.html"], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("Markdown заглавие не пренася съвпадението през края на коментар", () => {
+  // Репродукцията на ревюера: заглавието в кавички поглъщаше
+  // ` --> [broken](/missing.html) <!-- `, външният адрес минаваше за
+  // разпозната връзка, а `](` на истинската попадаше В диапазона на приетото
+  // съвпадение, тоест минаваше за „вече обработено“. 115 проверени, 0
+  // проблеми, exit 0. Сега заглавието не може да съдържа квадратна скоба, а
+  // отчитането е по ПОЗИЦИЯ на разпознатото `](`, не по диапазон.
+  const root = fixture({
+    "README.md":
+      '[база](docs/base.md)\n\nТекст <!-- [old](https://example.com " --> [broken](/missing.html) <!-- ") -->\n',
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["3 /missing.html"], JSON.stringify(dead));
+    assert.deepEqual(unparsable.map((u) => u.line), [3], JSON.stringify(unparsable));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("неподдържаният адрес на изображение в значка се съобщава, а не се заглушава", () => {
+  // `[![alt](/a(b).png)](https://example.com)` — външната връзка се разпознава,
+  // но адресът на изображението има скоби (неподдържана форма). Досега неговото
+  // `](` попадаше в диапазона на външното съвпадение и изчезваше без следа.
+  const root = fixture({
+    "README.md": "[база](docs/base.md)\n\n[![alt](/a(b).png)](https://example.com)\n",
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable, externalSkipped } = checkTree(root);
+    assert.deepEqual(dead, []);
+    assert.equal(externalSkipped, 1, "външната връзка пак се разпознава");
+    assert.deepEqual(unparsable.map((u) => u.line), [3], JSON.stringify(unparsable));
+  } finally {
+    cleanup(root);
   }
 });

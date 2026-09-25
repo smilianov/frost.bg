@@ -37,10 +37,13 @@
   зависимости в Worker-а не се приемат.
 - **Проверка на връзките в CI** (`npm run check:links`,
   `scripts/check_links.mjs`) — минава през README-тата, `CONTRIBUTING.md`,
-  `docs/**/*.md` и `site/**/*.html` и проверява, че всеки вътрешен път
-  реално съществува (относителните — спрямо файла, адресите с „/“ —
-  спрямо `site/`); пропуска `/api/*` (маршрут на Worker-а, не файл) и
-  външните връзки (без мрежа в CI).
+  `docs/**/*.md` и `site/**/*.html`. Разпознава Markdown връзките и
+  кавичните `href`/`src` и проверява дали пътят им съществува
+  (относителните — спрямо файла, адресите с „/“ — спрямо `site/`, след
+  нормализиране на `.`/`..`); пропуска `/api/*` (маршрут на Worker-а, не
+  файл) и външните връзки (без мрежа в CI). Каквото не може да разпознае —
+  и адрес, който излиза над корена — го съобщава с файл и ред и проверката
+  пада; пример, който не бива да се проверява, влиза в ограден блок.
 
 ### 🇬🇧 English
 
@@ -70,10 +73,13 @@
   in the Worker are not accepted.
 - **Link checker in CI** (`npm run check:links`,
   `scripts/check_links.mjs`) — walks the READMEs, `CONTRIBUTING.md`,
-  `docs/**/*.md` and `site/**/*.html` and checks that every internal path
-  actually exists (relative ones against the file, `/`-prefixed ones
-  against `site/`); skips `/api/*` (a Worker route, not a file) and
-  external links (no network in CI).
+  `docs/**/*.md` and `site/**/*.html`. It recognizes Markdown links and
+  quoted `href`/`src` and checks whether their path exists (relative ones
+  against the file, `/`-prefixed ones against `site/`, after normalizing
+  `.`/`..`); skips `/api/*` (a Worker route, not a file) and external links
+  (no network in CI). Whatever it cannot recognize — and an address that
+  escapes the root — it reports with file and line and the check fails; an
+  example that must not be checked goes in a fenced block.
 
 ---
 

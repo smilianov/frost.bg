@@ -44,20 +44,40 @@ CDS инструментите. Същото се пуска в CI при все
 са и **минали**, личи по `M` — нула неуспешни.
 
 `npm run check:links` (пуска се и в CI, след `npm test`) проверява
-вътрешните връзки в документацията и сайта — **проверява всяка Markdown
-връзка и всеки кавичен `href`/`src`, включително вътре в `inline code` и
-вътре в `<!-- HTML коментари -->`** (тих пропуск е единственото недопустимо
-за този инструмент; шумен фалшив резултат е поносим). Единственото място,
-което скриптът наистина не пипа, е ограден блок (три обратни кавички или
-три тилди на своя си ред) — там влиза пример, който не бива да се
-проверява. **Проверката никога не мълчи:** каквото не може да разпознае —
-`href`/`src` без кавички или със стойност, която не изглежда като адрес;
-нещо, което изглежда като Markdown връзка, но не е (интервал в адреса
-например); незатворен ограден блок — излиза като „Неразпознато“ с файл и
-ред и проверката пада, вместо да бъде подминато. Не разпознава
-reference-style Markdown връзки (`[текст][ref]`), нито проверява дали
-„#котва“ действително съществува в целевия файл (само че самият файл го
-прави).
+вътрешните връзки в документацията и сайта. Границата му е точно тази:
+
+**Какво проверява.** Всяка Markdown връзка и всеки кавичен `href`/`src` на
+реална позиция, включително вътре в `inline code` и вътре в `<!-- HTML
+коментари -->`. Етикетът може да съдържа една нива вложени скоби, колкото
+стига за значка (изображение, което само по себе си е връзка) — тогава се
+проверяват и двете цели. Двете форми, в ограден блок именно защото иначе
+щяха да бъдат проверени:
+
+```markdown
+[текст](цел.md)
+[![описание](картинка.png)](цел.html)
+```
+
+Относителните адреси се разрешават спрямо файла, започващите с „/“ — спрямо
+`site/`, след нормализиране на `.` и `..`; `/api/*` се пропуска като
+маршрут на Worker-а, а външните адреси не се докосват.
+
+**Какво съобщава като проблем** (излиза с файл и ред под „Неразпознато“ и
+проверката пада — тих пропуск е единственото недопустимо за този
+инструмент, шумен фалшив резултат е поносим): `href`/`src` без кавички, с
+незатворена кавичка, със стойност, която не изглежда като адрес, или с
+невалидна граница на атрибута (кавичка или наклонена черта веднага пред
+`href`/`src`); нещо, което изглежда като Markdown връзка, но не е (интервал или скоби в адреса, двойна
+вложеност в етикета); незатворен ограден блок; незатворен HTML коментар;
+адрес, който излиза над корена.
+
+**Какво остава непроверено.** Ограден блок (три обратни кавички или три
+тилди на своя си ред) — **там влиза пример, който не бива да се
+проверява**; reference-style Markdown връзки (`[текст][ref]`); дали
+„#котва“ действително съществува в целевия файл (проверява се само че
+самият файл го прави). Примери в `inline code`, в HTML коментари, в
+блокцитат и в четириинтервален код СЕ проверяват — ако целта им не
+съществува, това е шумна фалшива тревога и мястото ѝ е ограден блок.
 
 ## Версия
 
@@ -174,20 +194,42 @@ tests actually **ran** (as opposed to being skipped); whether they also
 **passed** shows in `M` — zero failures.
 
 `npm run check:links` (also runs in CI, after `npm test`) checks the
-internal links in the documentation and the site — **it checks every
-Markdown link and every quoted `href`/`src`, including inside `inline
-code` and inside `<!-- HTML comments -->`** (a silent miss is the one
-outcome this tool does not allow; a noisy false positive is acceptable).
-The only thing it truly leaves alone is a fenced block (three backticks or
-three tildes on a line of their own) — put an example there if it must not
-be checked. **The check never goes quiet:** whatever it cannot recognize —
-an `href`/`src` without quotes or with a value that does not look like an
-address; something that looks like a Markdown link but isn't (a space in
-the address, say); an unclosed fenced block — comes out as „Неразпознато“
-with file and line and the check fails, instead of being passed over. It
-does not recognize reference-style Markdown links (`[text][ref]`), nor does
-it check whether a "#fragment" actually exists in the target file (only
-that the file itself does).
+internal links in the documentation and the site. Its boundary is exactly
+this:
+
+**What it checks.** Every Markdown link and every quoted `href`/`src` in a
+real attribute position, including inside `inline code` and inside
+`<!-- HTML comments -->`. The label may contain one level of nested
+brackets, enough for a badge (an image that is itself a link) — then both
+targets are checked. The two forms, in a fenced block precisely because
+they would otherwise be checked:
+
+```markdown
+[text](target.md)
+[![description](picture.png)](target.html)
+```
+
+Relative addresses resolve against the file, `/`-prefixed ones against
+`site/`, after normalizing `.` and `..`; `/api/*` is skipped as a Worker
+route, and external addresses are left alone.
+
+**What it reports as a problem** (printed with file and line under
+„Неразпознато“, and the check fails — a silent miss is the one outcome this
+tool does not allow; a noisy false positive is acceptable): an `href`/`src`
+without quotes, with an unterminated quote, with a value that does not look
+like an address, or with an invalid attribute boundary (a quote or a slash
+immediately before `href`/`src`); something that looks like a Markdown link but
+isn't (a space or parentheses in the address, double nesting in the label);
+an unclosed fenced block; an unclosed HTML comment; an address that escapes
+the root.
+
+**What stays unchecked.** A fenced block (three backticks or three tildes
+on a line of their own) — **put an example there if it must not be
+checked**; reference-style Markdown links (`[text][ref]`); whether a
+"#fragment" actually exists in the target file (only that the file itself
+does). Examples in `inline code`, in HTML comments, in a blockquote and in
+four-space indented code ARE checked — if their target does not exist that
+is a noisy false alarm, and its place is a fenced block.
 
 ## Version
 

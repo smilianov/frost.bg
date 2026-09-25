@@ -8,7 +8,7 @@ frost** and **first autumn frost** — a typical date and a safe date — from
 also works as a free **API** for other applications (including Garden
 Planner).
 
-- [`api.md`](api.md) — the three API endpoints, parameters, example
+- [`api.md`](api.md) — the four API endpoints, parameters, example
   responses, error codes, caching and CORS.
 - [`architecture.md`](architecture.md) — how the project is built: the
   grid, the Worker, the cache, the page, the environments and the tests.

@@ -24,10 +24,13 @@
 //     цели: външната и на самото изображение (вторият пробег,
 //     MD_INLINE_FLAT, е точно за да не изчезне вътрешната тихо);
 //   - HTML href/src с кавички (главни или малки букви) — като атрибут на
-//     реална позиция (предхожда го празно пространство или начало на
-//     текста), не като подниз навсякъде в текста: `<div title='href="/x"'>`
-//     и `data-href="/x"` не съвпадат. Важи и за site/**/*.html, и за HTML,
-//     вграден в Markdown файл;
+//     реална позиция: знакът пред името решава. Празно пространство или
+//     начало на текста → кандидат; `"`, `'` или `/` → ПРОБЛЕМ (невалидна
+//     граница: `<a title="x"href=…>`, `<a/href=…>`, или `href` в стойността
+//     на друг атрибут); всичко друго (буква, цифра, тире, обратна кавичка) →
+//     не е кандидат: `data-href="/x"` е друго име, а `` `href="/x"` `` в
+//     проза е `inline code`. Важи и за site/**/*.html, и за HTML, вграден в
+//     Markdown файл;
 //   - HTML атрибутите се четат от целия текст на файла, не ред по ред, за
 //     да не изчезва връзка, чийто `href="…"` пада на следващия ред спрямо
 //     отварящия таг.
@@ -38,17 +41,29 @@
 //     кавичка вътре) — точно това хваща `<!-- href="https://example.com/ -->
 //     <a href="/missing.html">`: първата стойност гърми, а сканирането
 //     продължава веднага след „=“ и намира истинския href;
-//   - всяко `](`, което не е част от призната Markdown връзка — напр.
-//     `[x](/a b.html)` (интервал в адреса) или `](` в HTML коментар;
-//   - ограден блок, отворен и незатворен до края на файла.
+//   - всяко `](`, чиято ПОЗИЦИЯ не е разпозната като начало на адрес — напр.
+//     `[x](/a b.html)` (интервал в адреса) или `](` в HTML коментар.
+//     Отчитат се позиции, а не диапазони: попадането на едно `](` вътре в
+//     чуждо съвпадение не доказва, че неговата цел е проверена (точно това
+//     заглушаваше `[![alt](/a(b).png)](https://example.com)` — външната
+//     връзка минаваше, а адресът на изображението изчезваше);
+//   - ограден блок, отворен и незатворен до края на файла;
+//   - HTML коментар, отворен и незатворен до края на файла;
+//   - адрес, който след нормализиране излиза над корена (`/../x`).
 //
 // Какво се зачерква преди разпознаването (заменя се с празни редове, за да
 // останат номерата верни): САМО оградените блокове, по правила
-// CommonMark-lite — виж redactFences. Умишлено НЕ се редактират `inline
-// code` и HTML коментари: и двата опита (кръг 2) създадоха тих пропуск там,
-// където две отделни неща се пресичат — единична обратна кавичка в HTML
-// коментар се сдвоява с обратната кавичка на съвсем друг `inline code` span
-// по-надолу в реда и изяжда истинска Markdown връзка между тях:
+// CommonMark-lite — виж redactFences. Маркер за ограда, който започва вътре
+// в HTML коментар, НЕ е истински маркер: два `~~~` в два отделни коментара
+// иначе се сдвояваха и изтриваха обикновената Markdown връзка между тях.
+// Коментарният контекст се ползва САМО за това решение — съдържанието на
+// коментарите продължава да СЕ проверява.
+//
+// Умишлено НЕ се редактират `inline code` и HTML коментари: и двата опита
+// (кръг 2) създадоха тих пропуск там, където две отделни неща се пресичат —
+// единична обратна кавичка в HTML коментар се сдвоява с обратната кавичка на
+// съвсем друг `inline code` span по-надолу в реда и изяжда истинска Markdown
+// връзка между тях:
 //
 //   Текст <!-- ` --> [счупена](/missing.html) `код`
 //
@@ -69,8 +84,13 @@
 //   - ако адресът е написан с крайно "/", а разрешеният път излиза файл
 //     (не директория) — връзката е мъртва (файловата система би върнала
 //     ENOTDIR за "app.css/" — скриптът отговаря същото);
-//   - адрес, започващ с "/api/" → маршрут на Worker-а, не файл — прескача
-//     се нарочно (проверка във файловата система би излъгала);
+//   - сайт-абсолютният адрес се НОРМАЛИЗИРА (`.` и `..`, включително
+//     процентно кодирани) преди всяко решение по него; `..` над корена е
+//     проблем, не тихо разрешаване;
+//   - адрес, чийто НОРМАЛИЗИРАН вид започва с "/api/" → маршрут на Worker-а,
+//     не файл — прескача се нарочно (проверка във файловата система би
+//     излъгала). Преди нормализирането `/api/../missing.html` се пропускаше
+//     по суровия префикс, макар да сочи `/missing.html`;
 //   - външни http(s) (и всякакви други URI схеми — mailto:, tel:…) → не се
 //     докосват.
 //
@@ -88,6 +108,11 @@
 //     не рекурсия, а адресът не може да съдържа скоби. Излизат като
 //     „Неразпознато“, тоест шумно; истинската им поддръжка иска CommonMark
 //     parser;
+//   - заглавие в кавички след адреса не може да съдържа квадратна скоба,
+//     макар CommonMark да го позволява: иначе `<!-- [old](https://example.com
+//     " --> [broken](/missing.html) <!-- ") -->` се четеше като ЕДНА връзка с
+//     дълго заглавие, което поглъщаше истинската връзка след коментара. Сега
+//     конструкцията е неразпозната (шумна), а вътрешната връзка се проверява;
 //   - reference-style Markdown връзки ([текст][ref] / [ref]: цел) не се
 //     поддържат — в хранилището няма нито една; коректното им разпознаване
 //     иска истински CommonMark parser. `[ref]: цел` няма `](`, затова не
@@ -154,22 +179,59 @@ function existingFile(path) {
 // Затворените огради преди нея си остават зачеркнати: шумът е локален за
 // истинския дефект, вместо един незатворен блок да гръмне цял файл.
 //
-// Връща { text, unclosedFence } — unclosedFence е 1-базиран ред или null.
+// Диапазоните на HTML коментарите в текста, линейно отпред назад. Незатворен
+// коментар се смята за коментар до края на файла И се съобщава като проблем.
+// Посоката на грешката тук е задължителна: колкото повече текст минава за
+// коментар, толкова по-малко маркери за ограда се смятат за истински, значи
+// толкова ПОВЕЧЕ съдържание се проверява — шумно, никога по-малко.
+function htmlCommentRanges(text) {
+  const ranges = [];
+  let unclosed = null;
+  let i = 0;
+  for (;;) {
+    const open = text.indexOf("<!--", i);
+    if (open === -1) break;
+    const close = text.indexOf("-->", open + 4);
+    if (close === -1) {
+      unclosed = open;
+      ranges.push([open, text.length]);
+      break;
+    }
+    ranges.push([open, close + 3]);
+    i = close + 3;
+  }
+  return { ranges, unclosed };
+}
+
+// Връща { text, problems } — problems са редовете, които скриптът е видял, но
+// не е разпознал (незатворена ограда, незатворен HTML коментар).
 function redactFences(text) {
   const lines = text.split("\n");
+  const { ranges, unclosed } = htmlCommentRanges(text);
+  const inComment = (pos) => ranges.some(([from, to]) => pos >= from && pos < to);
   const out = [];
-  let fence = null; // { char, len, line }
+  const problems = [];
+  let fence = null; // { char, len, line, from }
+  let at = 0; // абсолютната позиция на началото на реда в ОРИГИНАЛНИЯ текст
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const lineStart = at;
+    at += line.length + 1;
+    // CRLF: маркер след `\r` иначе не се разпознава нито като отварящ (`.` не
+    // хваща `\r`), нито като затварящ (`[ \t]*$` не го хваща).
+    const bare = line.endsWith("\r") ? line.slice(0, -1) : line;
     if (fence) {
       out.push("");
       // fence.char е ` или ~ — нито един от двата не е метазнак в regex;
-      // `[ \t]` в шаблона дава клас от интервал и табулация.
-      if (new RegExp(`^ {0,3}${fence.char}{${fence.len},}[ \t]*$`).test(line)) fence = null;
+      // `[ \t]` в шаблона дава клас от интервал и табулация. Коментарният
+      // контекст НЕ се прилага за затварящия маркер нарочно: вътре в ограда
+      // CommonMark не познава HTML коментари, а и грешката би била в грешната
+      // посока — пропуснато затваряне зачерква ПОВЕЧЕ и може да скрие връзка.
+      if (new RegExp(`^ {0,3}${fence.char}{${fence.len},}[ \t]*$`).test(bare)) fence = null;
       continue;
     }
-    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
-    if (m && !(m[1][0] === "`" && m[2].includes("`"))) {
+    const m = /^ {0,3}(`{3,}|~{3,})(.*)$/d.exec(bare);
+    if (m && !(m[1][0] === "`" && m[2].includes("`")) && !inComment(lineStart + m.indices[1][0])) {
       fence = { char: m[1][0], len: m[1].length, line: i + 1, from: i };
       out.push("");
       continue;
@@ -181,9 +243,15 @@ function redactFences(text) {
     // надолу; out има по един ред за всеки ред от файла, затова индексите
     // съвпадат едно към едно.
     for (let i = fence.from; i < out.length; i++) out[i] = lines[i];
-    return { text: out.join("\n"), unclosedFence: fence.line };
+    problems.push({ line: fence.line, what: "незатворен ограден блок" });
   }
-  return { text: out.join("\n"), unclosedFence: null };
+  if (unclosed !== null) {
+    problems.push({
+      line: text.slice(0, unclosed).split("\n").length,
+      what: "незатворен HTML коментар",
+    });
+  }
+  return { text: out.join("\n"), problems };
 }
 
 // --- разпознаване на връзка в текста -----------------------------------
@@ -205,16 +273,41 @@ function redactFences(text) {
 // пробег, защото при значка първият израз хваща ВЪНШНАТА връзка и вътрешната
 // `![alt](img)` остава вътре в съвпадението — без втория пробег целта на
 // самото изображение би изчезнала тихо.
-const MD_TAIL = String.raw`\(\s*(<[^<>\n]*>|[^()\s]+)(?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^()\n]*\)))?\s*\)`;
-const MD_INLINE = new RegExp(String.raw`\[(?:[^\[\]]|\[[^\[\]]*\])*\]` + MD_TAIL, "g");
-const MD_INLINE_FLAT = new RegExp(String.raw`\[[^\[\]]*\]` + MD_TAIL, "g");
-// Началото на href=/src= като атрибут на реална позиция: изисква празно
-// пространство (или начало на текста) пред името — точно това пази
-// `data-href` и `<div title='href="/x"'>` да не съвпадат. Главните букви се
-// изписват като класове, а не с флаг "i", нарочно: с "i" класът [a-z]
-// хваща и знака Kelvin (U+212A) като "k", а тук всяко разхлабване на
-// границите вече е плащано с тих пропуск.
-const ATTR_START = /(?:^|\s)([Hh][Rr][Ee][Ff]|[Ss][Rr][Cc])\s*=\s*/g;
+//
+// Заглавието в кавички НЕ може да съдържа квадратна скоба, макар CommonMark да
+// го позволява. Причината е находка от финалния преглед: `<!-- [old](https://
+// example.com " --> [broken](/missing.html) <!-- ") -->` се четеше като ЕДНА
+// връзка с дълго заглавие, което поглъщаше истинската връзка след края на
+// коментара. Скоба в заглавието вече прави конструкцията неразпозната, тоест
+// шумна, и вътрешната връзка се намира и проверява.
+//
+// Групата `open` е самата „(“ след етикета: от нейния индекс се смята точната
+// позиция на разпознатото `](` (един знак преди нея). Отчитаме ПОЗИЦИИ, не
+// диапазони — попадането в диапазон на съвпадение не доказва, че целта на
+// това `](` е проверена.
+const MD_TAIL = String.raw`(?<open>\()\s*(?<target><[^<>\n]*>|[^()\s]+)(?:\s+(?:"[^"\n\[\]]*"|'[^'\n\[\]]*'|\([^()\n]*\)))?\s*\)`;
+const MD_INLINE = new RegExp(String.raw`\[(?:[^\[\]]|\[[^\[\]]*\])*\]` + MD_TAIL, "gd");
+const MD_INLINE_FLAT = new RegExp(String.raw`\[[^\[\]]*\]` + MD_TAIL, "gd");
+// Всяко `href=`/`src=` в текста; знакът ПРЕД името решава какво е то.
+// Главните букви се изписват като класове, а не с флаг "i", нарочно: с "i"
+// класът [a-z] хваща и знака Kelvin (U+212A) като "k", а тук всяко
+// разхлабване на границите вече е плащано с тих пропуск.
+const ATTR_START = /([Hh][Rr][Ee][Ff]|[Ss][Rr][Cc])\s*=\s*/g;
+
+// Присъдата по знака пред името:
+//   - празно пространство или начало на текста → кандидат за истински атрибут;
+//   - `"`, `'` или `/` → ПРОБЛЕМ: `<a title="x"href=…>` и `<a/href=…>` са
+//     невалиден маркъп, който досега изчезваше без диагностика;
+//   - всичко друго (буква, цифра, тире, обратна кавичка…) → не е кандидат:
+//     това е друго име (`data-href`), част от проза или `inline code`
+//     (`` `href="/en/"` `` в план), не атрибут на реална позиция.
+function attrBoundary(text, at) {
+  if (at === 0) return "кандидат";
+  const ch = text[at - 1];
+  if (/\s/.test(ch)) return "кандидат";
+  if (ch === '"' || ch === "'" || ch === "/") return "невалидна";
+  return "чуждо";
+}
 
 // Ръчно сканиране вместо един regex: „разпознай или се оплаши“. Регулярен
 // израз със `[^"]*` за стойност прескача край на таг и край на коментар —
@@ -234,6 +327,14 @@ function htmlAttrMatches(text) {
   while ((m = ATTR_START.exec(text)) !== null) {
     const name = m[1].toLowerCase();
     const eq = m.index + m[0].indexOf("=");
+    const boundary = attrBoundary(text, m.index);
+    if (boundary !== "кандидат") {
+      if (boundary === "невалидна") {
+        problems.push({ index: eq, what: `${name}=: невалидна граница на атрибут` });
+      }
+      ATTR_START.lastIndex = eq + 1;
+      continue;
+    }
     const valueStart = m.index + m[0].length; // след `\s*` подир „=“
     const quote = text[valueStart];
     if (quote !== '"' && quote !== "'") {
@@ -291,27 +392,24 @@ function lineForIndex(offsets, idx) {
 // скриптът е видял, но не е разпознал като връзка. Никоя от двете не
 // прескача тихо.
 function findMarkdownLinks(text) {
-  const { text: redacted, unclosedFence } = redactFences(text);
+  const { text: redacted, problems: fenceProblems } = redactFences(text);
   const offsets = buildLineIndex(redacted);
   const links = [];
-  const problems = [];
-  if (unclosedFence !== null) {
-    problems.push({ line: unclosedFence, what: "незатворен ограден блок" });
-  }
-  const accepted = [];
-  const seen = new Set(); // позиция на вече добавена връзка — двата пробега
+  const problems = [...fenceProblems];
+  // Точните позиции на разпознатите `](` — не диапазоните на съвпаденията.
+  const recognized = new Set();
   for (const re of [MD_INLINE, MD_INLINE_FLAT]) {
     for (const m of redacted.matchAll(re)) {
-      accepted.push([m.index, m.index + m[0].length]);
-      if (seen.has(m.index)) continue; // обикновена връзка, хваната и от двата
-      seen.add(m.index);
-      links.push({ line: lineForIndex(offsets, m.index), target: extractTarget(m[1]) });
+      const bracket = m.indices.groups.open[0] - 1; // „](“ започва един знак преди „(“
+      if (recognized.has(bracket)) continue; // обикновена връзка, хваната и от двата
+      recognized.add(bracket);
+      links.push({ line: lineForIndex(offsets, m.index), target: extractTarget(m.groups.target) });
     }
   }
-  // Шумният край: всяко `](`, което не попада в прието съвпадение, изглежда
-  // като Markdown връзка, но не е разпозната — съобщава се, не се прескача.
+  // Шумният край: всяко `](`, чиято позиция не е разпозната, изглежда като
+  // Markdown връзка, но не е — съобщава се, не се прескача.
   for (let i = redacted.indexOf("]("); i !== -1; i = redacted.indexOf("](", i + 1)) {
-    if (!accepted.some(([from, to]) => i >= from && i < to)) {
+    if (!recognized.has(i)) {
       problems.push({
         line: lineForIndex(offsets, i),
         what: "изглежда като Markdown връзка, но не се разпознава",
@@ -395,16 +493,51 @@ function safeDecode(s) {
   }
 }
 
-// Връща { skip: "…" } или { path: "…абсолютен път…" }.
-function resolveTarget(target, sourceFile, siteDir) {
+// Нормализира "." и ".." в сайт-абсолютен адрес, като пази началната и
+// крайната наклонена черта (крайната носи изискването „трябва да е
+// директория“). Връща null, ако ".." излиза над началото.
+function normalizeAddress(t) {
+  const trailing = t.endsWith("/") && t !== "/";
+  const out = [];
+  for (const seg of t.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") {
+      if (out.length === 0) return null;
+      out.pop();
+      continue;
+    }
+    out.push(seg);
+  }
+  let p = "/" + out.join("/");
+  if (trailing && !p.endsWith("/")) p += "/";
+  return p;
+}
+
+// Връща { skip: "…" }, { path: "…абсолютен път…" } или { problem: "…" }.
+//
+// Редът е важен и е платен с находка от прегледа: проверката за външна схема
+// стои върху СУРОВИЯ низ (декодирането не бива да СЪЗДАВА схема — `mailto%3Ax`
+// не е външен адрес), а проверката за `/api/` стои след декодирането И след
+// нормализирането: `/api/../missing.html` и `/api/%2e%2e/missing.html` се
+// нормализират до `/missing.html`, значи не са маршрути на Worker-а и досега
+// се пропускаха тихо по суровия префикс.
+function resolveTarget(target, sourceFile, siteDir, root) {
   let t = target.split("#")[0]; // котвата не се проверява
   t = t.split("?")[0]; // низът за заявка не участва в пътя
   if (t === "") return { skip: "same-page anchor" };
   if (EXTERNAL_SCHEME.test(t)) return { skip: "external" };
-  if (t.startsWith("/api/")) return { skip: "api route" };
   t = safeDecode(t);
-  if (t.startsWith("/")) return { path: join(siteDir, t) };
-  return { path: join(dirname(sourceFile), t) };
+  if (t.startsWith("/")) {
+    const norm = normalizeAddress(t);
+    if (norm === null) return { problem: "адресът излиза над корена на сайта" };
+    if (norm.startsWith("/api/")) return { skip: "api route" };
+    return { path: join(siteDir, norm) };
+  }
+  const abs = join(dirname(sourceFile), t); // join сам нормализира "." и ".."
+  if (relative(root, abs).startsWith("..")) {
+    return { problem: "адресът излиза над корена на дървото" };
+  }
+  return { path: abs };
 }
 
 // --- главна проверка -----------------------------------------------------
@@ -441,7 +574,11 @@ export function checkTree(root) {
       unparsable.push({ file: relative(root, file), line, what });
     }
     for (const { line, target } of links) {
-      const r = resolveTarget(target, file, siteDir);
+      const r = resolveTarget(target, file, siteDir, root);
+      if (r.problem) {
+        unparsable.push({ file: relative(root, file), line, what: r.problem });
+        continue;
+      }
       if (r.skip === "external") {
         externalSkipped++;
         continue;
