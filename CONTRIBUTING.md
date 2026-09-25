@@ -46,10 +46,15 @@ CDS инструментите. Същото се пуска в CI при все
 `npm run check:links` (пуска се и в CI, след `npm test`) проверява
 вътрешните връзки в документацията и сайта. Границата му е точно тази:
 
-**Твърдото обещание.** Markdown връзка или кавичен `href`/`src` ИЗВЪН
-ограден блок или се проверява, или излиза като проблем с файл и ред. Няма
-трети изход — тих пропуск е единственото недопустимо за този инструмент,
-шумен фалшив резултат е поносим.
+**Обещанието, с неговата граница.** Markdown връзка или кавичен `href`/`src`
+извън ограден блок или се проверява, или излиза като проблем с файл и ред.
+Тих пропуск е единственото недопустимо за този инструмент, шумен фалшив
+резултат е поносим. Но проверката е **евристична, не parser**: при
+патологично преплетени огради и HTML коментари разпознаването не е сигурно и
+връзка може да остане непроверена. Затова това не се гарантира, а се
+СЪОБЩАВА — разминаването между двата анализа на оградите дава диагностика
+„смесени огради и HTML коментари — разпознаването не е сигурно“ и проверката
+пада. Целият клас е шумен, не тих.
 
 **Какво проверява.** Markdown връзките и кавичните `href`/`src` на реална
 позиция, включително вътре в `inline code` и вътре в `<!-- HTML коментари
@@ -72,25 +77,37 @@ CDS инструментите. Същото се пуска в CI при все
 инструмент, шумен фалшив резултат е поносим): `href`/`src` без кавички, с
 незатворена кавичка, със стойност, която не изглежда като адрес, или с
 невалидна граница на атрибута (кавичка или наклонена черта веднага пред
-`href`/`src`); нещо, което изглежда като Markdown връзка, но не е (интервал или скоби в адреса, двойна
-вложеност в етикета); незатворен ограден блок; незатворен HTML коментар;
-адрес, който излиза над корена.
+`href`/`src`); нещо, което изглежда като Markdown връзка, но не е (интервал
+или скоби в адреса, двойна вложеност в етикета); незатворен ограден блок;
+незатворен HTML коментар; адрес, който излиза над корена; файл, в който
+двата анализа на оградите не са съгласни.
 
-**Какво остава непроверено — и трите граници са приети, не пропуск.**
+**Какво остава непроверено — всяка граница е приета, не пропуск.**
 
 - **Ограден блок** (три обратни кавички или три тилди на своя си ред) —
-  **там влиза пример, който не бива да се проверява.** Той изключва
-  проверката на връзките вътре, но не изключва всичко: блок, съдържащ само
-  отварящ HTML коментар без затварящ, пак дава диагностика „незатворен HTML
-  коментар“.
+  **там влиза пример, който не бива да се проверява.** Той обаче не изключва
+  БЕЗУСЛОВНО: блок, съдържащ само отварящ HTML коментар без затварящ, пак
+  дава диагностика „незатворен HTML коментар“; а ако първият блок съдържа
+  отварящ коментар, а вторият — затварящ, връзката във ВТОРИЯ блок се
+  проверява и излиза мъртва. Правило, на което може да се разчита: пример,
+  който не бива да се проверява, влиза в ограден блок БЕЗ парчета от HTML
+  коментар в него.
 - **Reference-style връзки** (`[текст][ref]`) не се разпознават И не дават
-  диагностика — единственото място, където инструментът мълчи. Приета
-  граница: в хранилището няма нито една такава връзка, а коректното им
-  разпознаване иска истински CommonMark parser.
-- **Заглавието на връзка не може да съдържа квадратна скоба**, макар
-  CommonMark да го позволява: такава връзка излиза като „Неразпознато“
+  диагностика. Приета граница: в хранилището няма нито една такава връзка, а
+  коректното им разпознаване иска истински CommonMark parser.
+- **Заглавието на връзка в кавички не може да съдържа квадратна скоба**,
+  макар CommonMark да го позволява: такава връзка излиза като „Неразпознато“
   (шумно, не тихо). Цената е платена нарочно — заглавие, което може да
-  съдържа скоби, поглъща истинската връзка след себе си.
+  съдържа скоби, поглъща истинската връзка след себе си. Заглавие в КРЪГЛИ
+  скоби обаче минава без диагностика — друг израз, друга граница. Трите
+  форми, пак в ограден блок, защото първите две нарочно не се разпознават, а
+  третата се проверява:
+
+  ```markdown
+  [текст](цел.md "виж [бележка]")
+  [текст](цел.md 'виж [бележка]')
+  [текст](цел.md (виж [бележка]))
+  ```
 
 Освен това: проверява се само че целевият ФАЙЛ съществува, не и дали
 „#котва“ в него съществува. Диагностиката „незатворен HTML коментар“ важи за
@@ -217,10 +234,15 @@ tests actually **ran** (as opposed to being skipped); whether they also
 internal links in the documentation and the site. Its boundary is exactly
 this:
 
-**The firm promise.** A Markdown link or a quoted `href`/`src` OUTSIDE a
-fenced block is either checked or comes out as a problem with file and
-line. There is no third outcome — a silent miss is the one outcome this
-tool does not allow; a noisy false positive is acceptable.
+**The promise, with its boundary.** A Markdown link or a quoted `href`/`src`
+outside a fenced block is either checked or comes out as a problem with file
+and line. A silent miss is the one outcome this tool does not allow; a noisy
+false positive is acceptable. But the check is **heuristic, not a parser**:
+with pathologically interleaved fences and HTML comments the recognition is
+not certain and a link can go unchecked. So this is not guaranteed — it is
+REPORTED: a disagreement between the two fence analyses yields the
+diagnostic "смесени огради и HTML коментари — разпознаването не е сигурно"
+and the check fails. The whole class is noisy, not silent.
 
 **What it checks.** Markdown links and quoted `href`/`src` in a real
 attribute position, including inside `inline code` and inside `<!-- HTML
@@ -246,24 +268,34 @@ like an address, or with an invalid attribute boundary (a quote or a slash
 immediately before `href`/`src`); something that looks like a Markdown link but
 isn't (a space or parentheses in the address, double nesting in the label);
 an unclosed fenced block; an unclosed HTML comment; an address that escapes
-the root.
+the root; a file where the two fence analyses disagree.
 
-**What stays unchecked — all three are accepted boundaries, not
-oversights.**
+**What stays unchecked — every boundary is accepted, not an oversight.**
 
 - **A fenced block** (three backticks or three tildes on a line of their
-  own) — **put an example there if it must not be checked.** It turns off
-  link checking inside it, but not everything: a block containing only an
-  opening HTML comment marker with no closing one still yields an
-  "unclosed HTML comment" diagnostic.
+  own) — **put an example there if it must not be checked.** It does not,
+  however, exclude UNCONDITIONALLY: a block containing only an opening HTML
+  comment marker with no closing one still yields an "unclosed HTML comment"
+  diagnostic; and if the first block holds an opening comment marker and the
+  second a closing one, a link in the SECOND block is checked and comes out
+  dead. The rule you can rely on: an example that must not be checked goes
+  in a fenced block WITHOUT pieces of an HTML comment in it.
 - **Reference-style links** (`[text][ref]`) are neither recognized NOR
-  reported — the one place where the tool stays quiet. An accepted
-  boundary: the repository has no such link, and recognizing them properly
-  needs a real CommonMark parser.
-- **A link title may not contain a square bracket**, even though CommonMark
-  allows it: such a link comes out as „Неразпознато“ (noisy, not silent).
-  The price is paid on purpose — a title that may contain brackets swallows
-  the real link after it.
+  reported. An accepted boundary: the repository has no such link, and
+  recognizing them properly needs a real CommonMark parser.
+- **A quoted link title may not contain a square bracket**, even though
+  CommonMark allows it: such a link comes out as „Неразпознато“ (noisy, not
+  silent). The price is paid on purpose — a title that may contain brackets
+  swallows the real link after it. A title in PARENTHESES, however, passes
+  with no diagnostic — a different expression, a different boundary. The
+  three forms, again in a fenced block because the first two are deliberately
+  not recognized while the third is checked:
+
+  ```markdown
+  [text](target.md "see [note]")
+  [text](target.md 'see [note]')
+  [text](target.md (see [note]))
+  ```
 
 Besides that: only the target FILE is checked for existence, not whether a
 "#fragment" inside it exists. The "unclosed HTML comment" diagnostic applies

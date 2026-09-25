@@ -869,11 +869,20 @@ test("маркер за ограда вътре в HTML коментар не з
   });
   try {
     const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(unparsable, []);
     assert.deepEqual(
       dead.map((d) => `${d.line} ${d.target}`),
       ["6 /missing.html"],
       JSON.stringify(dead),
+    );
+    // ДОПЪЛНЕНО в закриващата вълна: тук двете маски се разминават (слепият
+    // анализ вижда ограда от ред 4 до ред 8, осведоменият — никаква), затова
+    // файлът получава и диагностика „разпознаването не е сигурно“. Връзката
+    // пак СЕ проверява — това е същината; диагностиката е добавен шум, не
+    // замяна.
+    assert.deepEqual(
+      unparsable.map((u) => `${u.line} ${u.what}`),
+      ["4 смесени огради и HTML коментари — разпознаването не е сигурно"],
+      JSON.stringify(unparsable),
     );
   } finally {
     cleanup(root);
@@ -1012,8 +1021,15 @@ test("`<!--` в един ограден блок и `-->` в друг не за�
   });
   try {
     const { dead, unparsable } = checkTree(root);
-    assert.deepEqual(unparsable, [], JSON.stringify(unparsable));
     assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["10 /missing.html"], JSON.stringify(dead));
+    // ДОПЪЛНЕНО в закриващата вълна: слепият анализ отваря ограда на ред 6,
+    // осведоменият не — разминаване, значи и диагностика. Връзката пак се
+    // проверява.
+    assert.deepEqual(
+      unparsable.map((u) => `${u.line} ${u.what}`),
+      ["6 смесени огради и HTML коментари — разпознаването не е сигурно"],
+      JSON.stringify(unparsable),
+    );
   } finally {
     cleanup(root);
   }
@@ -1039,6 +1055,102 @@ test("счупено процентно кодиране в съседен се�
     assert.equal(apiSkipped, 1, "само истинският /api/v1/frost");
     assert.deepEqual(unparsable, []);
     assert.deepEqual(dead.map((d) => d.line), [2, 3, 5], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+// --- Закриваща вълна ------------------------------------------------------
+
+test("/api/ се пропуска само когато суровият и нормализираният път са съгласни", () => {
+  // Декодирането по сегменти внесе регресия: `%2F` се декодираше до наклонена
+  // черта, слепеният низ се разделяше наново и `..` изяждаха погрешните
+  // сегменти. Сега `%2F` остава ВЪТРЕ в сегмента си (в адрес то не е
+  // разделител), а изключението за `/api/` иска съгласие на двата вида път.
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "[x](/api/a%2Fb/../../missing%zz.html)", // 2 — нормализира се до /missing%zz.html
+      "[x](/api%2Fv1/frost)", // 3 — суровият път не започва с /api/
+      "[истински](/api/v1/frost)", // 4 — единственият безспорен маршрут
+      "[x](/api/%2e%2e/missing.html)", // 5 — нормализира се до /missing.html
+      "[x](/api/..%2Fmissing.html)", // 6 — виж коментара под теста
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, apiSkipped, unparsable } = checkTree(root);
+    assert.deepEqual(unparsable, []);
+    // Ред 6 СЕ пропуска, и това е вярното: Worker-ът решава по `URL.pathname`,
+    // който запазва `%2F`, значи `/api/..%2Fmissing.html` наистина влиза в API
+    // клона. Досега скриптът го обявяваше за мъртъв файл — шумна, но погрешна
+    // класификация. Закрепено тук, за да не се „поправи“ обратно.
+    assert.equal(apiSkipped, 2, "истинският маршрут и този с %2F в сегмента");
+    assert.deepEqual(dead.map((d) => d.line), [2, 3, 5], JSON.stringify(dead));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("разминаване между двете маски е диагностика, не тишина", () => {
+  // Репродукцията на ревюера: при патологично преплетени огради и коментари
+  // ОБЩАТА грешка на двете маски оцелява в сечението — и двете зачеркват ред
+  // 10 и връзката там не се проверява. Пълното решение иска истински
+  // CommonMark + HTML parser и е отказано съзнателно. Но щом двете маски се
+  // различават където и да е във файла, разпознаването не е сигурно — и това
+  // се съобщава. Целият клас става шумен вместо тих.
+  const root = fixture({
+    "README.md": [
+      "~~~html", // 1
+      "<!--", // 2
+      "~~~", // 3
+      "~~~html", // 4 — слепият анализ я отваря, осведоменият я потиска
+      "-->", // 5
+      "~~~", // 6
+      "<!--", // 7
+      "```", // 8
+      "-->", // 9
+      "[broken](/missing.html)", // 10 — зачерква се и от двете маски
+      "<!--", // 11
+      "~~~", // 12
+      "```", // 13
+      "-->", // 14
+      "", // 15
+      "[база](docs/base.md)", // 16
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(dead, [], "връзката на ред 10 наистина не се проверява — това е приетата граница");
+    assert.equal(unparsable.length, 1, JSON.stringify(unparsable));
+    assert.equal(unparsable[0].line, 4, "първият ред, на който двете маски се разминават");
+    assert.match(unparsable[0].what, /смесени огради и HTML коментари/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("огради и коментари, където двете маски съвпадат, не вдигат диагностика", () => {
+  // Обичайният случай — HTML коментар ВЪТРЕ в ограден блок. Правилото не бива
+  // да става шумно за всичко.
+  const root = fixture({
+    "README.md": [
+      "[база](docs/base.md)", // 1
+      "", // 2
+      "```html", // 3
+      "<!-- пример -->", // 4
+      '<a href="/inside.html">x</a>', // 5
+      "```", // 6
+      "", // 7
+      "[след](/missing.html)", // 8
+    ].join("\n"),
+    "docs/base.md": "x",
+  });
+  try {
+    const { dead, unparsable } = checkTree(root);
+    assert.deepEqual(unparsable, []);
+    assert.deepEqual(dead.map((d) => `${d.line} ${d.target}`), ["8 /missing.html"], JSON.stringify(dead));
   } finally {
     cleanup(root);
   }

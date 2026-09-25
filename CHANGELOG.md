@@ -44,9 +44,12 @@
   файл) и външните връзки (без мрежа в CI). Обещанието е едно: връзка ИЗВЪН
   ограден блок или се проверява, или излиза като проблем с файл и ред, и
   проверката пада — пример, който не бива да се проверява, влиза в ограден
-  блок. Приетите граници: reference-style връзките (`[текст][ref]`) не се
-  разпознават и не дават диагностика; заглавие на връзка с квадратна скоба
-  вътре е „Неразпознато“; „#котва“ не се проверява, само целевият файл.
+  блок. Проверката е евристична, не parser: при преплетени огради и HTML
+  коментари разпознаването не е сигурно, затова самото разминаване между
+  двата анализа на оградите е диагностика. Приетите граници: reference-style
+  връзките (`[текст][ref]`) не се разпознават и не дават диагностика;
+  заглавие в кавички с квадратна скоба вътре е „Неразпознато“ (в кръгли
+  скоби — не); „#котва“ не се проверява, само целевият файл.
 
 ### 🇬🇧 English
 
@@ -83,9 +86,12 @@
   (no network in CI). The promise is a single one: a link OUTSIDE a fenced
   block is either checked or comes out as a problem with file and line, and
   the check fails — an example that must not be checked goes in a fenced
-  block. The accepted boundaries: reference-style links (`[text][ref]`) are
-  neither recognized nor reported; a link title with a square bracket in it
-  is „Неразпознато“; a "#fragment" is not checked, only the target file.
+  block. The check is heuristic, not a parser: with interleaved fences and
+  HTML comments the recognition is not certain, so a disagreement between the
+  two fence analyses is itself a diagnostic. The accepted boundaries:
+  reference-style links (`[text][ref]`) are neither recognized nor reported;
+  a quoted title with a square bracket in it is „Неразпознато“ (one in
+  parentheses is not); a "#fragment" is not checked, only the target file.
 
 ---
 
