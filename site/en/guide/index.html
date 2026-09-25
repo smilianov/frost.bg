@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>frost.bg — how to read this</title>
+<meta name="description" content="What the dates, the chart, the periods, the risk and the two elevations on frost.bg mean.">
+<link rel="stylesheet" href="/css/app.css">
+</head>
+<body data-lang="en">
+<header class="top">
+  <a class="brand" href="/en/">frost.bg</a>
+  <a class="lang" href="/guide/">Български</a>
+</header>
+<main class="wrap">
+  <h1>How to read this</h1>
+  <p class="lead">The page gives you two pairs of dates for your point, and the history behind them. Here is what each number means.</p>
+
+  <h2>The two pairs of dates</h2>
+  <p>For any point, the page gives four dates: typical spring and typical autumn frost, and safe spring and safe autumn.</p>
+  <p>The <strong>typical</strong> date is the median of all the years: in half of them the frost is already over by that date, and in the other half it isn't.</p>
+  <p>The <strong>safe</strong> date is more cautious — the 90th percentile in spring and the 10th in autumn: in 9 years out of 10 there is no frost after the spring safe date, and none before the autumn one.</p>
+  <p>For Manole, over 30 years of data: typical March 29 / November 25, safe April 11 / October 30.</p>
+  <p class="hint">Tip: in your first year at a new place, use the safe date — sowing a week later costs less than a frozen seedling.</p>
+
+  <h2>The chart</h2>
+  <p>Each point on the chart is one year: a circle for the last spring frost, a diamond for the first autumn frost. The axis on the left is the months.</p>
+  <p>Arrow keys (or a finger on a phone) pick a year and show its dates.</p>
+  <p>Points outside the selected period are hollow, not hidden. The chart's range doesn't change with the period, so years never appear to vanish.</p>
+
+  <h2>The 10, 20 and 30-year periods</h2>
+  <p>The dates are recalculated for the selected period from the same data, with no new request to the server.</p>
+  <p>There is no period shorter than 10 years: under 10 years with frost, a "safe in 9 years out of 10" date is meaningless — the sample is too small.</p>
+  <p>Below the dates is how many days the typical frost has shifted over the last 10 years compared with all 30 — so you can see whether frost is coming earlier or later at your place than before.</p>
+
+  <h2>The risk after a date</h2>
+  <p>Example: "in 4 of 30 years there was frost after April 20 and before July 1 — 13%".</p>
+  <p>This is a historical frequency, not a forecast for this year; frost <strong>on</strong> the date itself does not count — only after it.</p>
+  <p>It answers for spring only: the first autumn frost before a given date says nothing about the days that follow.</p>
+  <p>The same sentence explains the safe date too — by construction, it's the date with about a 10% risk.</p>
+
+  <h2>The frost-free season</h2>
+  <p>Typical, shortest and longest length of the frost-free season — the days between the last spring frost and the first autumn frost.</p>
+  <p>Each of the three is computed per year first, and only then averaged.</p>
+  <p class="hint">That's why subtracting the two typical dates gives a different number: for Manole, 240 days, while the true typical season length is 237.</p>
+
+  <h2>The two elevations</h2>
+  <p>The grid cell is about 9 km across and has its own average elevation. For Manole the cell is at 42.2°N, 24.9°E, 99 m.</p>
+  <p>The point you pick or search for is usually elsewhere in that cell and can be at a different elevation — for Manole the point is ≈ 152 m.</p>
+  <p>The two come from different models and <strong>do not</strong> correct the dates — they're there for you to judge for yourself.</p>
+  <p>ERA5 overestimates the night minimum in valley bottoms, meaning it underestimates frost: if you're lower than the cell, expect a later spring frost and an earlier autumn frost than shown.</p>
+
+  <h2>Where the numbers come from</h2>
+  <p>The data is ERA5-Land via Copernicus CDS, 30 full years. Frost means a day with a 2 m minimum temperature ≤ 0°C.</p>
+  <p>The grid has 0.1° cells (≈ 9 km) and was precomputed for 2,080 points over Bulgaria.</p>
+  <p>A year with under 300 valid days doesn't count for that cell. A cell with under 10 years with frost has no dates.</p>
+  <p>An empty year in the table means "not enough data". An empty date within a year means "no frost was recorded" — those are not the same thing.</p>
+
+  <h2>Why it doesn't match what I see</h2>
+  <p>The grid is a model, not a thermometer in your garden: a 9 km cell, an average elevation, no microrelief, no cold pocket behind the fence.</p>
+  <p>Use the dates as a frame for planning, not a verdict — and keep your own notes. After three years, your own records beat any model.</p>
+</main>
+<footer class="foot">
+  <a href="/en/">Back to the frost dates</a> · <a href="https://github.com/smilianov/frost.bg">Source on GitHub</a> · <a href="/api/v1/config">API</a>
+</footer>
+</body>
+</html>

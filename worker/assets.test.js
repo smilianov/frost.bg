@@ -89,7 +89,7 @@ test("site/.assetsignore спира всеки *.test.js в site/", () => {
 
 test("site/.assetsignore не спира самата страница и скриптовете ѝ", () => {
   const patterns = ignorePatterns();
-  for (const f of ["index.html", "en/index.html", "js/app.js", "js/map.js", "css/app.css", "vendor/leaflet/leaflet.js"]) {
+  for (const f of ["index.html", "en/index.html", "guide/index.html", "en/guide/index.html", "js/app.js", "js/map.js", "css/app.css", "vendor/leaflet/leaflet.js"]) {
     assert.ok(!ignored(f, patterns), `${f} е спрян погрешно`);
   }
 });
