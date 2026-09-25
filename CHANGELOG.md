@@ -19,11 +19,13 @@
   слана, двете височини, откъде са числата, защо не съвпада с
   наблюденията. Статични страници, без JavaScript; връзка от футъра на
   двете начални страници (и обратно), двуезично.
-- **Контрастът на футъра там** — навсякъде другаде `.foot` е с намалена
-  непрозрачност (`opacity: 0.75`), което дава ≈3.05:1 на светла тема,
-  под изискваните 4.5:1 за нормален текст. Футърът на ръководството е
-  само връзки, затова е с пълна непрозрачност: ≈4.80:1 на светла тема,
-  ≈8.40:1 на тъмна.
+- **Контрастът на футъра — навсякъде, не само на новите страници.** Общото
+  правило `.foot { opacity: 0.75 }` композираше и връзките в него: за
+  `--accent` върху `--paper` това мереше ≈3.04:1 на светла тема, под
+  изискваните 4.5:1 за нормален текст. Премахнато изцяло от споделеното
+  правило — важи и за двете начални страници, не само за ръководството:
+  връзките вече носят чистия `--accent`, ≈4.80:1 на светла тема, ≈8.40:1
+  на тъмна.
 
 #### За разработчици
 
@@ -49,11 +51,13 @@
   frost-free season, the two elevations, where the numbers come from, why
   it doesn't match what you see. Static pages, no JavaScript; linked from
   both home pages' footers (and back), bilingual.
-- **The guide's footer contrast** — elsewhere `.foot` runs at reduced
-  opacity (`opacity: 0.75`), which measures ≈3.05:1 in the light theme,
-  below the 4.5:1 required for normal text. The guide's footer is links
-  only, so it runs at full opacity: ≈4.80:1 in the light theme, ≈8.40:1
-  in dark.
+- **Footer contrast — sitewide, not just on the new pages.** The shared
+  `.foot { opacity: 0.75 }` rule composited the links in it too: for
+  `--accent` over `--paper` that measured ≈3.04:1 in the light theme,
+  below the 4.5:1 required for normal text. Removed entirely from the
+  shared rule — it applies to both home pages too, not just the guide:
+  the links now carry the plain `--accent`, ≈4.80:1 in the light theme,
+  ≈8.40:1 in dark.
 
 #### For contributors
 

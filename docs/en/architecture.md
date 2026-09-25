@@ -109,8 +109,9 @@ file's logic.
 ## The tests
 
 `npm test` runs, in order: the Worker's tests (`node --test
-"worker/*.test.js"`), the page's tests (`node --test "site/js/*.test.js"`)
-and the Python tests for the grid and the CDS tooling. `grid/grid.json` is
+"worker/*.test.js"`), the page's tests (`node --test "site/js/*.test.js"`),
+the scripts' tests (`node --test "scripts/*.test.js"`) and the Python
+tests for the grid and the CDS tooling. `grid/grid.json` is
 checked on every run of the Worker tests: 2,080 cells, all inside the
 bounding box, dates as `MM-DD` or `null`. The bridge between the page and
 the grid is `site/js/stats.parity.test.js` — see "The page" above for

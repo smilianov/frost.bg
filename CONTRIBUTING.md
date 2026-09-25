@@ -27,9 +27,10 @@ npm test
 ```
 
 Пуска подред тестовете на Worker-а (`node --test "worker/*.test.js"`), на
-страницата (`node --test "site/js/*.test.js"`) и питоновите тестове на
-мрежата и на CDS инструментите. Същото се пуска в CI при всеки push и pull
-request — PR не се приема с червено CI.
+страницата (`node --test "site/js/*.test.js"`), на скриптовете
+(`node --test "scripts/*.test.js"`) и питоновите тестове на мрежата и на
+CDS инструментите. Същото се пуска в CI при всеки push и pull request — PR
+не се приема с червено CI.
 
 **CDS тестовете се пропускат, когато избраният интерпретатор не може да
 внесе `netCDF4`.** `test:cds` (`package.json`) пуска `grid/tests_cds.py`
@@ -41,6 +42,13 @@ request — PR не се приема с червено CI.
 „NN успешни, M неуспешни“ (`grid/tests_cds.py`) — доказва, че CDS тестовете
 наистина са **пуснати** (за разлика от пропуснатите с „пропуснато“); дали
 са и **минали**, личи по `M` — нула неуспешни.
+
+## Версия
+
+Вдигането на версията (`APP_VERSION` в `worker/index.js`, `version` в
+`package.json`) минава и през примерните стойности в документацията —
+`"app_version"` в `docs/bg/api.md` и `docs/en/api.md`; иначе остават стари
+до следващия преглед.
 
 ## Правилото за промените
 
@@ -133,9 +141,10 @@ npm test
 ```
 
 Runs, in order, the Worker's tests (`node --test "worker/*.test.js"`), the
-page's tests (`node --test "site/js/*.test.js"`) and the Python tests for
-the grid and the CDS tooling. The same runs in CI on every push and pull
-request — a PR is not merged with red CI.
+page's tests (`node --test "site/js/*.test.js"`), the scripts' tests
+(`node --test "scripts/*.test.js"`) and the Python tests for the grid and
+the CDS tooling. The same runs in CI on every push and pull request — a PR
+is not merged with red CI.
 
 **The CDS tests are skipped whenever the selected interpreter can't import
 `netCDF4`.** `test:cds` (`package.json`) runs `grid/tests_cds.py` through
@@ -147,6 +156,13 @@ A completed run is not the same as a passing run: the totals line at the
 end — "NN успешни, M неуспешни" (`grid/tests_cds.py`) — proves the CDS
 tests actually **ran** (as opposed to being skipped); whether they also
 **passed** shows in `M` — zero failures.
+
+## Version
+
+Bumping the version (`APP_VERSION` in `worker/index.js`, `version` in
+`package.json`) also means updating the example values in the
+documentation — `"app_version"` in `docs/bg/api.md` and `docs/en/api.md`;
+otherwise they go stale until the next review catches them.
 
 ## The rule for changes
 
