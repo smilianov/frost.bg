@@ -43,6 +43,12 @@ CDS инструментите. Същото се пуска в CI при все
 наистина са **пуснати** (за разлика от пропуснатите с „пропуснато“); дали
 са и **минали**, личи по `M` — нула неуспешни.
 
+`npm run check:links` (пуска се и в CI, след `npm test`) проверява
+вътрешните връзки в документацията и сайта — нарочно тесен обхват: не
+разпознава reference-style Markdown връзки (`[текст][ref]`), `href`/`src`
+без кавички, нито дали „#котва“ действително съществува в целевия файл
+(само че самият файл го прави).
+
 ## Версия
 
 Вдигането на версията (`APP_VERSION` в `worker/index.js`, `version` в
@@ -156,6 +162,12 @@ A completed run is not the same as a passing run: the totals line at the
 end — "NN успешни, M неуспешни" (`grid/tests_cds.py`) — proves the CDS
 tests actually **ran** (as opposed to being skipped); whether they also
 **passed** shows in `M` — zero failures.
+
+`npm run check:links` (also runs in CI, after `npm test`) checks the
+internal links in the documentation and the site — deliberately narrow
+scope: it does not recognize reference-style Markdown links
+(`[text][ref]`), unquoted `href`/`src`, or whether a "#fragment" actually
+exists in the target file (only that the file itself does).
 
 ## Version
 
