@@ -636,7 +636,7 @@ if (isMain) {
       for (const d of dead) console.error(`${d.file}:${d.line} → ${d.target}`);
     }
     if (unparsable.length > 0) {
-      console.error(`Неразпознато (${unparsable.length}) — примерът се слага в ограден блок:`);
+      console.error(`Неразпознато (${unparsable.length}) — или адресът се поправя, или примерът влиза в ограден блок:`);
       for (const u of unparsable) console.error(`${u.file}:${u.line} → ${u.what}`);
     }
     process.exit(1);
