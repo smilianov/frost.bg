@@ -323,3 +323,53 @@ test("началните страници водят към ръководств
   assert.match(home, /href="\/guide\/"/);
   assert.match(homeEn, /href="\/en\/guide\/"/);
 });
+
+// --- читателският преглед на документацията (25 септ. 2026) --------------
+
+// C1: „една седмица по-късна сеитба“ звучи като достатъчно отместване, а за
+// Маноле разликата между типичната и сигурната пролетна дата е 13 дни. Числото
+// се смята от мрежата, не се преписва: ако датите се сменят, тестът иска
+// новото число, не старото.
+test("съветът за сеитба назовава истинското отместване, не „една седмица“", () => {
+  const gap = safeSpringDay - typicalSpringDay;
+  const bgP = paragraphContaining(bg, "Съвет");
+  const enP = paragraphContaining(en, "Tip");
+  // Числото и това, спрямо КОЕТО е, стоят в едно очакване: „13 дни“ само по
+  // себе си би минало и в изречение, което не казва спрямо какво. Самата дума
+  // „седмица“ остава допустима — новият текст я ползва като контраст („13 дни,
+  // а не една седмица“), което е точно поправката, не дефектът.
+  assert.ok(includesExactPhraseWithTrailingUnit(bgP, `${gap} дни след типичната`), `bg: ${gap} дни след типичната`);
+  assert.ok(includesExactPhraseWithTrailingUnit(enP, `${gap} days after the typical date`), `en: ${gap} days after the typical`);
+});
+
+// I2: дължината на сезона и рискът след дата следват ИЗБРАНИЯ период
+// (history.js), а текстът ги описваше като неизменно сметнати от 30 години.
+test("сезонът без слана се смята от избрания период, не от фиксирани 30 години", () => {
+  const bgP = paragraphContaining(bg, "дължината на сезона");
+  const enP = paragraphContaining(en, "season length");
+  assert.match(bgP, /избрания период/, "bg: периодът е избираем");
+  assert.match(bgP, /10, 20 или 30/, "bg: трите възможни периода");
+  assert.match(enP, /selected period/, "en: периодът е избираем");
+  assert.match(enP, /10, 20 or 30/, "en: трите възможни периода");
+  // Числата на Маноле остават, но вече са обозначени като пример за 30 години.
+  assert.match(paragraphContaining(bg, `${midLow} + ${midHigh}`), /при избрани 30 години/, "bg: числата са за избрани 30 години");
+  assert.match(paragraphContaining(en, `${midLow} + ${midHigh}`), /with 30 years selected/, "en: числата са за избрани 30 години");
+});
+
+// F1: 105 клетки в мрежата имат поне една година с липсваща сезонна дата, а
+// ръководството определяше дължината само като разстояние между две дати.
+test("ръководството обяснява дължината и когато липсва сезонна дата", () => {
+  assert.match(bg, /няма записана пролетна слана, сезонът се брои от 1 януари/, "bg: липсваща пролетна дата");
+  assert.match(bg, /до 31 декември/, "bg: липсваща есенна дата");
+  assert.ok(includesExact(paragraphContaining(bg, "31 декември"), "365"), "bg: и двете липсващи дават 365 дни");
+  assert.match(en, /no recorded spring frost, the season is counted from January 1/, "en: липсваща пролетна дата");
+  assert.match(en, /through December 31/, "en: липсваща есенна дата");
+  assert.ok(includesExact(paragraphContaining(en, "December 31"), "365"), "en: и двете липсващи дават 365 дни");
+});
+
+// L1: българското обобщение казва „Прагът от 10 години СО СЛАНА“, английското
+// казваше само „The 10-year threshold“ — обобщаващият абзац казваше по-малко.
+test("английското обобщение носи условието „години със записана слана“", () => {
+  const enP = paragraphContaining(en, "threshold");
+  assert.match(enP, /years with recorded frost/, "en: условието „със записана слана“");
+});

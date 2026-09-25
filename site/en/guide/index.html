@@ -22,7 +22,7 @@
   <p>The <strong>typical</strong> date is the median of the years with data for that season — close to "half the years," but not exactly: for Manole, 16 of the 30 years had the last spring frost on or before the typical date, and 16 of the 30 had the first autumn frost on or before the typical date too. With an even number of years, the choice is conservative: the later of the two middle dates in spring, the earlier one in autumn.</p>
   <p>The <strong>safe</strong> date is a percentile of the same years — the 90th in spring, the 10th in autumn. The two boundaries are separate statistics for separate seasons, not one combined promise: for Manole, 3 of the 30 years had frost after the safe spring date (April 11), 2 of the 30 had frost before the safe autumn date (October 30), and 25 of the 30 had neither.</p>
   <p>For Manole, over 30 years of data: typical March 29 / November 25, safe April 11 / October 30.</p>
-  <p class="hint">Tip: in your first year at a new place, use the safe date — sowing a week later costs less than a frozen seedling.</p>
+  <p class="hint">Tip: for your first spring at a new place, use the safe date as a more cautious guide — for Manole it is 13 days after the typical date, not one week. Before sowing, also consider the forecast, the conditions in your garden and the plant's requirements: this date does not promise that frost is over.</p>
 
   <h2>The chart</h2>
   <p>Each point on the chart is one year: a circle for the last spring frost, a diamond for the first autumn frost. The axis on the left is the months.</p>
@@ -41,8 +41,9 @@
   <p>The safe date works on the same idea, just with a fixed target instead of a date you pick — for your own point, use the "Risk of frost after a date" control on the results page.</p>
 
   <h2>The frost-free season</h2>
-  <p>For each of the 30 years separately, the frost-free season length is computed — the days between that year's last spring frost and first autumn frost, not counting either frost day.</p>
-  <p>The typical length is the median of those 30 yearly values — with an even number of years, the median is the average of the two middle ones: for Manole, (236 + 238) / 2 = 237 days. The shortest (194 days, 1997) and longest (281 days, 2023) are real, individual years, not a calculation.</p>
+  <p>The frost-free season and the risk after a date are computed from the years with data in the selected period — 10, 20 or 30 years. For each such year, the frost-free season length is the number of days between that year's last spring frost and first autumn frost, not counting either frost day.</p>
+  <p>If a year with data has no recorded spring frost, the season is counted from January 1; if it has no recorded autumn frost, it is counted through December 31. If both are absent, the calculation gives 365 days. The calendar has 365 days, with February 29 treated as March 1.</p>
+  <p>The typical length is the median of the yearly lengths — with an even number of years, the median is the average of the two middle ones: for Manole, with 30 years selected, (236 + 238) / 2 = 237 days. The shortest (194 days, 1997) and longest (281 days, 2023) are real, individual years, not a calculation.</p>
   <p class="hint">That's why subtracting the two typical dates gives a different number: the same calculation, applied directly to March 29 and November 25, gives 240 days, while the median of the yearly lengths is 237. The median of the differences is not the difference of the medians.</p>
 
   <h2>The two elevations</h2>
@@ -54,7 +55,7 @@
   <h2>Where the numbers come from</h2>
   <p>The data is ERA5-Land via Copernicus CDS, 30 full years. Frost means a day with a 2 m minimum temperature ≤ 0°C.</p>
   <p>The grid has 0.1° cells (≈ 9 km) and was precomputed for 2,080 points over Bulgaria.</p>
-  <p>A year with under 300 valid days doesn't count for that cell. The 10-year threshold applies separately to spring and autumn, and separately to the selected period — so a cell can have spring dates but no autumn dates, or the other way round.</p>
+  <p>A year with under 300 valid days doesn't count for that cell. The threshold of 10 years with recorded frost for the relevant season applies separately to spring and autumn, and separately to the selected period — so a cell can have spring dates but no autumn dates, or the other way round.</p>
   <p>A table row with no data for that year is labeled "not enough data". A date that wasn't recorded in a year that does have data is labeled "no frost recorded" — those are not the same thing.</p>
 
   <h2>Why it doesn't match what I see</h2>
