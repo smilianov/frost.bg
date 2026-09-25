@@ -5,12 +5,61 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { dayOfYear, pair, riskAfter, seasonSummary } from "./stats.js";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const bg = read("../guide/index.html");
 const en = read("../en/guide/index.html");
 
 const headings = (html) => [...html.matchAll(/<h2[^>]*>([^<]+)<\/h2>/g)].map((m) => m[1].trim());
+
+// Изречението, което съдържа „marker“ — не файлът като цяло. Замяна на
+// числата само вътре в примерния абзац (истинската мутация от прегледа)
+// трябва да събори теста; числа, вярни другаде във файла, не бива да го
+// спасяват.
+const paragraphContaining = (html, marker) => {
+  const paras = [...html.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)].map((m) => m[1]);
+  const found = paras.find((p) => p.includes(marker));
+  assert.ok(found !== undefined, `няма абзац, съдържащ „${marker}“`);
+  return found;
+};
+
+// Всички очаквани числа по-долу идват от истинската мрежа (grid/grid.json)
+// през същите чисти функции, които страницата би ползвала (site/js/stats.js)
+// — не са преписани на ръка. Клетката е тази на Маноле, 42.2/24.9.
+const grid = JSON.parse(read("../../grid/grid.json"));
+const gridCells = Array.isArray(grid) ? grid : grid.cells;
+const manole = gridCells.find((c) => c.lat === 42.2 && c.lon === 24.9);
+const manoleRows = manole.years;
+const N = manoleRows.length;
+
+const risk = riskAfter(manoleRows, "04-20");
+const seasonManole = seasonSummary(manoleRows);
+const pairManole = pair(manoleRows);
+const lengthsSorted = seasonManole.byYear.map((y) => y.days).sort((a, b) => a - b);
+const midLow = lengthsSorted[lengthsSorted.length / 2 - 1];
+const midHigh = lengthsSorted[lengthsSorted.length / 2];
+
+const typicalSpringDay = dayOfYear(pairManole.typical.last_spring);
+const typicalAutumnDay = dayOfYear(pairManole.typical.first_autumn);
+const springDays = manoleRows.map((r) => dayOfYear(r[1])).filter((d) => d !== null);
+const autumnDays = manoleRows.map((r) => dayOfYear(r[2])).filter((d) => d !== null);
+const springOnOrBefore = springDays.filter((d) => d <= typicalSpringDay).length;
+const autumnOnOrBefore = autumnDays.filter((d) => d <= typicalAutumnDay).length;
+const typicalDatesDiffDays = typicalAutumnDay - typicalSpringDay - 1;
+
+const safeSpringDay = dayOfYear(pairManole.safe.last_spring);
+const safeAutumnDay = dayOfYear(pairManole.safe.first_autumn);
+let springBreach = 0, autumnBreach = 0, eitherBreach = 0;
+for (const r of manoleRows) {
+  const s = dayOfYear(r[1]), a = dayOfYear(r[2]);
+  const sBad = s !== null && s > safeSpringDay;
+  const aBad = a !== null && a < safeAutumnDay;
+  if (sBad) springBreach++;
+  if (aBad) autumnBreach++;
+  if (sBad || aBad) eitherBreach++;
+}
+const neitherBreach = N - eitherBreach;
 
 test("двете страници нямат JavaScript", () => {
   for (const [name, html] of [["bg", bg], ["en", en]]) {
@@ -70,42 +119,82 @@ test("езикът на документа е обявен вярно", () => {
 });
 
 test("клетката и точката на Маноле стоят в изречението, което ги обяснява", () => {
-  assert.match(bg, /клетката е 42\.2, 24\.9, на 99 м/);
-  assert.match(en, /the cell is 42\.2, 24\.9, at an elevation of 99 m/);
+  const bgP = paragraphContaining(bg, "надморска височина");
+  const enP = paragraphContaining(en, "elevation of");
+  assert.ok(bgP.includes(`${manole.lat}, ${manole.lon}, на ${manole.elev} м`), "bg: клетката (от grid.json)");
+  assert.ok(enP.includes(`${manole.lat}, ${manole.lon}, at an elevation of ${manole.elev} m`), "en: клетката (от grid.json)");
+  // 152 м е височината на самата точка (Open-Meteo/Copernicus DEM за точния
+  // Маноле от брифа) — идва от отделен доставчик, не е в grid.json, затова
+  // остава документирана константа, не преизчислена стойност.
   assert.match(bg, /точката е ≈ 152 м/);
   assert.match(en, /the point is ≈ 152 m/);
 });
 
-// Рисковият пример е преизчислен от истинската мрежа (site/js/stats.js
-// riskAfter върху клетка 42.2/24.9): 1 от 30 години, 3 % — не 4/30, 13 %,
-// каквото беше в плана. Числата трябва да стоят В изречението, не някъде
-// другаде във файла (иначе замяна с невярно число пак минава).
-test("рисковият пример носи истинските числа за Маноле, в самото изречение", () => {
-  assert.match(bg, /в 1 от 30 години е имало слана след 20 април и преди 1 юли — 3\s?%/);
-  assert.match(en, /in 1 of 30 years there was frost after April 20 and before July 1 — 3%/);
+// Рисковият пример е преизчислен от истинската мрежа (riskAfter върху
+// клетка 42.2/24.9 от grid/grid.json, вижте изчисленията по-горе) — не
+// преписан на ръка. Числата трябва да стоят В абзаца с „Пример“, не някъде
+// другаде: прегледът замени датите само вътре в примерния абзац и старите
+// тестове пак минаха — paragraphContaining хваща точно това.
+test("рисковият пример носи истинските числа за Маноле, в самия примерен абзац", () => {
+  const bgP = paragraphContaining(bg, "Пример за Маноле");
+  const enP = paragraphContaining(en, "Example for Manole");
+  assert.ok(bgP.includes(`${risk.count} от ${risk.total} години`), `bg: очаквах ${risk.count} от ${risk.total}`);
+  assert.ok(bgP.includes(`${risk.percent} %`), `bg: очаквах ${risk.percent} %`);
+  assert.ok(bgP.includes("20 април"), "bg: датата на примера");
+  assert.ok(enP.includes(`${risk.count} of ${risk.total} years`), `en: очаквах ${risk.count} of ${risk.total}`);
+  assert.ok(enP.includes(`${risk.percent}%`), `en: очаквах ${risk.percent}%`);
+  assert.ok(enP.includes("April 20"), "en: датата на примера");
 });
 
-// Границите на „сигурна“ поотделно (3/30 напролет, 2/30 наесен, 25/30
-// нито едното) — преизчислени от истинската мрежа, не съчинена обща
-// „9 от 10“ статистика за двете граници наведнъж.
-test("границите на сигурната дата стоят поотделно, с истинските числа за Маноле", () => {
-  assert.match(bg, /в 3 от 30 години е имало слана след сигурната пролетна дата \(11 април\)/);
-  assert.match(bg, /в 2 от 30 — преди сигурната есенна \(30 октомври\)/);
-  assert.match(bg, /в 25 от 30 — нито едното, нито другото/);
-  assert.match(en, /3 of the 30 years had frost after the safe spring date \(April 11\)/);
-  assert.match(en, /2 of the 30 had frost before the safe autumn date \(October 30\)/);
-  assert.match(en, /25 of the 30 had neither/);
+// Границите на „сигурна“ поотделно (напролет/наесен/нито едното) —
+// преброени директно от годините на клетката, не съчинена обща „9 от 10“
+// статистика за двете граници наведнъж. В абзаца, който ги обяснява.
+test("границите на сигурната дата стоят поотделно, с истинските числа за Маноле, в изречението", () => {
+  const bgP = paragraphContaining(bg, "Двете граници са отделни статистики");
+  const enP = paragraphContaining(en, "The two boundaries are separate statistics");
+  assert.ok(bgP.includes(`${springBreach} от ${N} години е имало слана след сигурната пролетна дата (11 април)`), "bg: пролетна граница");
+  assert.ok(bgP.includes(`${autumnBreach} от ${N} — преди сигурната есенна (30 октомври)`), "bg: есенна граница");
+  assert.ok(bgP.includes(`${neitherBreach} от ${N} — нито едното, нито другото`), "bg: нито едното");
+  assert.ok(enP.includes(`${springBreach} of the ${N} years had frost after the safe spring date (April 11)`), "en: пролетна граница");
+  assert.ok(enP.includes(`${autumnBreach} of the ${N} had frost before the safe autumn date (October 30)`), "en: есенна граница");
+  assert.ok(enP.includes(`${neitherBreach} of the ${N} had neither`), "en: нито едното");
 });
 
-// 237 е медианата на годишните дължини (site/js/stats.js seasonSummary за
-// 42.2/24.9); 240 е каквото дава същата сметка приложена направо върху
-// двете типични дати — двете число трябва да стоят в изречението, което
-// обяснява разликата, не разпръснати другаде.
-test("237 стои в изречението, което го обяснява като медиана на годишните дължини", () => {
-  assert.match(bg, /истинската типична дължина — медианата на годишните дължини — е 237/);
-  assert.match(en, /the true typical length — the median of the yearly lengths — is 237/);
-  assert.match(bg, /29 март и 25 ноември, дава 240 дни/);
-  assert.match(en, /March 29 and November 25, gives 240 days/);
+// „Типичната“ не дели точно наполовина — реалният брой години „на или
+// преди“ границата, поотделно за пролет и есен, в абзаца, който го твърди.
+test("типичната дата дава истинския брой години „на или преди“ границата, не точно наполовина", () => {
+  const bgP = paragraphContaining(bg, "медианата на годините с данни за съответния сезон");
+  const enP = paragraphContaining(en, "median of the years with data for that season");
+  assert.ok(bgP.includes(`${springOnOrBefore} от ${N} години последната пролетна слана`), "bg: пролетта на/преди типичната");
+  assert.ok(bgP.includes(`${autumnOnOrBefore} от ${N} — първата есенна слана`), "bg: есента на/преди типичната");
+  assert.ok(enP.includes(`${springOnOrBefore} of the ${N} years had the last spring frost`), "en: пролетта на/преди типичната");
+  assert.ok(enP.includes(`${autumnOnOrBefore} of the ${N} had the first autumn frost`), "en: есента на/преди типичната");
+});
+
+// 237 е медианата на годишните дължини — при четен брой години (30),
+// средното на двете средни стойности (не „нищо не се осреднява“: точно
+// обратното, самата медиана тук Е средно). 240 е каквото дава същата
+// сметка, приложена направо върху двете типични дати. И четирите числа в
+// изречението, което ги обяснява.
+test("237, 240 и средните две годишни стойности стоят в изреченията, които ги обясняват", () => {
+  const bgTypicalP = paragraphContaining(bg, "средното на двете средни");
+  const enTypicalP = paragraphContaining(en, "average of the two middle ones");
+  assert.ok(bgTypicalP.includes(`(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} дни`), "bg: средното на двете средни");
+  assert.ok(enTypicalP.includes(`(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} days`), "en: средното на двете средни");
+
+  const bgExtremesP = paragraphContaining(bg, "Най-късата");
+  const enExtremesP = paragraphContaining(en, "shortest");
+  assert.ok(bgExtremesP.includes(`${seasonManole.shortest.days} дни, ${seasonManole.shortest.years[0]}`), "bg: най-късата година");
+  assert.ok(bgExtremesP.includes(`${seasonManole.longest.days} дни, ${seasonManole.longest.years[0]}`), "bg: най-дългата година");
+  assert.ok(enExtremesP.includes(`${seasonManole.shortest.days} days, ${seasonManole.shortest.years[0]}`), "en: shortest year");
+  assert.ok(enExtremesP.includes(`${seasonManole.longest.days} days, ${seasonManole.longest.years[0]}`), "en: longest year");
+
+  const bgHintP = paragraphContaining(bg, "Затова изваждането");
+  const enHintP = paragraphContaining(en, "That's why subtracting");
+  assert.ok(bgHintP.includes(`дава ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
+  assert.ok(bgHintP.includes(`е ${seasonManole.typical}`), "bg: 237 от медианата");
+  assert.ok(enHintP.includes(`gives ${typicalDatesDiffDays} days`), "en: 240 от типичните дати");
+  assert.ok(enHintP.includes(`is ${seasonManole.typical}`), "en: 237 от медианата");
 });
 
 test("началните страници водят към ръководството", () => {

@@ -8,7 +8,7 @@
 <meta name="description" content="What the dates, the chart, the periods, the risk and the two elevations on frost.bg mean.">
 <link rel="stylesheet" href="/css/app.css">
 </head>
-<body data-lang="en" data-page="guide">
+<body data-lang="en">
 <header class="top">
   <a class="brand" href="/en/">frost.bg</a>
   <a class="lang" href="/guide/">Български</a>
@@ -19,7 +19,7 @@
 
   <h2>The two pairs of dates</h2>
   <p>For any point, the page gives four dates: typical and safe for spring, typical and safe for autumn. The two seasons are computed separately — each from its own years with data, because a given cell can be missing spring dates only, or autumn dates only.</p>
-  <p>The <strong>typical</strong> date is the median of the years with data for that season: in spring it means "in half of them, the last frost was already over by that date"; in autumn, "in half of them, the first frost had already happened by that date." With an even number of years, the choice is conservative: the later of the two middle dates in spring, the earlier one in autumn.</p>
+  <p>The <strong>typical</strong> date is the median of the years with data for that season — close to "half the years," but not exactly: for Manole, 16 of the 30 years had the last spring frost on or before the typical date, and 16 of the 30 had the first autumn frost on or before the typical date too. With an even number of years, the choice is conservative: the later of the two middle dates in spring, the earlier one in autumn.</p>
   <p>The <strong>safe</strong> date is a percentile of the same years — the 90th in spring, the 10th in autumn. The two boundaries are separate statistics for separate seasons, not one combined promise: for Manole, 3 of the 30 years had frost after the safe spring date (April 11), 2 of the 30 had frost before the safe autumn date (October 30), and 25 of the 30 had neither.</p>
   <p>For Manole, over 30 years of data: typical March 29 / November 25, safe April 11 / October 30.</p>
   <p class="hint">Tip: in your first year at a new place, use the safe date — sowing a week later costs less than a frozen seedling.</p>
@@ -38,12 +38,12 @@
   <p>Example for Manole: in 1 of 30 years there was frost after April 20 and before July 1 — 3%.</p>
   <p>This is a historical frequency for this cell and this date, not a forecast for this year; frost <strong>on</strong> the date itself does not count — only after it.</p>
   <p>It answers for spring only: the first autumn frost before a given date says nothing about the days that follow.</p>
-  <p>The safe date works on the same idea, just with a fixed target instead of a date you pick — see how often it's breached at your cell in "The two pairs of dates" above.</p>
+  <p>The safe date works on the same idea, just with a fixed target instead of a date you pick — for your own point, use the "Risk of frost after a date" control on the results page.</p>
 
   <h2>The frost-free season</h2>
   <p>For each of the 30 years separately, the frost-free season length is computed — the days between that year's last spring frost and first autumn frost, not counting either frost day.</p>
-  <p>The typical length is the median of those 30 yearly values; the shortest and longest are the smallest and largest of them. Nothing is averaged.</p>
-  <p class="hint">That's why subtracting the two typical dates gives a different number: the same calculation, applied directly to March 29 and November 25, gives 240 days, while the true typical length — the median of the yearly lengths — is 237. The median of the differences is not the difference of the medians.</p>
+  <p>The typical length is the median of those 30 yearly values — with an even number of years, the median is the average of the two middle ones: for Manole, (236 + 238) / 2 = 237 days. The shortest (194 days, 1997) and longest (281 days, 2023) are real, individual years, not a calculation.</p>
+  <p class="hint">That's why subtracting the two typical dates gives a different number: the same calculation, applied directly to March 29 and November 25, gives 240 days, while the median of the yearly lengths is 237. The median of the differences is not the difference of the medians.</p>
 
   <h2>The two elevations</h2>
   <p>The grid cell is about 9 km across and has its own average elevation. For Manole the cell is 42.2, 24.9, at an elevation of 99 m.</p>
