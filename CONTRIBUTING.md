@@ -2,6 +2,8 @@
 
 ## Локален пуск
 
+Иска се **Node 24.21.0** (`AGENTS.md`):
+
 ```bash
 npm install
 npm run dev
@@ -29,12 +31,11 @@ npm test
 мрежата и на CDS инструментите. Същото се пуска в CI при всеки push и pull
 request — PR не се приема с червено CI.
 
-**Без venv-а CDS частта минава незабелязано пропусната, не проверена.**
-`test:cds` (`package.json`) пуска `grid/tests_cds.py` през
-`grid/.venv-cds/bin/python`, ако е изпълним файл, иначе през системния
-`python3`; самият тест **пропуска тихо с изход 0** („пропуснато: няма
-netCDF4“), щом стартиралият го интерпретатор — без значение кой от двата —
-не може да внесе `netCDF4`.
+**CDS тестовете се пропускат, когато избраният интерпретатор не може да
+внесе `netCDF4`.** `test:cds` (`package.json`) пуска `grid/tests_cds.py`
+през `grid/.venv-cds/bin/python`, ако е изпълним файл, иначе през
+системния `python3`; самият тест **пропуска тихо с изход 0** („пропуснато:
+няма netCDF4“) точно в този случай.
 
 Завършен пробег не е същото като успешен пробег: редът с бройки в края —
 „NN успешни, M неуспешни“ (`grid/tests_cds.py`) — доказва, че CDS тестовете
@@ -107,6 +108,8 @@ netCDF4“), щом стартиралият го интерпретатор —
 
 ## Running locally
 
+Needs **Node 24.21.0** (`AGENTS.md`):
+
 ```bash
 npm install
 npm run dev
@@ -134,12 +137,11 @@ page's tests (`node --test "site/js/*.test.js"`) and the Python tests for
 the grid and the CDS tooling. The same runs in CI on every push and pull
 request — a PR is not merged with red CI.
 
-**Without the venv, the CDS part goes unnoticed as skipped, not checked.**
-`test:cds` (`package.json`) runs `grid/tests_cds.py` through
+**The CDS tests are skipped whenever the selected interpreter can't import
+`netCDF4`.** `test:cds` (`package.json`) runs `grid/tests_cds.py` through
 `grid/.venv-cds/bin/python` if that's an executable file, else through the
 system `python3`; the test itself **skips silently with exit code 0**
-("пропуснато: няма netCDF4") whenever the interpreter that ran it —
-whichever of the two — can't import `netCDF4`.
+("пропуснато: няма netCDF4") exactly in that case.
 
 A completed run is not the same as a passing run: the totals line at the
 end — "NN успешни, M неуспешни" (`grid/tests_cds.py`) — proves the CDS
