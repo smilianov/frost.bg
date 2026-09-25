@@ -8,6 +8,94 @@
 
 ---
 
+## [0.3.3] — 2026-09-25
+
+### 🇧🇬 Български
+
+#### Ръководството и документацията след читателски преглед
+
+- **Съветът за сеитба вече не омекотява предупреждението.** „Една седмица
+  по-късна сеитба“ звучеше като достатъчно отместване, а за Маноле разликата
+  между типичната и сигурната пролетна дата е **13 дни**; текстът казва и че
+  тази дата не обещава, че слана повече няма да има. Числото се смята от
+  мрежата в `site/js/guide.test.js`, не се преписва.
+- **Сезонът без слана следва избрания период.** Ръководството го описваше
+  като неизменно сметнат от 30 години, а той се смята от годините с данни в
+  избрания период (10, 20 или 30). Добавено е и как се брои дължината, когато
+  за годината липсва пролетна или есенна дата, и че календарът е 365-дневен.
+- **Персентилът не е обещание за 9 от 10 години.** В `docs/{bg,en}/README.md`
+  сигурната дата вече се описва като „в поне 90% от включените години със
+  записана слана за този сезон“ — две отделни исторически граници, и всеки
+  сезон ползва наличните си дати, които може да са по-малко от приетите години.
+- **Една височина за едно място.** Примерът за `/api/v1/elevation` в
+  `api.md` ползваше координатите на Маноле с `350` м, докато ръководството
+  казва ≈ 152 м. Числото е поправено на **152**, а нов тест чете височината от
+  ръководството и иска същата в двата `api.md`.
+- **Командите за мрежата са алтернативи, не стъпки.** `--synthetic` и
+  `--finish` презаписват `grid/grid.json`, който сайтът чете; блоковете в
+  README-тата и в `operations.md` вече го казват, заедно с `--out` за отделна
+  проба.
+- **Deploy-ът проверява това, което обещава.** Командата започва с
+  `import netCDF4` във venv-а (пропуснати CDS тестове с изход 0 вече не минават
+  за зелено) и включва `npm run check:links`.
+- **Open-Meteo има три роли, не две** — липсваше височината на самата избрана
+  точка, зависимост по време на работа със свой бюджет и свои откази.
+- **Още поправени твърдения:** „всеки януари помества с една година“ (периодът
+  се избира при ръчното преизчисляване); изтичането на браузърния кеш не е
+  автоматична повторна проверка; десетминутният отказ на `/elevation` не значи
+  502 за всяка заявка (успешният кеш се проверява преди маркера); 405 важи за
+  всеки `/api/*` път, защото проверката на метода предхожда маршрутизирането;
+  `elevation_m` разделя `null`, `0` и отрицателна стойност; таймаутът за
+  височината е 8 секунди; `years_used` вече е определен; `grid.json` СЕ
+  преизчислява след промяна в статистиката — забранено е ръчното редактиране на
+  числата; и пътят от одобрен PR до публикуван main е описан, с препратка към
+  `AGENTS.md` за самите команди.
+
+### 🇬🇧 English
+
+#### The guide and the documentation after a reader-level review
+
+- **The sowing tip no longer softens its own warning.** "Sowing a week later"
+  read like a sufficient offset, while for Manole the gap between the typical
+  and the safe spring date is **13 days**; the text now also says this date does
+  not promise that frost is over. The number is computed from the grid in
+  `site/js/guide.test.js`, not copied by hand.
+- **The frost-free season follows the selected period.** The guide described it
+  as always computed from 30 years; it is computed from the years with data in
+  the selected period (10, 20 or 30). It now also explains how the length is
+  counted when a year's spring or autumn date is missing, and that the calendar
+  has 365 days.
+- **The percentile is not a promise of 9 in 10 years.** In
+  `docs/{bg,en}/README.md` the safe date is now "at least 90% of the included
+  years with recorded frost for that season" — two separate historical
+  boundaries, and each season uses its available dates, which may be fewer than
+  the accepted years.
+- **One elevation per place.** The `/api/v1/elevation` example in `api.md` used
+  Manole's coordinates with `350` m while the guide says ≈ 152 m. The number is
+  now **152**, and a new test reads the elevation from the guide and requires
+  the same in both `api.md` files.
+- **The grid commands are alternatives, not steps.** `--synthetic` and
+  `--finish` overwrite `grid/grid.json`, which the site reads; the blocks in the
+  READMEs and in `operations.md` now say so, together with `--out` for a
+  separate experiment.
+- **The deploy checks what it promises.** The command starts with
+  `import netCDF4` in the venv (skipped CDS tests with exit code 0 no longer
+  pass for green) and includes `npm run check:links`.
+- **Open-Meteo has three roles, not two** — the elevation of the selected point
+  itself was missing, a runtime dependency with its own budget and failures.
+- **Other corrected statements:** "shifts by one year every January" (the period
+  is chosen during the manual recomputation); browser cache expiry is not an
+  automatic re-check; the ten-minute refusal on `/elevation` does not mean a 502
+  for every request (a successful cache entry is checked before the marker); 405
+  applies to any `/api/*` path because the method check precedes routing;
+  `elevation_m` separates `null`, `0` and a negative value; the elevation
+  timeout is eight seconds; `years_used` is now defined; `grid.json` IS
+  regenerated after a change in the statistics — what is forbidden is editing
+  its numbers by hand; and the path from an approved PR to a published main is
+  described, pointing to `AGENTS.md` for the commands themselves.
+
+---
+
 ## [0.3.2] — 2026-09-25
 
 ### 🇧🇬 Български

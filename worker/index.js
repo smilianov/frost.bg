@@ -19,7 +19,7 @@ const WEEK = "public, max-age=300, s-maxage=604800";
 // Локален const, НЕ export: workerd разгръща export-ите на входния модул
 // като handler обекти или функции/класове конструктори — низ не отговаря на
 // нито едното и чупи `wrangler dev` (виж бележката накрая на файла).
-const APP_VERSION = "0.3.2";
+const APP_VERSION = "0.3.3";
 
 export function json(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
