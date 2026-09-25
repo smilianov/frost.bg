@@ -1,8 +1,9 @@
 """Тестове за четенето от Copernicus CDS (NetCDF) и fetch_cds (без мрежа) —
 пускат се с: .venv-cds/bin/python tests_cds.py
 
-Ако netCDF4 не е наличен (значи venv-ът grid/.venv-cds не е бил активиран),
-тестът пропуска тихо с изход 0, за да не чупи `npm test` на машина без venv-а.
+Ако интерпретаторът, който го стартира, не може да внесе netCDF4 (най-често,
+защото не е python-ът на venv-а grid/.venv-cds), тестът пропуска тихо с
+изход 0, за да не чупи `npm test` на машина без venv-а.
 """
 import copy, io, json, os, struct, sys, tempfile, types, zipfile
 from datetime import date, timedelta

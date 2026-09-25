@@ -8,6 +8,107 @@
 
 ---
 
+## [0.3.2] — 2026-09-25
+
+### 🇧🇬 Български
+
+#### Ръководство на сайта
+
+- **`/guide` и `/en/guide`** — осем кратки раздела: двете двойки дати,
+  графиката, периодите 10/20/30 години, рискът след дата, сезонът без
+  слана, двете височини, откъде са числата, защо не съвпада с
+  наблюденията. Статични страници, без JavaScript; връзка от футъра на
+  двете начални страници (и обратно), двуезично.
+- **Контрастът на футъра — навсякъде, не само на новите страници.** Общото
+  правило `.foot { opacity: 0.75 }` композираше и връзките в него: за
+  `--accent` върху `--paper` това мереше ≈3.04:1 на светла тема, под
+  изискваните 4.5:1 за нормален текст. Премахнато изцяло от споделеното
+  правило — важи и за двете начални страници, не само за ръководството:
+  връзките вече носят чистия `--accent`, ≈4.80:1 на светла тема, ≈8.40:1
+  на тъмна.
+
+#### За разработчици
+
+- **`docs/bg/architecture.md`, `docs/en/architecture.md`** — как е
+  устроен проектът: мрежата, Worker-ът, кешът, страницата, средите,
+  тестовете и пътят на една заявка `GET /api/v1/frost`.
+- **`CONTRIBUTING.md`** — локален пуск, тестове, правилото за промените,
+  прегледите, езиковите правила, мрежата не се редактира на ръка, нови
+  зависимости в Worker-а не се приемат.
+- **Проверка на връзките в CI** (`npm run check:links`,
+  `scripts/check_links.mjs`) — минава през README-тата, `CONTRIBUTING.md`,
+  `docs/**/*.md` и `site/**/*.html`. Разпознава Markdown връзките и
+  кавичните `href`/`src` и проверява дали пътят им съществува
+  (относителните — спрямо файла, адресите с „/“ — спрямо `site/`, след
+  нормализиране на `.`/`..`); пропуска `/api/*` (маршрут на Worker-а, не
+  файл) и външните връзки (без мрежа в CI). По правило връзка ИЗВЪН ограден
+  блок или се проверява, или излиза като проблем с файл и ред, и проверката
+  пада — пример, който не бива да се проверява, влиза в ограден блок. Това
+  НЕ е гаранция: проверката е евристика, не parser — при
+  преплетени огради и HTML коментари файлът пада шумно (разминаването между
+  двата анализа на оградите е диагностика), но една връзка в него може да
+  остане непроверена, а чист ограден блок не е достатъчен, ако съседният
+  съдържа парче от HTML коментар. Приетите граници: reference-style връзките
+  (`[текст][ref]`) не се разпознават и не дават диагностика; заглавие в
+  кавички с квадратна скоба вътре е „Неразпознато“ (в кръгли скоби — не);
+  „#котва“ не се проверява, само целевият файл; измерени тихи случаи, които
+  остават описани, а не поправени — адрес, завършващ с точков сегмент върху
+  файл, и привидни оградни редове вътре в HTML блок. Адрес в `<…>` се
+  поддържа,
+  включително с интервали и скоби; външни са адресите с URI схема и
+  protocol-relative адресите (`//example.com/…`).
+
+### 🇬🇧 English
+
+#### Site guide
+
+- **`/guide` and `/en/guide`** — eight short sections: the two pairs of
+  dates, the chart, the 10/20/30-year periods, the risk after a date, the
+  frost-free season, the two elevations, where the numbers come from, why
+  it doesn't match what you see. Static pages, no JavaScript; linked from
+  both home pages' footers (and back), bilingual.
+- **Footer contrast — sitewide, not just on the new pages.** The shared
+  `.foot { opacity: 0.75 }` rule composited the links in it too: for
+  `--accent` over `--paper` that measured ≈3.04:1 in the light theme,
+  below the 4.5:1 required for normal text. Removed entirely from the
+  shared rule — it applies to both home pages too, not just the guide:
+  the links now carry the plain `--accent`, ≈4.80:1 in the light theme,
+  ≈8.40:1 in dark.
+
+#### For contributors
+
+- **`docs/bg/architecture.md`, `docs/en/architecture.md`** — how the
+  project is put together: the grid, the Worker, the cache, the page, the
+  environments, the tests, and the path of one `GET /api/v1/frost`
+  request.
+- **`CONTRIBUTING.md`** — running locally, tests, the rule for changes,
+  reviews, language rules, the grid is not hand-edited, new dependencies
+  in the Worker are not accepted.
+- **Link checker in CI** (`npm run check:links`,
+  `scripts/check_links.mjs`) — walks the READMEs, `CONTRIBUTING.md`,
+  `docs/**/*.md` and `site/**/*.html`. It recognizes Markdown links and
+  quoted `href`/`src` and checks whether their path exists (relative ones
+  against the file, `/`-prefixed ones against `site/`, after normalizing
+  `.`/`..`); skips `/api/*` (a Worker route, not a file) and external links
+  (no network in CI). As a rule, a link OUTSIDE a fenced block is either
+  checked or comes out as a problem with file and line, and the check fails —
+  an example that must not be checked goes in a fenced block. This is NOT a
+  guarantee: the check is a heuristic, not a parser —
+  with interleaved fences and HTML comments the file fails noisily (a
+  disagreement between the two fence analyses is itself a diagnostic), but
+  one link in it may go unchecked, and a clean fenced block is not enough if
+  a neighbouring one holds a piece of an HTML comment. The accepted
+  boundaries: reference-style links (`[text][ref]`) are neither recognized
+  nor reported; a quoted title with a square bracket in it is „Неразпознато“
+  (one in parentheses is not); a "#fragment" is not checked, only the target
+  file; and the measured silent cases that stay described rather than fixed —
+  an address ending in a dot segment on top of a file, and fence-looking
+  lines inside an HTML block. An address in `<…>` is supported, spaces and parentheses included;
+  external are addresses with a URI scheme and protocol-relative ones
+  (`//example.com/…`).
+
+---
+
 ## [0.3.1] — 2026-09-24
 
 ### 🇧🇬 Български

@@ -38,10 +38,15 @@ npm test
 | Страница | Съдържание |
 |---|---|
 | [`docs/bg/README.md`](docs/bg/README.md) | какво е frost.bg, откъде са данните, какво значи „типична“/„сигурна“ дата |
-| [`docs/bg/api.md`](docs/bg/api.md) | API v1 — трите адреса, параметри, примерни отговори, грешки, кеш и CORS |
+| [`docs/bg/api.md`](docs/bg/api.md) | API v1 — четирите адреса, параметри, примерни отговори, грешки, кеш и CORS |
+| [`docs/bg/architecture.md`](docs/bg/architecture.md) | как е устроен проектът: мрежата, Worker-ът, кешът, страницата, средите и тестовете |
 | [`docs/bg/operations.md`](docs/bg/operations.md) | как се смята и подновява мрежата, локален пуск, тестове, кешът, какво липсва за deploy |
+| [Ръководството на сайта](https://frost.bg/guide/) | как се четат датите, графиката и рискът — за хора, не за разработчици |
 
-Английските им близнаци: [`docs/en/`](docs/en/README.md).
+Английските им близнаци: [`docs/en/`](docs/en/README.md) и
+[английското ръководство](https://frost.bg/en/guide/).
+
+Искаш ли да предложиш промяна — [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Спецификация
 

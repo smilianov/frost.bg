@@ -36,7 +36,8 @@ npm test
 ```
 
 Пуска подред: тестовете на Worker-а (`node --test "worker/*.test.js"`), на страницата
-(`node --test "site/js/*.test.js"`), питоновите тестове на мрежата
+(`node --test "site/js/*.test.js"`), на скриптовете (`node --test
+"scripts/*.test.js"`), питоновите тестове на мрежата
 (`cd grid && python3 tests_frost.py && python3 tests_grid.py`) и тестовете
 на CDS инструментите (`tests_cds.py` — през venv-а `grid/.venv-cds`, ако го
 има, иначе през системния `python3`). `grid/grid.json` се проверява при
