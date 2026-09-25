@@ -4,14 +4,24 @@
 // ("/css", "/css/", относително "css/"); reference-style Markdown, HTML в
 // Markdown и многоредов href бяха невидими за парсъра.
 //
-// Кръг 2: HTML в Markdown продължава да се брои, но само извън inline code
-// span-ове и HTML коментари (иначе `` `<a href="/missing">` `` в проза се
-// брои като жива връзка); `data-href` вече не съвпада с `href`; адрес с
-// крайно "/" към файл (не директория) е мъртъв (ENOTDIR); процентно
-// кодирани адреси се разрешават правилно; липсващ корен или дърво без нито
-// една връзка провалят проверката, вместо да минат тихо през 0/0.
-// Reference-style Markdown е махнат изцяло — хранилището няма нито един
-// такъв случай, а коректното му разпознаване иска истински parser.
+// Кръг 2: HTML в Markdown продължава да се брои; `data-href` вече не
+// съвпада с `href`; адрес с крайно "/" към файл (не директория) е мъртъв
+// (ENOTDIR); процентно кодирани адреси се разрешават правилно; липсващ
+// корен или дърво без нито една връзка провалят проверката, вместо да
+// минат тихо през 0/0. Reference-style Markdown е махнат изцяло —
+// хранилището няма нито един такъв случай, а коректното му разпознаване
+// иска истински parser.
+//
+// Кръг 2 добави и редакция на inline code span-ове/HTML коментари, за да
+// не се броят примери в проза — но кръг 3 я МАХНА: `<!-- ` --> [счупена
+// връзка](...) `код` ` показа, че единична обратна кавичка в коментар се
+// сдвоява с обратната кавичка на съвсем друг inline code span по-надолу и
+// изяжда истинска връзка между тях — тих фалшив негатив, единственото
+// недопустимо нещо за този инструмент. Сега се редактират само ```-огради
+// (котвени за реда, без такъв риск); всичко друго, включително вътре в
+// `inline code` и <!-- коментари -->, се брои. `href`/`src` вече изисква
+// истинска позиция на атрибут (предхожда го `\s`), не само "не буква/тире"
+// — `<div title='href="/x"'>` вече не съвпада.
 //
 // Всеки тест си строи собствена временна фикстура (mkdtempSync) — не пипа
 // истинското дърво и не оставя следа след себе си.
@@ -137,26 +147,23 @@ test("href, чиято стойност е на следващия ред спр
   }
 });
 
-// --- Находки от кръг 2 ----------------------------------------------------
+// --- Находки от кръг 3: без inline-code/коментар редакция ----------------
 
-test("inline code span не се брои като връзка — нито добра, нито счупена цел", () => {
-  const base = fixture({ "README.md": "[база](docs/base.md)", "docs/base.md": "x" });
-  const withInlineCode = fixture({
+test("inline code span СЕ брои като връзка — счупена цел вътре в `код` се хваща", () => {
+  const root = fixture({
     "README.md": '[база](docs/base.md)\n\nПрозата споменава `<a href="/missing.html">пример</a>` в текста.',
     "docs/base.md": "x",
   });
   try {
-    const baseResult = checkTree(base);
-    const result = checkTree(withInlineCode);
-    assert.equal(result.checked, baseResult.checked, "inline code не трябва да вдига броя");
-    assert.deepEqual(result.dead, []);
+    const { dead } = checkTree(root);
+    assert.equal(dead.length, 1, JSON.stringify(dead));
+    assert.equal(dead[0].target, "/missing.html");
   } finally {
-    cleanup(base);
-    cleanup(withInlineCode);
+    cleanup(root);
   }
 });
 
-test("```-ограден код не се брои като връзка", () => {
+test("```-ограден код не се брои като връзка (единствената редакция, останала в кръг 3)", () => {
   const base = fixture({ "README.md": "[база](docs/base.md)", "docs/base.md": "x" });
   const withFence = fixture({
     "README.md": [
@@ -179,26 +186,56 @@ test("```-ограден код не се брои като връзка", () =>
   }
 });
 
-test("HTML коментар не се брои като връзка — нито в Markdown, нито в HTML файл", () => {
-  const baseMd = fixture({ "README.md": "[база](docs/base.md)", "docs/base.md": "x" });
+test("HTML коментар СЕ брои като връзка — нито в Markdown, нито в HTML файл не се прескача", () => {
   const withCommentInMd = fixture({
     "README.md": '[база](docs/base.md)\n\n<!-- <a href="/missing.html">старо</a> -->',
     "docs/base.md": "x",
   });
-  const baseHtml = fixture({ "site/index.html": '<a href="/">начало</a>' });
   const withCommentInHtml = fixture({
     "site/index.html": '<a href="/">начало</a>\n<!-- <a href="/missing.html">старо</a> -->',
   });
   try {
-    assert.equal(checkTree(withCommentInMd).checked, checkTree(baseMd).checked);
-    assert.deepEqual(checkTree(withCommentInMd).dead, []);
-    assert.equal(checkTree(withCommentInHtml).checked, checkTree(baseHtml).checked);
-    assert.deepEqual(checkTree(withCommentInHtml).dead, []);
+    const md = checkTree(withCommentInMd);
+    assert.equal(md.dead.length, 1, JSON.stringify(md.dead));
+    assert.equal(md.dead[0].target, "/missing.html");
+    const html = checkTree(withCommentInHtml);
+    assert.equal(html.dead.length, 1, JSON.stringify(html.dead));
+    assert.equal(html.dead[0].target, "/missing.html");
   } finally {
-    cleanup(baseMd);
     cleanup(withCommentInMd);
-    cleanup(baseHtml);
     cleanup(withCommentInHtml);
+  }
+});
+
+test("коментар с обратна кавичка не изяжда съседна Markdown връзка (репродукцията от ревюто)", () => {
+  // <!-- ` --> [счупена](...) `код` — единичната обратна кавичка в
+  // коментара по-рано се сдвояваше с тази на `код` и изяждаше връзката
+  // между тях, докато скриптът докладваше "0 мъртви връзки".
+  const root = fixture({
+    "README.md": "Текст <!-- ` --> [счупена](/missing.html) `код`\n",
+  });
+  try {
+    const { dead } = checkTree(root);
+    assert.equal(dead.length, 1, JSON.stringify(dead));
+    assert.equal(dead[0].target, "/missing.html");
+  } finally {
+    cleanup(root);
+  }
+});
+
+test("`href` вътре в стойността на друг атрибут не съвпада (не е реална позиция)", () => {
+  const root = fixture({
+    "site/index.html": [
+      '<a href="/">начало</a>',
+      '<div title=\'href="/missing.html"\'>x</div>',
+    ].join("\n"),
+  });
+  try {
+    const { checked, dead } = checkTree(root);
+    assert.equal(checked, 1, "само истинският href, не подниз в друг атрибут");
+    assert.deepEqual(dead, []);
+  } finally {
+    cleanup(root);
   }
 });
 

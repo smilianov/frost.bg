@@ -44,10 +44,14 @@ CDS инструментите. Същото се пуска в CI при все
 са и **минали**, личи по `M` — нула неуспешни.
 
 `npm run check:links` (пуска се и в CI, след `npm test`) проверява
-вътрешните връзки в документацията и сайта — нарочно тесен обхват: не
-разпознава reference-style Markdown връзки (`[текст][ref]`), `href`/`src`
-без кавички, нито дали „#котва“ действително съществува в целевия файл
-(само че самият файл го прави).
+вътрешните връзки в документацията и сайта — **проверява всяка Markdown
+връзка и всеки кавичен `href`/`src`, включително вътре в `inline code` и
+вътре в `<!-- HTML коментари -->`** (тих пропуск е единственото недопустимо
+за този инструмент; шумен фалшив резултат е поносим). Единственото място,
+което скриптът наистина не пипа, е ```-ограден код — там, ако искаш пример,
+който да не се проверява. Не разпознава reference-style Markdown връзки
+(`[текст][ref]`), `href`/`src` без кавички, нито дали „#котва“ действително
+съществува в целевия файл (само че самият файл го прави).
 
 ## Версия
 
@@ -164,10 +168,15 @@ tests actually **ran** (as opposed to being skipped); whether they also
 **passed** shows in `M` — zero failures.
 
 `npm run check:links` (also runs in CI, after `npm test`) checks the
-internal links in the documentation and the site — deliberately narrow
-scope: it does not recognize reference-style Markdown links
-(`[text][ref]`), unquoted `href`/`src`, or whether a "#fragment" actually
-exists in the target file (only that the file itself does).
+internal links in the documentation and the site — **it checks every
+Markdown link and every quoted `href`/`src`, including inside `inline
+code` and inside `<!-- HTML comments -->`** (a silent miss is the one
+outcome this tool does not allow; a noisy false positive is acceptable).
+The only thing it truly leaves alone is fenced ```code``` blocks — put an
+example there if it must not be checked. It does not recognize
+reference-style Markdown links (`[text][ref]`), unquoted `href`/`src`, or
+whether a "#fragment" actually exists in the target file (only that the
+file itself does).
 
 ## Version
 
