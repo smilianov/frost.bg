@@ -75,6 +75,13 @@ and last of the 30 years; `synthetic` — `true` while the grid is from
 from the `/api/v1/` path), distinct from `app_version` in `/api/v1/config`
 below (the application's own version).
 
+`years_used` is the number of accepted years — those with at least 300 valid
+days — and equals the number of rows in `years`. Each row is `[year,
+last_spring_frost, first_autumn_frost]` with `MM-DD` dates; a seasonal `null`
+means no frost was recorded in the available data for that half of the year.
+Such a year counts toward `years_used` but not toward the percentile for the
+missing seasonal date; a rejected year has no row.
+
 `source` follows **the grid's origin** (`source_id` in `grid.json`, see
 `/config`), not an assumption — always the four keys `bg`, `en`, `url`,
 `attribution`:
@@ -113,15 +120,16 @@ provider is asked about too.
 Provider: [Open-Meteo Elevation](https://open-meteo.com/en/docs/elevation-api)
 (Copernicus DEM GLO-90, ~90 m resolution) — a different terrain model from
 ERA5-Land (the grid behind `/frost`), so this elevation and `cell.elev_m`
-can differ noticeably. A deadline over the request **and** reading the
-body, a format check, **no automatic retries**.
+can differ noticeably. The combined timeout for the request **and** reading
+its body is eight seconds; the response shape is validated, **with no
+automatic retries**.
 
 Example — `GET /api/v1/elevation?lat=42.18425&lon=24.92936`:
 
 ```json
 {
   "query": {"lat": 42.184, "lon": 24.929},
-  "elevation_m": 350,
+  "elevation_m": 152,
   "source": {
     "bg": "Copernicus DEM GLO-90 през Open-Meteo",
     "en": "Copernicus DEM GLO-90 via Open-Meteo",
@@ -132,9 +140,9 @@ Example — `GET /api/v1/elevation?lat=42.18425&lon=24.92936`:
 }
 ```
 
-`elevation_m` is rounded to a whole metre; a missing value is explicitly
-`null`, never `0` — zero is a valid elevation (sea level or below it) and
-must not be confused with no data. `source` carries attribution to both
+`elevation_m` is rounded to a whole metre: `null` means a missing value, `0`
+means sea level, and a negative number means an elevation below it. A missing
+value is explicitly `null`, never `0`. `source` carries attribution to both
 Copernicus and Open-Meteo — the same fixed four keys `bg`, `en`, `url`,
 `attribution`, independent of the grid's `source_id` (unlike `sourceLabel`
 in `/frost` above).
@@ -218,7 +226,7 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.2",
+  "app_version": "0.3.3",
   "elevation": true
 }
 ```
@@ -249,13 +257,15 @@ secret. Exactly these keys:
   elevation. Just like the map/geocoder, this value **is** part of
   `/config`'s cache revision below (its own `configRev()`, separate from
   `/frost`/`/geocode`) — flipping the switch reaches the edge immediately
-  on a new deploy, browsers within 5 minutes (see
-  [`operations.md`](operations.md)).
+  on a new deploy. The browser receives the change on its next request after
+  the cached copy expires (5 minutes); an open page does not recheck
+  `/config` automatically (see [`operations.md`](operations.md)).
 
 Caching: `Cache-Control: public, max-age=300, s-maxage=86400`; the edge key
 carries a revision, so a change of map/geocoder or a new grid reaches the
-edge immediately on a new rev, and browsers within 5 minutes (see
-[`operations.md`](operations.md)).
+edge immediately on a new rev. The browser receives the change on its next
+request after the cached copy expires (5 minutes); an open page does not
+recheck `/config` automatically (see [`operations.md`](operations.md)).
 
 ## Errors
 
@@ -272,8 +282,8 @@ One body shape for every error, in both languages:
 | `bad_query` | 400 | `/geocode`: `q` under 2 characters |
 | `geocoder_failed` | 502 | `/geocode`: the provider didn't respond or its response was malformed |
 | `elevation_failed` | 502 | `/elevation`: the provider didn't respond, its response was malformed, or it's in a short refusal after an earlier 429/5xx |
-| `not_found` | 404 | unknown `/api/*` path, or `/elevation` when `ELEVATION = "off"` |
-| `not_found` | 405 | a method other than `GET`/`OPTIONS` on a known `/api/*` path — the response also carries `Allow: GET, OPTIONS` |
+| `not_found` | 404 | `GET` to an unknown `/api/*` path, or to `/elevation` when `ELEVATION = "off"` |
+| `not_found` | 405 | a method other than `GET`/`OPTIONS` on any `/api/*` path (the method check precedes routing) — the response also carries `Allow: GET, OPTIONS` |
 
 Error responses always carry `Cache-Control: no-store` — they never enter
 the cache.

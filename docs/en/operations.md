@@ -140,6 +140,13 @@ still present, defined everywhere. Expected, not a bug.
 
 ### The helper path: Open-Meteo (probes and cross-check)
 
+The commands below are ALTERNATIVES, not consecutive steps. Without `--out`
+they work in the `grid/` directory: `--synthetic` replaces `grid/grid.json`
+with a sample grid, while `--finish` replaces it with the cells available in
+`cells.jsonl`, even when fewer than all 2,080 are there. For a separate
+experiment, pass an existing directory with `--out`; the site keeps reading
+`grid/grid.json`.
+
 ```bash
 python3 grid/compute_grid.py                  # point by point, resumes after interruption
 python3 grid/compute_grid.py --synthetic       # a plausible grid without network access, for development
@@ -177,8 +184,10 @@ s-maxage=86400` (`/frost`, `/config`) and `…, s-maxage=604800`
 (`/geocode`): `s-maxage` is for the edge (the Cache API honours it) — a
 day, respectively a week; `max-age` is for the browser — **5 minutes**.
 The browser knows nothing about the revision in the key below, so its
-lifetime is deliberately short: after a configuration or grid change the
-edge is fresh immediately, and browsers revalidate within 5 minutes.
+lifetime is deliberately short: with a new revision, the next request to the
+edge already uses the new key. A browser may use its old copy until its own 5
+minutes expire, but **expiry does not send a request by itself** — an open page
+loads `/config` again when reloaded.
 
 **The key carries a revision.** The cache survives deploys, so the key
 includes, as its first parameter `rev=`, four things:
@@ -186,7 +195,8 @@ includes, as its first parameter `rev=`, four things:
 effective geocoder` (URL-encoded; effective = what `/api/v1/config`
 reports: `google` only with its key present, otherwise `osm` /
 `openmeteo`). Consequences — everywhere below, "a fresh cache" means:
-**edge — immediately on a new rev; browsers — within 5 minutes**:
+**edge — immediately on a new rev; a browser — on its next request, after its
+cached copy expires (up to 5 minutes)**:
 
 - a deploy with a **new version** (`APP_VERSION` in `worker/index.js`,
   `package.json`, the changelog) = a fresh cache;
@@ -209,8 +219,8 @@ reports: `google` only with its key present, otherwise `osm` /
   unlike `GOOGLE_MAPS_KEY` above: `/config` (and only `/config`) caches
   under its own revision, `configRev()` in `worker/index.js` — the same
   foursome plus the switch. The change reaches the edge immediately on a
-  new deploy (a new rev), and browsers within 5 minutes, exactly like a
-  `MAP`/`GEOCODER` change. `/frost` and `/geocode` don't report
+  new deploy (a new rev), and a browser on its next request after its copy
+  expires (up to 5 minutes), exactly like a `MAP`/`GEOCODER` change. `/frost` and `/geocode` don't report
   `elevation` and don't depend on it, so their `cacheRev()` stays
   unchanged — only `/config` carries the extra element. `/api/v1/elevation`
   itself carries its **own**, entirely separate `rev` (see the next
@@ -229,8 +239,11 @@ doesn't specifically protect this budget upstream to Open-Meteo — so the
 endpoint keeps its own, stricter safeguard:
 
 - **A short refusal after a 429 or 5xx from the provider**: 10 minutes,
-  during which the endpoint returns `502 elevation_failed` without asking
-  Open-Meteo at all. Kept at **two levels**:
+  during which the endpoint returns `502 elevation_failed` **on a cache miss**,
+  without asking Open-Meteo at all. A successful cache entry is checked BEFORE
+  the refusal marker, so an already cached point keeps returning 200 — when
+  diagnosing, a mix of successful and failing responses is expected, not a sign
+  of something else. Kept at **two levels**:
   - `worker/elevation.js` keeps a fast local safeguard — a plain module
     variable (`cooldownUntil`), checked before every request;
   - the route in `worker/index.js` also keeps **its own marker in the
@@ -315,10 +328,18 @@ Tokens.
 
 ### How to deploy
 
+Before deploying: Node 24.21.0 and Python 3.12, with
+`grid/requirements-cds.txt` installed in the venv, and run the checks as
+non-root. Continue only after the CDS tests actually run with zero failures and
+`check:links` passes — skipped CDS tests with exit code 0 are not sufficient
+(see "A completed run is not the same as a passing run" in `CONTRIBUTING.md`).
+The deploy chain starts with a check for `netCDF4`: without it in the venv the
+chain stops right there.
+
 ```bash
 export CLOUDFLARE_API_TOKEN="$(cat ~/.cloudflare/frost.bg.token)"
 npx wrangler whoami     # shows the account → the token works
-npm test && npx wrangler deploy   # only a green tree gets deployed
+grid/.venv-cds/bin/python -c 'import netCDF4' && npm test && npm run check:links && npx wrangler deploy
 ```
 
 - All of `site/` is uploaded as static assets except what

@@ -29,8 +29,10 @@ The daily minimum at 2 m from the
 reanalysis (ECMWF), fetched via the
 [Copernicus Climate Data Store](https://cds.climate.copernicus.eu/) — a
 **0.1°** grid (≈ 9 km), the last **30 full years** counting back from the
-previous calendar year (currently 1996–2025; the window shifts by one year
-every January). Frost is a day with a minimum ≤ **0 °C**. `grid.json`
+previous calendar year (currently 1996–2025). The period is chosen during the
+annual MANUAL recomputation — January is the recommended time, and the site
+shows the new period after the updated grid is deployed; the calendar year
+turning over changes nothing by itself. Frost is a day with a minimum ≤ **0 °C**. `grid.json`
 (2,080 points over Bulgaria's grid) is computed **in advance**, offline —
 see [`operations.md`](operations.md) for how and when. The grid records
 its origin (`source_id`) and the page and the API say it as it is: in
@@ -39,19 +41,25 @@ production the source is real — ERA5-Land via Copernicus CDS
 plausible stand-in without network access) exists only for local
 development — see [`operations.md`](operations.md).
 
-Open-Meteo still has two jobs in the project: as the **geocoder** (place
-name → coordinates, [`api.md`](api.md)) and as a **cross-check** for the
-CDS grid — see [`operations.md`](operations.md).
+Open-Meteo still has three jobs in the project: as the **geocoder** (place
+name → coordinates, [`api.md`](api.md)), as the **elevation of the selected
+point itself** (the Elevation API — a runtime dependency, with its own budget
+and its own failures) and as a **cross-check** for the CDS grid — see
+[`operations.md`](operations.md).
 
 ## "Typical" and "safe" dates
 
-For each of the 30 years, the last frost day before July 1 (spring) and the
-first on or after July 1 (autumn) are found. From those 30 dates:
+For each accepted year, the last frost day before July 1 (spring) and the
+first on or after July 1 (autumn) are found. Each season uses its available
+dates — there may be fewer than the number of accepted years, because a year
+can have no recorded frost in one direction. From those dates:
 
 - **typical** — the median;
-- **safe** — the 90th percentile in spring / 10th percentile in autumn,
-  i.e. the date after which (spring) or before which (autumn) there was
-  **no frost in 9 of 10 years**. Deliberately more cautious than typical —
+- **safe** — the 90th percentile in spring / 10th percentile in autumn: in
+  **at least 90%** of the included years with recorded frost for that season
+  there is no later spring frost, respectively no earlier autumn frost. They
+  are two separate historical boundaries, not a promise for the coming season.
+  Deliberately more cautious than typical —
   it means sowing later and harvesting earlier.
 
 Two conventions of the calculation (`grid/frost_estimate.py`), so it can be

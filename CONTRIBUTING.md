@@ -171,6 +171,16 @@ Markdown файловете; в `site/**/*.html` не се зачерква ни
 описанието. По-голям PR отнема повече кръгове преглед и по-лесно крие бъг;
 раздели го, ако можеш.
 
+**От одобрен PR до публикуван main.** Работи в отделен branch, пази чуждите
+промени и ползвай exact-path staging. GitHub `origin` е основното хранилище;
+GitLab `gitlab` е ръчно обновявано огледало. След преглед и сливане main се
+публикува първо в `origin`, после в `gitlab`, без force. Преди push и след
+GitLab pipeline се изпълняват предписаните `ci-check preflight` и `verify` —
+точните команди и версии са в [`AGENTS.md`](AGENTS.md), който съдържа
+задължителните правила за публикуване, не само версиите на инструментите.
+`pending` и `skipped` не са PASS. При промяна в CI се иска и втори цял
+pipeline през API за същия SHA. Deploy не е част от CI промяна.
+
 ## Езикови правила
 
 - Думата е **„слана“**, никога „мраз“ — навсякъде в българския текст (виж
@@ -196,8 +206,11 @@ Markdown файловете; в `site/**/*.html` не се зачерква ни
 еднакви, виж `site/js/stats.parity.test.js` (сверява само датите и
 годишните бройки, не цялата логика на `stats.js` — прозорецът, сезонът и
 рискът съществуват само в JS, виж
-[`docs/bg/architecture.md`](docs/bg/architecture.md)); нищо от това не
-минава през самия `grid.json`.
+[`docs/bg/architecture.md`](docs/bg/architecture.md)). След промяна в
+статистиката `grid/grid.json` се преизчислява от истинските данни и се пуска
+проверката за съвпадение със `site/js/stats.js`: Worker-ът връща записаните в
+JSON стойности, той не изпълнява Python сметката. Тоест генерираният резултат
+СЕ променя — но никога чрез ръчно редактиране на числата в него.
 
 ## Нови зависимости в Worker-а не се приемат
 
@@ -396,6 +409,17 @@ on one thing** — one bug, one feature — with the "why" explained, not just
 the "what", in the description. A larger PR takes more review rounds and
 hides a bug more easily; split it up if you can.
 
+**From an approved PR to a published main.** Work on a separate branch,
+preserve other people's changes and use exact-path staging. GitHub `origin` is
+the primary repository; GitLab `gitlab` is a manually updated mirror. After
+review and merge, main is published to `origin` first, then to `gitlab`, without
+force. Before pushing and after the GitLab pipeline, run the prescribed
+`ci-check preflight` and `verify` steps — the exact commands and versions are in
+[`AGENTS.md`](AGENTS.md), which holds the mandatory publishing rules, not just
+the tool versions. `pending` and `skipped` are not PASS. A CI change also
+requires a second full pipeline through the API for the same SHA. Deploying is
+not part of a CI change.
+
 ## Language rules
 
 - In Bulgarian text, the word is always **"слана"**, never "мраз" (see
@@ -421,8 +445,11 @@ core of its counterpart on the page, `site/js/stats.js` — those two must
 stay identical there, see `site/js/stats.parity.test.js` (it checks only
 the dates and the yearly counts, not the rest of `stats.js`'s logic — the
 window, the season and the risk figure exist only in JS, see
-[`docs/en/architecture.md`](docs/en/architecture.md)); none of this goes
-through `grid.json` itself.
+[`docs/en/architecture.md`](docs/en/architecture.md)). After changing the
+statistics, regenerate `grid/grid.json` from the real data and run the parity
+check against `site/js/stats.js`: the Worker returns the values stored in JSON,
+it does not run the Python computation. So the generated result DOES change —
+but never by editing its numbers by hand.
 
 ## New dependencies in the Worker are not accepted
 
