@@ -373,3 +373,25 @@ test("английското обобщение носи условието „�
   const enP = paragraphContaining(en, "threshold");
   assert.match(enP, /years with recorded frost/, "en: условието „със записана слана“");
 });
+
+// I3: едно и също място не може да има две височини в два документа. Примерът
+// за `/elevation` в api.md ползва СЪЩИТЕ координати на Маноле, а показваше 350
+// м, докато ръководството казва ≈ 152 м — разликата спрямо клетката (99 м)
+// ставаше съответно 251 или 53 м, в абзац, който учи читателя да сравнява
+// височини. Тук ръководството е източникът: числото в него се чете и се иска
+// от двата api.md. Ако някой ден височината се смени, сменя се на едно място и
+// тестът иска същото и в справката.
+test("височината на точката в api.md е същата като в ръководството", () => {
+  const guideElev = bg.match(/точката е ≈ (\d+) м/);
+  assert.ok(guideElev, "ръководството носи височината на самата точка");
+  const enElev = en.match(/the point is ≈ (\d+) m/);
+  assert.ok(enElev && enElev[1] === guideElev[1], "двата езика на ръководството носят едно и също число");
+  for (const path of ["../../docs/bg/api.md", "../../docs/en/api.md"]) {
+    const doc = read(path);
+    const shown = [...doc.matchAll(/"elevation_m":\s*(\d+)/g)].map((m) => m[1]);
+    assert.ok(shown.length > 0, `${path}: примерът за /elevation носи elevation_m`);
+    for (const value of shown) {
+      assert.equal(value, guideElev[1], `${path}: elevation_m трябва да е ${guideElev[1]}, както в ръководството`);
+    }
+  }
+});
