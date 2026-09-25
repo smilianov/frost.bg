@@ -6,6 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dayOfYear, pair, riskAfter, seasonSummary } from "./stats.js";
+import { formatMMDD } from "./format.js";
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const bg = read("../guide/index.html");
@@ -23,6 +24,16 @@ const paragraphContaining = (html, marker) => {
   assert.ok(found !== undefined, `няма абзац, съдържащ „${marker}“`);
   return found;
 };
+
+// String#includes върху низ с число приема и грешно число, стига да го
+// съдържа като подниз: "1 от 30" стои и вътре в "11 от 30", "3 %" — вътре в
+// "13 %". includesExact() превръща очаквания низ в regex, в който всяко
+// число пази граница (?<!\d)…(?!\d) — не мърда до съседна цифра — докато
+// всичко останало си остава буквален, екраниран текст.
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const exactNumberPattern = (expected) =>
+  expected.split(/(\d+)/).map((part, i) => (i % 2 === 1 ? `(?<!\\d)${part}(?!\\d)` : escapeRe(part))).join("");
+const includesExact = (paragraph, expected) => new RegExp(exactNumberPattern(expected)).test(paragraph);
 
 // Всички очаквани числа по-долу идват от истинската мрежа (grid/grid.json)
 // през същите чисти функции, които страницата би ползвала (site/js/stats.js)
@@ -60,6 +71,17 @@ for (const r of manoleRows) {
   if (sBad || aBad) eitherBreach++;
 }
 const neitherBreach = N - eitherBreach;
+
+// Датите, форматирани точно както страницата ги пише (site/js/format.js —
+// същата функция, която app.js/chart.js/history.js ползват за показване).
+const typicalSpringBg = formatMMDD(pairManole.typical.last_spring, "bg");
+const typicalAutumnBg = formatMMDD(pairManole.typical.first_autumn, "bg");
+const safeSpringBg = formatMMDD(pairManole.safe.last_spring, "bg");
+const safeAutumnBg = formatMMDD(pairManole.safe.first_autumn, "bg");
+const typicalSpringEn = formatMMDD(pairManole.typical.last_spring, "en");
+const typicalAutumnEn = formatMMDD(pairManole.typical.first_autumn, "en");
+const safeSpringEn = formatMMDD(pairManole.safe.last_spring, "en");
+const safeAutumnEn = formatMMDD(pairManole.safe.first_autumn, "en");
 
 test("двете страници нямат JavaScript", () => {
   for (const [name, html] of [["bg", bg], ["en", en]]) {
@@ -121,13 +143,25 @@ test("езикът на документа е обявен вярно", () => {
 test("клетката и точката на Маноле стоят в изречението, което ги обяснява", () => {
   const bgP = paragraphContaining(bg, "надморска височина");
   const enP = paragraphContaining(en, "elevation of");
-  assert.ok(bgP.includes(`${manole.lat}, ${manole.lon}, на ${manole.elev} м`), "bg: клетката (от grid.json)");
-  assert.ok(enP.includes(`${manole.lat}, ${manole.lon}, at an elevation of ${manole.elev} m`), "en: клетката (от grid.json)");
+  assert.ok(includesExact(bgP, `${manole.lat}, ${manole.lon}, на ${manole.elev} м`), "bg: клетката (от grid.json)");
+  assert.ok(includesExact(enP, `${manole.lat}, ${manole.lon}, at an elevation of ${manole.elev} m`), "en: клетката (от grid.json)");
   // 152 м е височината на самата точка (Open-Meteo/Copernicus DEM за точния
   // Маноле от брифа) — идва от отделен доставчик, не е в grid.json, затова
   // остава документирана константа, не преизчислена стойност.
-  assert.match(bg, /точката е ≈ 152 м/);
-  assert.match(en, /the point is ≈ 152 m/);
+  assert.ok(includesExact(bg, "точката е ≈ 152 м"), "bg: 152 м, точна граница");
+  assert.ok(includesExact(en, "the point is ≈ 152 m"), "en: 152 m, точна граница");
+});
+
+// Обобщаващото изречение („типична 29 март / 25 ноември, сигурна 11 април /
+// 30 октомври“) е отделен абзац от този, който обяснява методите — прегледът
+// го счупи, докато другите тестове мълчаха: замени и четирите дати с 1–4
+// януари и целият файл пак мина 12/12. formatMMDD е същата функция, с която
+// страницата би написала датите (site/js/format.js).
+test("обобщаващото изречение носи истинските четири дати за Маноле, изчислени от мрежата", () => {
+  const bgP = paragraphContaining(bg, "по 30 години данни");
+  const enP = paragraphContaining(en, "over 30 years of data");
+  assert.ok(includesExact(bgP, `типична ${typicalSpringBg} / ${typicalAutumnBg}, сигурна ${safeSpringBg} / ${safeAutumnBg}`), "bg: и четирите дати");
+  assert.ok(includesExact(enP, `typical ${typicalSpringEn} / ${typicalAutumnEn}, safe ${safeSpringEn} / ${safeAutumnEn}`), "en: и четирите дати");
 });
 
 // Рисковият пример е преизчислен от истинската мрежа (riskAfter върху
@@ -135,29 +169,34 @@ test("клетката и точката на Маноле стоят в изр�
 // преписан на ръка. Числата трябва да стоят В абзаца с „Пример“, не някъде
 // другаде: прегледът замени датите само вътре в примерния абзац и старите
 // тестове пак минаха — paragraphContaining хваща точно това.
+// includesExact (не String#includes) пази границите на числото: "1 от 30"
+// стоеше и вътре в "11 от 30", "3 %" — вътре в "13 %" (прегледа откри и
+// това); фиксирано с (?<!\d)…(?!\d) около всяко число.
 test("рисковият пример носи истинските числа за Маноле, в самия примерен абзац", () => {
   const bgP = paragraphContaining(bg, "Пример за Маноле");
   const enP = paragraphContaining(en, "Example for Manole");
-  assert.ok(bgP.includes(`${risk.count} от ${risk.total} години`), `bg: очаквах ${risk.count} от ${risk.total}`);
-  assert.ok(bgP.includes(`${risk.percent} %`), `bg: очаквах ${risk.percent} %`);
-  assert.ok(bgP.includes("20 април"), "bg: датата на примера");
-  assert.ok(enP.includes(`${risk.count} of ${risk.total} years`), `en: очаквах ${risk.count} of ${risk.total}`);
-  assert.ok(enP.includes(`${risk.percent}%`), `en: очаквах ${risk.percent}%`);
-  assert.ok(enP.includes("April 20"), "en: датата на примера");
+  assert.ok(includesExact(bgP, `${risk.count} от ${risk.total} години`), `bg: очаквах ${risk.count} от ${risk.total}, не подниз`);
+  assert.ok(includesExact(bgP, `${risk.percent} %`), `bg: очаквах ${risk.percent} %, не подниз`);
+  assert.ok(includesExact(bgP, "20 април"), "bg: датата на примера");
+  assert.ok(includesExact(enP, `${risk.count} of ${risk.total} years`), `en: очаквах ${risk.count} of ${risk.total}, не подниз`);
+  assert.ok(includesExact(enP, `${risk.percent}%`), `en: очаквах ${risk.percent}%, не подниз`);
+  assert.ok(includesExact(enP, "April 20"), "en: датата на примера");
 });
 
 // Границите на „сигурна“ поотделно (напролет/наесен/нито едното) —
 // преброени директно от годините на клетката, не съчинена обща „9 от 10“
-// статистика за двете граници наведнъж. В абзаца, който ги обяснява.
+// статистика за двете граници наведнъж. В абзаца, който ги обяснява; и
+// самите гранични дати (11 април/30 октомври) идват от formatMMDD, не са
+// преписани на ръка.
 test("границите на сигурната дата стоят поотделно, с истинските числа за Маноле, в изречението", () => {
   const bgP = paragraphContaining(bg, "Двете граници са отделни статистики");
   const enP = paragraphContaining(en, "The two boundaries are separate statistics");
-  assert.ok(bgP.includes(`${springBreach} от ${N} години е имало слана след сигурната пролетна дата (11 април)`), "bg: пролетна граница");
-  assert.ok(bgP.includes(`${autumnBreach} от ${N} — преди сигурната есенна (30 октомври)`), "bg: есенна граница");
-  assert.ok(bgP.includes(`${neitherBreach} от ${N} — нито едното, нито другото`), "bg: нито едното");
-  assert.ok(enP.includes(`${springBreach} of the ${N} years had frost after the safe spring date (April 11)`), "en: пролетна граница");
-  assert.ok(enP.includes(`${autumnBreach} of the ${N} had frost before the safe autumn date (October 30)`), "en: есенна граница");
-  assert.ok(enP.includes(`${neitherBreach} of the ${N} had neither`), "en: нито едното");
+  assert.ok(includesExact(bgP, `${springBreach} от ${N} години е имало слана след сигурната пролетна дата (${safeSpringBg})`), "bg: пролетна граница");
+  assert.ok(includesExact(bgP, `${autumnBreach} от ${N} — преди сигурната есенна (${safeAutumnBg})`), "bg: есенна граница");
+  assert.ok(includesExact(bgP, `${neitherBreach} от ${N} — нито едното, нито другото`), "bg: нито едното");
+  assert.ok(includesExact(enP, `${springBreach} of the ${N} years had frost after the safe spring date (${safeSpringEn})`), "en: пролетна граница");
+  assert.ok(includesExact(enP, `${autumnBreach} of the ${N} had frost before the safe autumn date (${safeAutumnEn})`), "en: есенна граница");
+  assert.ok(includesExact(enP, `${neitherBreach} of the ${N} had neither`), "en: нито едното");
 });
 
 // „Типичната“ не дели точно наполовина — реалният брой години „на или
@@ -165,10 +204,10 @@ test("границите на сигурната дата стоят поотд�
 test("типичната дата дава истинския брой години „на или преди“ границата, не точно наполовина", () => {
   const bgP = paragraphContaining(bg, "медианата на годините с данни за съответния сезон");
   const enP = paragraphContaining(en, "median of the years with data for that season");
-  assert.ok(bgP.includes(`${springOnOrBefore} от ${N} години последната пролетна слана`), "bg: пролетта на/преди типичната");
-  assert.ok(bgP.includes(`${autumnOnOrBefore} от ${N} — първата есенна слана`), "bg: есента на/преди типичната");
-  assert.ok(enP.includes(`${springOnOrBefore} of the ${N} years had the last spring frost`), "en: пролетта на/преди типичната");
-  assert.ok(enP.includes(`${autumnOnOrBefore} of the ${N} had the first autumn frost`), "en: есента на/преди типичната");
+  assert.ok(includesExact(bgP, `${springOnOrBefore} от ${N} години последната пролетна слана`), "bg: пролетта на/преди типичната");
+  assert.ok(includesExact(bgP, `${autumnOnOrBefore} от ${N} — първата есенна слана`), "bg: есента на/преди типичната");
+  assert.ok(includesExact(enP, `${springOnOrBefore} of the ${N} years had the last spring frost`), "en: пролетта на/преди типичната");
+  assert.ok(includesExact(enP, `${autumnOnOrBefore} of the ${N} had the first autumn frost`), "en: есента на/преди типичната");
 });
 
 // 237 е медианата на годишните дължини — при четен брой години (30),
@@ -179,22 +218,22 @@ test("типичната дата дава истинския брой годи�
 test("237, 240 и средните две годишни стойности стоят в изреченията, които ги обясняват", () => {
   const bgTypicalP = paragraphContaining(bg, "средното на двете средни");
   const enTypicalP = paragraphContaining(en, "average of the two middle ones");
-  assert.ok(bgTypicalP.includes(`(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} дни`), "bg: средното на двете средни");
-  assert.ok(enTypicalP.includes(`(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} days`), "en: средното на двете средни");
+  assert.ok(includesExact(bgTypicalP, `(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} дни`), "bg: средното на двете средни");
+  assert.ok(includesExact(enTypicalP, `(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} days`), "en: средното на двете средни");
 
   const bgExtremesP = paragraphContaining(bg, "Най-късата");
   const enExtremesP = paragraphContaining(en, "shortest");
-  assert.ok(bgExtremesP.includes(`${seasonManole.shortest.days} дни, ${seasonManole.shortest.years[0]}`), "bg: най-късата година");
-  assert.ok(bgExtremesP.includes(`${seasonManole.longest.days} дни, ${seasonManole.longest.years[0]}`), "bg: най-дългата година");
-  assert.ok(enExtremesP.includes(`${seasonManole.shortest.days} days, ${seasonManole.shortest.years[0]}`), "en: shortest year");
-  assert.ok(enExtremesP.includes(`${seasonManole.longest.days} days, ${seasonManole.longest.years[0]}`), "en: longest year");
+  assert.ok(includesExact(bgExtremesP, `${seasonManole.shortest.days} дни, ${seasonManole.shortest.years[0]}`), "bg: най-късата година");
+  assert.ok(includesExact(bgExtremesP, `${seasonManole.longest.days} дни, ${seasonManole.longest.years[0]}`), "bg: най-дългата година");
+  assert.ok(includesExact(enExtremesP, `${seasonManole.shortest.days} days, ${seasonManole.shortest.years[0]}`), "en: shortest year");
+  assert.ok(includesExact(enExtremesP, `${seasonManole.longest.days} days, ${seasonManole.longest.years[0]}`), "en: longest year");
 
   const bgHintP = paragraphContaining(bg, "Затова изваждането");
   const enHintP = paragraphContaining(en, "That's why subtracting");
-  assert.ok(bgHintP.includes(`дава ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
-  assert.ok(bgHintP.includes(`е ${seasonManole.typical}`), "bg: 237 от медианата");
-  assert.ok(enHintP.includes(`gives ${typicalDatesDiffDays} days`), "en: 240 от типичните дати");
-  assert.ok(enHintP.includes(`is ${seasonManole.typical}`), "en: 237 от медианата");
+  assert.ok(includesExact(bgHintP, `дава ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
+  assert.ok(includesExact(bgHintP, `е ${seasonManole.typical}`), "bg: 237 от медианата");
+  assert.ok(includesExact(enHintP, `gives ${typicalDatesDiffDays} days`), "en: 240 от типичните дати");
+  assert.ok(includesExact(enHintP, `is ${seasonManole.typical}`), "en: 237 от медианата");
 });
 
 test("началните страници водят към ръководството", () => {
