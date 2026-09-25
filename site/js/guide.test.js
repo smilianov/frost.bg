@@ -27,13 +27,31 @@ const paragraphContaining = (html, marker) => {
 
 // String#includes върху низ с число приема и грешно число, стига да го
 // съдържа като подниз: "1 от 30" стои и вътре в "11 от 30", "3 %" — вътре в
-// "13 %". includesExact() превръща очаквания низ в regex, в който всяко
-// число пази граница (?<!\d)…(?!\d) — не мърда до съседна цифра — докато
+// "13 %". Граница само (?<!\d)…(?!\d) пак не стига: "3" стои и вътре в
+// "0,3" (десетична запетая/точка), "237" — вътре в "237,5" или "1 194"
+// (интервал/NBSP/тесен NBSP като разделител на хилядите), "20" — вътре в
+// "19–20" (тире за диапазон от дати). SEP изброява всичко, което може да
+// свързва число с друго число тук: точка, запетая, интервал, NBSP (U+00A0),
+// тесен NBSP (U+202F), тире, en dash, em dash. includesExact() превръща
+// очаквания низ в regex, в който всяко число пази граница И към цифра, И
+// към „цифра+разделител“ отляво/„разделител+цифра“ отдясно — докато
 // всичко останало си остава буквален, екраниран текст.
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const SEP = "[.,\\u00A0\\u202F\\u2013\\u2014\\- ]";
+const numberBoundary = (token) => `(?<!\\d)(?<!\\d${SEP})${escapeRe(token)}(?!\\d)(?!${SEP}\\d)`;
+// Токенът е ЦЯЛОТО число, включително собствен десетичен разделител
+// ("42.2" остава един токен, не "42" + "." + "2" поотделно) — иначе
+// границата отхвърля и легитимно число само защото продължава със своята
+// СОБСТВЕНА десетична част.
 const exactNumberPattern = (expected) =>
-  expected.split(/(\d+)/).map((part, i) => (i % 2 === 1 ? `(?<!\\d)${part}(?!\\d)` : escapeRe(part))).join("");
+  expected.split(/(\d+(?:[.,]\d+)*)/).map((part, i) => (i % 2 === 1 ? numberBoundary(part) : escapeRe(part))).join("");
 const includesExact = (paragraph, expected) => new RegExp(exactNumberPattern(expected)).test(paragraph);
+
+// За число + мерна единица (152 м / 152 m): освен границата на числото,
+// единицата зад него не бива да продължава с още буква — "мм"/"mm" не
+// бива да мине за "м"/"m". \p{L} изисква флага "u".
+const includesExactValueWithUnit = (text, prefix, number, unit) =>
+  new RegExp(`${escapeRe(prefix)}${numberBoundary(String(number))} ${escapeRe(unit)}(?![\\p{L}])`, "u").test(text);
 
 // Всички очаквани числа по-долу идват от истинската мрежа (grid/grid.json)
 // през същите чисти функции, които страницата би ползвала (site/js/stats.js)
@@ -143,13 +161,17 @@ test("езикът на документа е обявен вярно", () => {
 test("клетката и точката на Маноле стоят в изречението, което ги обяснява", () => {
   const bgP = paragraphContaining(bg, "надморска височина");
   const enP = paragraphContaining(en, "elevation of");
-  assert.ok(includesExact(bgP, `${manole.lat}, ${manole.lon}, на ${manole.elev} м`), "bg: клетката (от grid.json)");
-  assert.ok(includesExact(enP, `${manole.lat}, ${manole.lon}, at an elevation of ${manole.elev} m`), "en: клетката (от grid.json)");
+  assert.ok(includesExact(bgP, `${manole.lat}, ${manole.lon}, на `), "bg: клетката (координати, от grid.json)");
+  assert.ok(includesExact(enP, `${manole.lat}, ${manole.lon}, at an elevation of `), "en: клетката (координати, от grid.json)");
+  // Единицата зад числото също се проверява точно — "мм"/"mm" не бива да
+  // мине за "м"/"m" (същата дупка като при числата, само с буква).
+  assert.ok(includesExactValueWithUnit(bgP, "на ", manole.elev, "м"), "bg: клетката (99 м, от grid.json)");
+  assert.ok(includesExactValueWithUnit(enP, "at an elevation of ", manole.elev, "m"), "en: клетката (99 m, от grid.json)");
   // 152 м е височината на самата точка (Open-Meteo/Copernicus DEM за точния
   // Маноле от брифа) — идва от отделен доставчик, не е в grid.json, затова
   // остава документирана константа, не преизчислена стойност.
-  assert.ok(includesExact(bg, "точката е ≈ 152 м"), "bg: 152 м, точна граница");
-  assert.ok(includesExact(en, "the point is ≈ 152 m"), "en: 152 m, точна граница");
+  assert.ok(includesExactValueWithUnit(bg, "точката е ≈ ", 152, "м"), "bg: 152 м, точна граница");
+  assert.ok(includesExactValueWithUnit(en, "the point is ≈ ", 152, "m"), "en: 152 m, точна граница");
 });
 
 // Обобщаващото изречение („типична 29 март / 25 ноември, сигурна 11 април /
