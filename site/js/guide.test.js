@@ -419,3 +419,23 @@ test("височината на точката в api.md е същата кат�
     );
   }
 });
+
+test("„Двете височини“ обяснява предупреждението: прагът 50 м, посоката и Маноле, без дни", () => {
+  // 0.3.4: страницата предупреждава при разлика от поне 50 м. Ръководството
+  // трябва да казва същото като екрана — прага, двете посоки (асиметрично:
+  // ниско НЕ значи по-топло) и че за Маноле (53 м) предупреждението се
+  // показва. Дни не се казват нарочно — решение на собственика, същото като
+  // на екрана: поправката зависи почти изцяло от несигурния нощен градиент.
+  for (const [html, lang, marker, threshold, manole, noDays] of [
+    [bg, "bg", "поне 50 м по-високо", "50 м", "53 м", /седмиц|\d+\s*дни/],
+    [en, "en", "at least 50 m above", "50 m", "53 m", /week|\d+\s*days/i],
+  ]) {
+    const p = paragraphContaining(html, marker);
+    assert.ok(includesExactPhraseWithTrailingUnit(p, threshold), `${lang}: прагът „${threshold}“ с точна граница`);
+    assert.ok(includesExactPhraseWithTrailingUnit(p, manole), `${lang}: Маноле „${manole}“ с точна граница`);
+    assert.ok(!noDays.test(p), `${lang}: абзацът не бива да обещава дни: ${p}`);
+  }
+  // Асиметрията: и двата езика казват, че по-ниско НЕ значи по-ранни дати.
+  assert.ok(paragraphContaining(bg, "поне 50 м по-високо").includes("не разчиташ на по-ранни дати"), "bg: ниско не значи по-ранно");
+  assert.ok(paragraphContaining(en, "at least 50 m above").includes("not to count on earlier dates"), "en: low does not mean earlier");
+});
