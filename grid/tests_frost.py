@@ -32,12 +32,14 @@ section("Сметката на сланите от дневни минимуми
 # ===================================================================
 
 
-def synthetic_years(spring_days, autumn_days, start_year=1996, gaps=None, drop_year=None):
-    """30 години по 10 °C, със слана (−1 °C) на зададените дни.
+def synthetic_years(spring_days, autumn_days, start_year=1996, gaps=None, drop_year=None,
+                    frost_temp=-1.0):
+    """30 години по 10 °C, със слана (frost_temp, по подразбиране −1 °C) на зададените дни.
 
     spring_days[i]/autumn_days[i] са (месец, ден) за година start_year+i;
     None = няма такава слана. gaps = {година: брой дни с None в средата}.
     drop_year = година, от която се дават само 100 дни (трябва да се пропусне).
+    frost_temp = температурата на зададените дни; 0,0 °C проверява дали прагът е „≤“.
     """
     days = []
     for i, (sp, au) in enumerate(zip(spring_days, autumn_days)):
@@ -47,9 +49,9 @@ def synthetic_years(spring_days, autumn_days, start_year=1996, gaps=None, drop_y
         while d.year == y:
             t = 10.0
             if sp and (d.month, d.day) == sp:
-                t = -1.0
+                t = frost_temp
             if au and (d.month, d.day) == au:
-                t = -1.0
+                t = frost_temp
             if d.month == 12 and d.day >= 20:
                 t = -3.0                      # декемврийските слани не са „първата“
             if gaps and y in gaps and 150 <= d.timetuple().tm_yday < 150 + gaps[y]:
@@ -108,6 +110,57 @@ est7 = fe.estimate_frost(synthetic_years(few, autumns), year=2026)
 check("под 10 години с пролетна слана -> None и брой 5",
       est7.typical_last is None and est7.safe_last is None and est7.years_with_spring == 5, str(est7))
 check("есенната при това си е сметната", est7.typical_first == date(2026, 10, 15))
+
+# --- Границите на договора, всяка поотделно ---------------------------
+# Седем гранични правила оцеляваха мутация: можеше да се сменят и целият
+# пакет да мине. Всеки тест по-долу пази точно едно от тях и е доказан с
+# мутация — правилото се сменя, тестът пада, правилото се връща. Тестовете
+# са копие от Garden Planner (backend/tests_places.py), защото
+# frost_estimate.py тук е замразено копие на същия договор.
+
+# „Слана“ е минимум ≤ прага, не < прага: ден с точно 0,0 °C се брои.
+zero = fe.estimate_frost(synthetic_years(springs, autumns, frost_temp=0.0), year=2026)
+check("ден с точно 0,0 °C е пролетна слана (прагът е ≤, не <)",
+      zero.typical_last == date(2026, 4, 16) and zero.years_with_spring == 30,
+      f"{zero.typical_last}, {zero.years_with_spring} години")
+check("ден с точно 0,0 °C е есенна слана (прагът е ≤, не <)",
+      zero.typical_first == date(2026, 10, 15) and zero.years_with_autumn == 30,
+      f"{zero.typical_first}, {zero.years_with_autumn} години")
+
+# Границата от 300 валидни дни е „под“: точно 300 дни се броят, 299 — не.
+# 2001 е невисокосна (365 дни), затова 65 липсващи оставят точно 300.
+est300 = fe.estimate_frost(synthetic_years(springs, autumns, gaps={2001: 65}), year=2026)
+est299 = fe.estimate_frost(synthetic_years(springs, autumns, gaps={2001: 66}), year=2026)
+check("година с точно 300 валидни дни се брои, с 299 — не",
+      est300.years_used == 30 and est299.years_used == 29,
+      f"300 дни -> {est300.years_used} години, 299 дни -> {est299.years_used} години")
+
+# Годината се разделя на 1 юли: юни е пролет, юли е есен.
+june_july = fe.estimate_frost(synthetic_years([(6, 30)] * 30, [(7, 1)] * 30), year=2026)
+check("слана на 30 юни е последната пролетна, а 1 юли не е пролетна",
+      june_july.typical_last == date(2026, 6, 30), str(june_july.typical_last))
+check("слана на 1 юли е първата есенна, не последната пролетна",
+      june_july.typical_first == date(2026, 7, 1), str(june_july.typical_first))
+
+# Персентилът е nearest-rank с ceil: при 25 години 0,9·25 = 22,5, тоест
+# ранг 23 (23 април) и 0,1·25 = 2,5, тоест ранг 3 (3 октомври).
+# floor би дал 22 април и 2 октомври.
+p25 = fe.estimate_frost(synthetic_years([(4, 1 + i) for i in range(25)],
+                                        [(10, 1 + i) for i in range(25)]), year=2026)
+check("персентилът е nearest-rank с ceil: при 25 години 23 април и 3 октомври",
+      p25.safe_last == date(2026, 4, 23) and p25.safe_first == date(2026, 10, 3),
+      f"{p25.safe_last}, {p25.safe_first}")
+
+# Прагът от 10 години е „поне“: точно 10 стигат, 9 не.
+ten = fe.estimate_frost(synthetic_years([(4, 1 + i) for i in range(10)],
+                                        [(10, 1 + i) for i in range(10)]), year=2026)
+nine = fe.estimate_frost(synthetic_years([(4, 1 + i) for i in range(9)],
+                                         [(10, 1 + i) for i in range(9)]), year=2026)
+check("точно 10 години със слана дават дати, 9 години -> None",
+      ten.typical_last is not None and ten.safe_first is not None
+      and nine.typical_last is None and nine.safe_first is None,
+      f"10 години -> {ten.typical_last} / {ten.safe_first}, "
+      f"9 години -> {nine.typical_last} / {nine.safe_first}")
 
 check("period: 30 пълни години до миналата",
       fe.period(date(2026, 9, 8)) == (date(1996, 1, 1), date(2025, 12, 31)), str(fe.period(date(2026, 9, 8))))
