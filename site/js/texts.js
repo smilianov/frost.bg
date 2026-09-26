@@ -67,6 +67,9 @@ export const T = {
     // сланата (никога не го чака, никога 0, никога височината на клетката).
     point_elev: (m) => `приблизителна височина около точката: ≈ ${m} м`,
     elev_note: "Двете височини идват от различни модели и не коригират датите.",
+    // 0.3.4 — посоката при разлика от поне 50 м, без дни (виж elevation.js).
+    elev_above: (m) => `Точката е около ${m} м над средната височина на клетката — очаквай по-късна пролетна и по-ранна есенна слана от показаните.`,
+    elev_below: (m) => `Точката е около ${m} м под средната височина на клетката. В ниско място студеният въздух се задържа нощем, така че не разчитай на по-ранни дати.`,
   },
   en: {
     title: "When is the frost at your place?",
@@ -135,5 +138,8 @@ export const T = {
     // (never blocks it, never 0, never the cell's elevation instead).
     point_elev: (m) => `approximate elevation near the point: ≈ ${m} m`,
     elev_note: "The two elevations come from different models and do not correct the dates.",
+    // 0.3.4 — the direction for a difference of at least 50 m, no days (see elevation.js).
+    elev_above: (m) => `This point is about ${m} m above the cell's average elevation — expect a later last spring frost and an earlier first autumn frost than shown.`,
+    elev_below: (m) => `This point is about ${m} m below the cell's average elevation. Cold air settles in low ground at night, so do not count on earlier dates.`,
   },
 };

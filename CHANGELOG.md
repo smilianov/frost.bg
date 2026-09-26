@@ -8,6 +8,44 @@
 
 ---
 
+## [0.3.4] — 2026-09-26
+
+### 🇧🇬 Български
+
+- **Предупреждение, когато точката е далеч от височината на клетката.** Щом
+  точката е поне 50 м по-високо от средната височина на клетката, страницата
+  казва, че там сланата идва по-късно напролет и по-рано наесен от
+  показаните дати. Щом е поне 50 м по-ниско — да не се разчита на по-ранни
+  дати, защото нощем студеният въздух се стича в ниското. Разликата се
+  закръгля до 10 м; дни не се дават нарочно.
+- **Защо без дни:** изчислено от 30-те години дневни минимуми за Маноле,
+  53 м над клетката местят сигурната пролетна дата със седмица — но почти
+  цялата поправка идва от това колко бързо пада нощният минимум с
+  височината, а това е най-несигурното число. Посоката е сигурна, големината
+  не е.
+- Датите на клетката **не се променят** — решетката и `/api/v1/frost` са
+  същите. Разделът „Двете височини“ в ръководството обяснява предупреждението
+  на двата езика.
+
+### 🇬🇧 English
+
+- **A warning when the point is far from the cell's elevation.** When the
+  point is at least 50 m above the cell's average elevation, the page says
+  frost there comes later in spring and earlier in autumn than the dates
+  shown. When it is at least 50 m below, it warns not to count on earlier
+  dates, because cold air settles in low ground at night. The difference is
+  rounded to 10 m; no days are given, on purpose.
+- **Why no days:** computed from 30 years of Manole's daily minima, 53 m
+  above the cell moves the safe spring date by a week — but nearly all of
+  that correction comes from how fast the night-time minimum falls with
+  height, which is the most uncertain number. The direction is certain; the
+  size is not.
+- The cell's dates **do not change** — the grid and `/api/v1/frost` are the
+  same. The guide's "The two elevations" section explains the warning in
+  both languages.
+
+---
+
 ## [0.3.3] — 2026-09-25
 
 ### 🇧🇬 Български

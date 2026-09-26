@@ -226,7 +226,7 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.3",
+  "app_version": "0.3.4",
   "elevation": true
 }
 ```
