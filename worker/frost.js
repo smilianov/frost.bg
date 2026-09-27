@@ -43,7 +43,7 @@ function index(grid) {
 }
 
 // Решетката е правилна: най-близката точка е закръглянето до 0,1. Липсва ли
-// в мрежата (извън правоъгълника) — null.
+// в решетката (извън правоъгълника) — null.
 export function nearestCell(grid, lat, lon) {
   const cell = index(grid).get(key(round1(lat), round1(lon)));
   if (!cell) return null;
@@ -64,7 +64,7 @@ export function frostResponse(grid, lat, lon) {
     period: grid.period,
     threshold_c: grid.threshold_c,
     note: TEXTS.note,
-    // Стара мрежа без source_id (отпреди етикета) е CDS по подразбиране.
+    // Стара решетка без source_id (отпреди етикета) е CDS по подразбиране.
     source: TEXTS.sourceLabel(grid.period.start, grid.period.end, Number(grid.computed.slice(0, 4)), grid.source_id ?? "cds"),
     synthetic: grid.synthetic === true,
     version: "1",

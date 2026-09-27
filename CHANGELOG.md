@@ -8,6 +8,46 @@
 
 ---
 
+## [0.3.5] — 2026-09-27
+
+### 🇧🇬 Български
+
+- **„Площ около 9 × 9 км“ вместо „клетка на мрежата“.** Думата „мрежа“
+  се чете като интернет — така я прочете и собственикът на проекта. В
+  ръководството, на страницата и в бележката на `/api/v1/frost` датите
+  вече са „за площ около 9 × 9 км“, после „площта“: етикетът до
+  координатите е „Площ около 9 × 9 км“, предупреждението за височината
+  сравнява точката със средната височина на площта. „9 × 9“, не „9 км“ —
+  „площ от 9 км“ се чете като 9 км², а площта е около 90 км².
+- Полето `note` и етикетът за синтетичните данни в `source` имат нов
+  текст, затова кешът се сменя с версията. Имената на полетата (`cell`,
+  `elev_m`…) и числата не се пипат.
+- За разработчиците (README, `docs/`, `CONTRIBUTING.md`, коментарите) е
+  „решетката“. Където „мрежа“ значеше интернет („без мрежа“), вече пише
+  „без интернет“.
+- README: опашката на CDS може да е дни (последния път — шест), не „минути
+  до часове“; `--finish` е в блока с командите; „близнак“ → „същото на
+  английски“.
+
+### 🇬🇧 English
+
+- **"An area of about 9 × 9 km" instead of "grid cell".** In the guide, on
+  the page and in the `/api/v1/frost` note, the dates are now "for an area
+  of about 9 × 9 km", then "the area": the label next to the coordinates is
+  "Area of about 9 × 9 km", and the elevation warning compares the point
+  with the area's average elevation. "9 × 9", not "9 km" — "an area of
+  9 km" reads as 9 km², and the area is about 90 km².
+- The `note` field and the synthetic-data label in `source` have new text,
+  so the cache changes with the version. Field names (`cell`, `elev_m`…)
+  and the numbers are untouched.
+- The developer docs keep "the grid"; the Bulgarian ones now say
+  „решетката“ where they used to say „мрежата“, which reads as "network".
+- README: the CDS queue can take days (six last time), not "minutes to
+  hours"; `--finish` is in the command block; "their Bulgarian twins" →
+  "the same in Bulgarian".
+
+---
+
 ## [0.3.4] — 2026-09-26
 
 ### 🇧🇬 Български

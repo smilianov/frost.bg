@@ -11,15 +11,15 @@ const env = (over = {}) => ({
 });
 const get = (path, e = env(), ctx) => worker.fetch(new Request(`https://frost.bg${path}`), e, ctx);
 
-// Ревизията в ключа на кеша: версията на приложението, датата на мрежата и
+// Ревизията в ключа на кеша: версията на приложението, датата на решетката и
 // ЕФЕКТИВНИТЕ карта/геокодер (същите, които /config докладва). Нов deploy с
-// нова версия, нова мрежа или друга карта/геокодер = други ключове; старите
+// нова версия, нова решетка или друга карта/геокодер = други ключове; старите
 // записи просто изтичат по TTL.
-const REV = (map = "osm", geocoder = "openmeteo") => encodeURIComponent(`0.3.4|${grid.computed}|${map}|${geocoder}`);
+const REV = (map = "osm", geocoder = "openmeteo") => encodeURIComponent(`0.3.5|${grid.computed}|${map}|${geocoder}`);
 // /config носи и превключвателя ELEVATION в собствената си ревизия (fix
 // round 1, findings 1) — /frost и /geocode не го ползват и не се пипат.
 const CONFIG_REV = (map = "osm", geocoder = "openmeteo", elevationFlag = true) =>
-  encodeURIComponent(`0.3.4|${grid.computed}|${map}|${geocoder}|${elevationFlag}`);
+  encodeURIComponent(`0.3.5|${grid.computed}|${map}|${geocoder}|${elevationFlag}`);
 
 // Заглавките, общи за всеки JSON отговор (успех или грешка) — CORS и content-type
 // не бива да изчезват тихо при бъдещи промени.
@@ -155,7 +155,7 @@ test("/api/v1/config: osm без ключ", async () => {
   const b = await r.json();
   assert.deepEqual(b, { map: "osm", google_maps_key: null, geocoder: "openmeteo", languages: ["bg", "en"],
     grid: { computed: grid.computed, period: grid.period, synthetic: grid.synthetic === true, source_id: grid.source_id },
-    version: "1", app_version: "0.3.4", elevation: true });
+    version: "1", app_version: "0.3.5", elevation: true });
 });
 test("/api/v1/config: GEOCODER=google с GOOGLE_KEY -> geocoder google, без да разкрива ключа", async () => {
   const r = await get("/api/v1/config", env({ GEOCODER: "google", GOOGLE_KEY: "SECRET123" }));
@@ -254,7 +254,7 @@ test("/api/v1/elevation: успешен отговор се кешира под 
     const r1 = await getSettled("/api/v1/elevation?lat=42.18425&lon=24.92936", e, makeCtx());
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
-    assert.ok(store.has(`https://frost.bg/api/v1/elevation?rev=${encodeURIComponent("0.3.4|openmeteo-elevation")}&lat=42.184&lon=24.929`),
+    assert.ok(store.has(`https://frost.bg/api/v1/elevation?rev=${encodeURIComponent("0.3.5|openmeteo-elevation")}&lat=42.184&lon=24.929`),
       [...store.keys()].join(" "));
   } finally {
     clearCacheStub();
@@ -473,7 +473,7 @@ test("/api/v1/config: без globalThis.caches всичко пак работи"
   assert.equal(b.map, "osm");
 });
 
-// Ревизията в ключа: запазен кеш + друга конфигурация/мрежа = miss, не
+// Ревизията в ключа: запазен кеш + друга конфигурация/решетка = miss, не
 // стария отговор. Сентинелът под стария ключ доказва, че miss-ът е заради
 // ключа, не заради изтекъл или липсващ запис.
 test("/api/v1/config: друг MAP в env при запазен кеш -> друг ключ, втори put, свеж отговор", async () => {
@@ -575,7 +575,7 @@ test("/api/v1/geocode: смяна на GEOCODER (с ключ) при запаз�
     clearCacheStub();
   }
 });
-test("/api/v1/frost: нова мрежа (друг grid.computed) при запазен кеш -> miss, не старият отговор", async () => {
+test("/api/v1/frost: нова решетка (друг grid.computed) при запазен кеш -> miss, не старият отговор", async () => {
   const store = stubCache();
   const computed0 = grid.computed;
   try {
@@ -583,15 +583,15 @@ test("/api/v1/frost: нова мрежа (друг grid.computed) при зап�
     assert.equal(r1.status, 200);
     assert.equal(store.puts, 1);
     store.set(`https://frost.bg/api/v1/frost?rev=${REV()}&lat=42.184&lon=24.929`, cachedEntry({ sentinel: true }));
-    // Импортираният grid е един и същ обект в теста и в Worker-а — „нова мрежа“
+    // Импортираният grid е един и същ обект в теста и в Worker-а — „нова решетка“
     // е просто друга дата на смятане; frost.js индексира клетките, не датата.
     grid.computed = "2031-01-05";
     const r2 = await getSettled("/api/v1/frost?lat=42.18425&lon=24.92936", env(), makeCtx());
     const b2 = await r2.json();
-    assert.notDeepEqual(b2, { sentinel: true }, "новата мрежа не бива да връща стария запис");
+    assert.notDeepEqual(b2, { sentinel: true }, "новата решетка не бива да връща стария запис");
     assert.deepEqual(b2.query, { lat: 42.184, lon: 24.929 });
     assert.equal(store.puts, 2);
-    assert.ok(store.has(`https://frost.bg/api/v1/frost?rev=${encodeURIComponent("0.3.4|2031-01-05|osm|openmeteo")}&lat=42.184&lon=24.929`),
+    assert.ok(store.has(`https://frost.bg/api/v1/frost?rev=${encodeURIComponent("0.3.5|2031-01-05|osm|openmeteo")}&lat=42.184&lon=24.929`),
       [...store.keys()].join(" "));
   } finally {
     grid.computed = computed0;

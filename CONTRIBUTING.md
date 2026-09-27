@@ -28,7 +28,7 @@ npm test
 
 Пуска подред тестовете на Worker-а (`node --test "worker/*.test.js"`), на
 страницата (`node --test "site/js/*.test.js"`), на скриптовете
-(`node --test "scripts/*.test.js"`) и питоновите тестове на мрежата и на
+(`node --test "scripts/*.test.js"`) и питоновите тестове на решетката и на
 CDS инструментите. Същото се пуска в CI при всеки push и pull request — PR
 не се приема с червено CI.
 
@@ -190,16 +190,16 @@ pipeline през API за същия SHA. Deploy не е част от CI пр�
 - **Всеки видим текст съществува и на двата езика** — интерфейсът
   (`site/js/texts.js`), грешките и посочванията на API-то
   (`worker/texts.js`), документацията (`docs/bg/` и `docs/en/`, огледални
-  по съдържание). Нов текст на един език без своя близнак на другия не се
-  приема.
+  по съдържание). Нов текст на един език без съответния текст на другия не
+  се приема.
 
-## Мрежата не се редактира на ръка
+## Решетката не се редактира на ръка
 
 `grid/grid.json` е **генериран файл** — сметнат офлайн от `grid/compute_grid.py`
 (виж [`docs/bg/architecture.md`](docs/bg/architecture.md) и
 [`docs/bg/operations.md`](docs/bg/operations.md)). Промяна в число в него
 директно, без да мине през скрипта и истинските данни, ще бъде презаписана
-при следващото опресняване на мрежата — а дотогава ще лъже. Промяна в
+при следващото опресняване на решетката — а дотогава ще лъже. Промяна в
 самата статистика (медианата, персентилът зад типичната/сигурната дата)
 минава през `grid/frost_estimate.py` **и** през сърцевината на нейното
 копие на страницата, `site/js/stats.js` — двете там трябва да останат
@@ -429,8 +429,8 @@ not part of a CI change.
 - **Every user-visible text exists in both languages** — the interface
   (`site/js/texts.js`), the API's errors and attributions
   (`worker/texts.js`), the documentation (`docs/bg/` and `docs/en/`,
-  mirrored in content). New text in one language without its twin in the
-  other is not accepted.
+  mirrored in content). New text in one language without the matching text
+  in the other is not accepted.
 
 ## The grid is not hand-edited
 

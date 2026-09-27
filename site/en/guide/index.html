@@ -18,7 +18,7 @@
   <p class="lead">The page gives you two pairs of dates for your point, and the history behind them. Here is what each number means.</p>
 
   <h2>The two pairs of dates</h2>
-  <p>For any point, the page gives four dates: typical and safe for spring, typical and safe for autumn. The two seasons are computed separately — each from its own years with data, because a given cell can be missing spring dates only, or autumn dates only.</p>
+  <p>For any point, the page gives four dates for the area of about 9 × 9 km that contains it: typical and safe for spring, typical and safe for autumn. The two seasons are computed separately — each from its own years with data, because a given area can be missing spring dates only, or autumn dates only.</p>
   <p>The <strong>typical</strong> date is the median of the years with data for that season — close to "half the years," but not exactly: for Manole, 16 of the 30 years had the last spring frost on or before the typical date, and 16 of the 30 had the first autumn frost on or before the typical date too. With an even number of years, the choice is conservative: the later of the two middle dates in spring, the earlier one in autumn.</p>
   <p>The <strong>safe</strong> date is a percentile of the same years — the 90th in spring, the 10th in autumn. The two boundaries are separate statistics for separate seasons, not one combined promise: for Manole, 3 of the 30 years had frost after the safe spring date (April 11), 2 of the 30 had frost before the safe autumn date (October 30), and 25 of the 30 had neither.</p>
   <p>For Manole, over 30 years of data: typical March 29 / November 25, safe April 11 / October 30.</p>
@@ -36,7 +36,7 @@
 
   <h2>The risk after a date</h2>
   <p>Example for Manole: in 1 of 30 years there was frost after April 20 and before July 1 — 3%.</p>
-  <p>This is a historical frequency for this cell and this date, not a forecast for this year; frost <strong>on</strong> the date itself does not count — only after it.</p>
+  <p>This is a historical frequency for this area and this date, not a forecast for this year; frost <strong>on</strong> the date itself does not count — only after it.</p>
   <p>It answers for spring only: the first autumn frost before a given date says nothing about the days that follow.</p>
   <p>The safe date works on the same idea, just with a fixed target instead of a date you pick — for your own point, use the "Risk of frost after a date" control on the results page.</p>
 
@@ -47,20 +47,20 @@
   <p class="hint">That's why subtracting the two typical dates gives a different number: the same calculation, applied directly to March 29 and November 25, gives 240 days, while the median of the yearly lengths is 237. The median of the differences is not the difference of the medians.</p>
 
   <h2>The two elevations</h2>
-  <p>The grid cell is about 9 km across and has its own average elevation. For Manole the cell is 42.2, 24.9, at an elevation of 99 m.</p>
-  <p>The point you pick or search for is usually elsewhere in that cell and can be at a different elevation — for Manole the point is ≈ 152 m.</p>
+  <p>The dates are computed for an area of about 9 × 9 km, with a single average elevation for the whole area. For Manole it is the area centred on 42.2, 24.9, at an elevation of 99 m.</p>
+  <p>The point you pick or search for is usually elsewhere in that area and can be at a different elevation — for Manole the point is ≈ 152 m.</p>
   <p>The two come from different models and <strong>do not</strong> correct the dates — they're there for you to judge for yourself.</p>
-  <p>When the point is at least 50 m above the cell's average elevation, the page warns that frost there comes later in spring and earlier in autumn than the dates shown. When it is at least 50 m below, it warns you not to count on earlier dates: cold air settles in low ground at night. Manole is 53 m above its cell, so the warning shows there.</p>
-  <p>ERA5 is a 9–25 km grid; in valley bottoms the night minimum is usually overestimated, meaning frost is underestimated: real dates there may be later in spring and earlier in autumn than shown. This is a tendency, not a rule — the elevation difference alone isn't enough to tell you whether or by how much.</p>
+  <p>When the point is at least 50 m above the area's average elevation, the page warns that frost there comes later in spring and earlier in autumn than the dates shown. When it is at least 50 m below, it warns you not to count on earlier dates: cold air settles in low ground at night. Manole is 53 m above its area's average elevation, so the warning shows there.</p>
+  <p>ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is usually overestimated, meaning frost is underestimated: real dates there may be later in spring and earlier in autumn than shown. This is a tendency, not a rule — the elevation difference alone isn't enough to tell you whether or by how much.</p>
 
   <h2>Where the numbers come from</h2>
   <p>The data is ERA5-Land via Copernicus CDS, 30 full years. Frost means a day with a 2 m minimum temperature ≤ 0°C.</p>
-  <p>The grid has 0.1° cells (≈ 9 km) and was precomputed for 2,080 points over Bulgaria.</p>
-  <p>A year with under 300 valid days doesn't count for that cell. The threshold of 10 years with recorded frost for the relevant season applies separately to spring and autumn, and separately to the selected period — so a cell can have spring dates but no autumn dates, or the other way round.</p>
+  <p>Each area is 0.1° × 0.1° (about 9 × 9 km); the dates were precomputed for 2,080 such areas over Bulgaria.</p>
+  <p>A year with under 300 valid days doesn't count for that area. The threshold of 10 years with recorded frost for the relevant season applies separately to spring and autumn, and separately to the selected period — so an area can have spring dates but no autumn dates, or the other way round.</p>
   <p>A table row with no data for that year is labeled "not enough data". A date that wasn't recorded in a year that does have data is labeled "no frost recorded" — those are not the same thing.</p>
 
   <h2>Why it doesn't match what I see</h2>
-  <p>The grid is a model, not a thermometer in your garden: one cell is about 9 km across (≈ 11 km north–south, ≈ 8 km east–west), which is close to 90 km² under one and the same number — with a single average elevation for that whole area, no microrelief and no cold pocket behind the fence.</p>
+  <p>The dates come from a model, not a thermometer in your garden: one area is about 9 × 9 km (≈ 11 km north–south, ≈ 8 km east–west), which is close to 90 km² under one and the same number — with a single average elevation for that whole area, no microrelief and no cold pocket behind the fence.</p>
   <p>Use the dates as a frame for planning, not a verdict — and keep your own notes for your place. Over time, they become your best guide to your own garden specifically.</p>
 </main>
 <footer class="foot">
