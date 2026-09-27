@@ -105,7 +105,7 @@ function render(d) {
   // Задача 7: празни, скрити слотове — fetchElevation() ги попълва после,
   // ако и само ако височината на точката пристигне успешно (никога
   // предварително). #elev-source носи посочването (Open-Meteo/Copernicus) —
-  // изисквано от лиценза им, точно както #src по-долу за мрежата на /frost;
+  // изисквано от лиценза им, точно както #src по-долу за решетката на /frost;
   // не зависи от geocoder/MAP конфигурацията.
   const elevNoteP = el("p", { id: "elev-note", class: "hint" });
   elevNoteP.hidden = true;
@@ -418,9 +418,9 @@ $("locate").onclick = () => {
 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
-// Footer-ът следва /config: източникът на мрежата (grid.source_id) и
+// Footer-ът следва /config: източникът на решетката (grid.source_id) и
 // доставчикът на имената (geocoder). Връзка и посочване — само където
-// лицензът ги иска (CDS, Open-Meteo); синтетичната мрежа няма нито едното.
+// лицензът ги иска (CDS, Open-Meteo); синтетичната решетка няма нито едното.
 // Същите три етикета дава и API-то в `source` (worker/texts.js).
 const SOURCES = {
   cds: { label: "src_cds", url: "https://cds.climate.copernicus.eu/",
@@ -433,7 +433,7 @@ function footerSource(cfg) {
   const periodText = Number.isFinite(period?.start) && Number.isFinite(period?.end) ? ` ${period.start}–${period.end}` : "";
   const computed = typeof cfg?.grid?.computed === "string" ? cfg.grid.computed : "";
   const year = /^\d{4}/.test(computed) ? computed.slice(0, 4) : "";
-  const src = SOURCES[cfg?.grid?.source_id] ?? SOURCES.cds; // стара мрежа без етикет = CDS, както в Worker-а
+  const src = SOURCES[cfg?.grid?.source_id] ?? SOURCES.cds; // стара решетка без етикет = CDS, както в Worker-а
   const label = `${t[src.label]}${periodText}`;
   const node = $("source");
   node.replaceChildren(text(`${t.source}: `), src.url ? el("a", { href: src.url, rel: "noopener", text: label }) : text(label));

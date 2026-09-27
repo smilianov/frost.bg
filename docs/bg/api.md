@@ -40,8 +40,8 @@
   "period": {"start": 1996, "end": 2025},
   "threshold_c": 0,
   "note": {
-    "bg": "ERA5 е мрежа от 9–25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни височината на клетката с тази на мястото си.",
-    "en": "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation."
+    "bg": "ERA5 дава по едно число за площ от около 9 × 9 до 25 × 25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни средната височина на площта с височината на мястото си.",
+    "en": "ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the area's average elevation with your location's elevation."
   },
   "source": {
     "bg": "ERA5-Land през Copernicus CDS, 1996–2025",
@@ -59,7 +59,7 @@
 
 Полета: `query` — заявените координати, закръглени до 3 знака; `cell` —
 центърът на клетката, височината ѝ и разстоянието до нея (височината е от
-геопотенциала на CDS при мрежа от CDS; при мрежа от Open-Meteo пробег — от
+геопотенциала на CDS при решетка от CDS; при решетка от Open-Meteo пробег — от
 Open-Meteo; при синтетична — измислена); `typical`/`safe` — датите като
 `MM-DD` (без година — клиентът ги пренася в която година му трябва); `null`
 вместо дата означава под 10 години с валидна слана в тази посока; `years` —
@@ -68,7 +68,7 @@ Open-Meteo; при синтетична — измислена); `typical`/`safe
 за период, нито друг вариант на отговора (вижте
 [спецификацията на фаза 2](../superpowers/specs/2026-09-23-frost-bg-phase2-design.md));
 `period` — първата и последната от
-30-те години; `synthetic` — `true` докато мрежата е от `--synthetic`, не от
+30-те години; `synthetic` — `true` докато решетката е от `--synthetic`, не от
 истински данни; `version` — версията на API формата (`"1"`, от пътя
 `/api/v1/`), различна от `app_version` в `/api/v1/config` по-долу (версията
 на самото приложение).
@@ -80,7 +80,7 @@ Open-Meteo; при синтетична — измислена); `typical`/`safe
 `years_used`, но не и в персентила за липсващата сезонна дата; неприета година
 няма ред.
 
-`source` следва **произхода на мрежата** (`source_id` в `grid.json`, виж
+`source` следва **произхода на решетката** (`source_id` в `grid.json`, виж
 `/config`), не предположение — винаги четирите ключа `bg`, `en`, `url`,
 `attribution`:
 
@@ -88,9 +88,9 @@ Open-Meteo; при синтетична — измислена); `typical`/`safe
 |---|---|---|---|
 | `cds` (продукция) | `ERA5-Land през Copernicus CDS, 1996–2025` / `ERA5-Land via Copernicus CDS, 1996–2025` | страницата на набора в CDS | `Contains modified Copernicus Climate Change Service information 2026` (годината на смятането; изисква се от лиценза на CDS) |
 | `openmeteo` | `ERA5 през Open-Meteo, 1996–2025` / `ERA5 via Open-Meteo, 1996–2025` | `https://open-meteo.com/` | `Weather data by Open-Meteo.com` |
-| `synthetic` | `Пробни данни (синтетична мрежа)` / `Sample data (synthetic grid)` | `null` | `null` |
+| `synthetic` | `Пробни данни (синтетични)` / `Sample data (synthetic)` | `null` | `null` |
 
-Синтетичната мрежа е само за локална разработка без мрежов достъп до
+Синтетичната решетка е само за локална разработка без мрежов достъп до
 CDS/Open-Meteo (`grid/compute_grid.py --synthetic`, вижте
 [`operations.md`](operations.md)); в production `source_id` винаги е
 `cds`, какъвто е и примерът по-горе.
@@ -98,7 +98,7 @@ CDS/Open-Meteo (`grid/compute_grid.py --synthetic`, вижте
 Кеш: `Cache-Control: public, max-age=300, s-maxage=86400` — браузърът пази
 отговора 5 минути, ръбът на Cloudflare (Cache API, изрично, не само по
 хедъра) — денонощие; ключът на ръба носи и ревизия (версия, дата на
-мрежата, карта, геокодер). Защо и какво значи това при deploy — „Кешът на
+решетката, карта, геокодер). Защо и какво значи това при deploy — „Кешът на
 API-то“ в [`operations.md`](operations.md).
 
 ## `GET /api/v1/elevation?lat=&lon=`
@@ -116,7 +116,7 @@ API-то“ в [`operations.md`](operations.md).
 
 Доставчик: [Open-Meteo Elevation](https://open-meteo.com/en/docs/elevation-api)
 (Copernicus DEM GLO-90, разделителна способност ~90 м) — различен модел на
-терена от ERA5-Land (мрежата зад `/frost`), затова височината тук и
+терена от ERA5-Land (решетката зад `/frost`), затова височината тук и
 `cell.elev_m` могат да се разминават осезаемо. Общият таймаут за заявката
 **и** четенето на тялото е 8 секунди; отговорът се проверява по форма,
 **без автоматични повторни опити**.
@@ -141,7 +141,7 @@ API-то“ в [`operations.md`](operations.md).
 `0` — морско равнище, а отрицателно число — височина под него. Липсата на
 данни е изрично `null`, никога `0`. `source` носи посочване и към
 Copernicus, и към Open-Meteo — фиксирани четирите ключа `bg`, `en`, `url`,
-`attribution`, без зависимост от `source_id` на мрежата (за разлика от
+`attribution`, без зависимост от `source_id` на решетката (за разлика от
 `sourceLabel` в `/frost` по-горе).
 
 Грешки: `bad_request`/`outside_bulgaria` (400, същите правила като
@@ -210,7 +210,7 @@ Copernicus, и към Open-Meteo — фиксирани четирите клю�
 ## `GET /api/v1/config`
 
 Настройките на текущия deploy, за да знае страницата коя карта и кой
-геокодер да ползва и откъде е мрежата, без да пренася тайни. Точно тези
+геокодер да ползва и откъде е решетката, без да пренася тайни. Точно тези
 ключове:
 
 ```json
@@ -221,7 +221,7 @@ Copernicus, и към Open-Meteo — фиксирани четирите клю�
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.4",
+  "app_version": "0.3.5",
   "elevation": true
 }
 ```
@@ -237,10 +237,10 @@ Copernicus, и към Open-Meteo — фиксирани четирите клю�
   доставчика — ключът никога не излиза. Страницата кредитира доставчика
   на имената по това;
 - `languages` — езиците на страницата;
-- `grid.computed` — датата, на която е смятана текущата мрежа;
+- `grid.computed` — датата, на която е смятана текущата решетка;
   `grid.period` — първата и последната от 30-те години; `grid.synthetic` —
-  вярно, докато мрежата не е сметната от истински данни;
-  `grid.source_id` — произходът на мрежата: `"cds"`, `"openmeteo"` или
+  вярно, докато решетката не е сметната от истински данни;
+  `grid.source_id` — произходът на решетката: `"cds"`, `"openmeteo"` или
   `"synthetic"` (по него страницата и `/frost` етикетират източника);
 - `version` — версията на API формата (същата стойност като в отговорите
   на `/frost`; `/geocode` не носи версия); `app_version` — версията на
@@ -257,7 +257,7 @@ Copernicus, и към Open-Meteo — фиксирани четирите клю�
   препроверява `/config` сама (виж [`operations.md`](operations.md)).
 
 Кеш: `Cache-Control: public, max-age=300, s-maxage=86400`; ключът на ръба
-носи ревизия, така че смяна на картата/геокодера или нова мрежа стига до
+носи ревизия, така че смяна на картата/геокодера или нова решетка стига до
 ръба веднага при нов rev. Браузърът получава промяната при следваща заявка
 след изтичане на кешираното копие (5 минути); отворената страница не
 препроверява `/config` сама (виж [`operations.md`](operations.md)).

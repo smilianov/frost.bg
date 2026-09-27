@@ -1,12 +1,12 @@
 // Текстовете, които API-то връща на двата езика. Думата е „слана“.
 export const TEXTS = {
   note: {
-    bg: "ERA5 е мрежа от 9–25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни височината на клетката с тази на мястото си.",
-    en: "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation.",
+    bg: "ERA5 дава по едно число за площ от около 9 × 9 до 25 × 25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни средната височина на площта с височината на мястото си.",
+    en: "ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the area's average elevation with your location's elevation.",
   },
   // Задача 7: посочването за /api/v1/elevation (Open-Meteo Elevation,
   // Copernicus DEM GLO-90) — отделно от sourceLabel() по-долу, което е за
-  // произхода на самата мрежа (/frost), не за височината на точката.
+  // произхода на самата решетка (/frost), не за височината на точката.
   elevationSource: {
     bg: "Copernicus DEM GLO-90 през Open-Meteo",
     en: "Copernicus DEM GLO-90 via Open-Meteo",
@@ -29,7 +29,7 @@ export const TEXTS = {
         return { bg: `ERA5 през Open-Meteo, ${start}–${end}`, en: `ERA5 via Open-Meteo, ${start}–${end}`,
                  url: "https://open-meteo.com/", attribution: "Weather data by Open-Meteo.com" };
       case "synthetic":
-        return { bg: "Пробни данни (синтетична мрежа)", en: "Sample data (synthetic grid)", url: null, attribution: null };
+        return { bg: "Пробни данни (синтетични)", en: "Sample data (synthetic)", url: null, attribution: null };
       default:
         throw new Error(`непознат source_id: ${sourceId}`);
     }

@@ -56,7 +56,7 @@ test("nearestCell: половин стъпка извън ръба още е в�
   assert.equal(nearestCell(grid, 41.14, 24.9), null);          // 41.1 няма
   assert.equal(nearestCell(grid, 42.2, 22.24), null);          // 22.2 няма
 });
-test("nearestCell: клетка в правоъгълника, но липсваща в мрежата -> null", () => {
+test("nearestCell: клетка в правоъгълника, но липсваща в решетката -> null", () => {
   assert.equal(nearestCell(grid, 43.0, 25.0), null);
 });
 test("nearestCell: distance_m е цяло число", () => {
@@ -137,7 +137,7 @@ test("frostResponse: source.bg/en и period идват от grid.period, не с
   assert.ok(r.source.attribution.endsWith("2030"), r.source.attribution);
 });
 // Произходът идва от данните: source_id в grid.json решава етикета, връзката
-// и посочването — не Worker-ът да твърди CDS за всяка мрежа.
+// и посочването — не Worker-ът да твърди CDS за всяка решетка.
 test("frostResponse: source_id openmeteo -> етикет „през Open-Meteo“, url open-meteo.com, посочване на Open-Meteo (без CC-BY на CDS)", () => {
   const r = frostResponse({ ...grid, source_id: "openmeteo" }, 42.2, 24.9);
   assert.equal(r.source.bg, "ERA5 през Open-Meteo, 1996–2025");
@@ -148,13 +148,13 @@ test("frostResponse: source_id openmeteo -> етикет „през Open-Meteo�
 });
 test("frostResponse: source_id synthetic -> „пробни данни“, url null, attribution null", () => {
   const r = frostResponse({ ...grid, source_id: "synthetic", synthetic: true }, 42.2, 24.9);
-  assert.equal(r.source.bg, "Пробни данни (синтетична мрежа)");
-  assert.equal(r.source.en, "Sample data (synthetic grid)");
+  assert.equal(r.source.bg, "Пробни данни (синтетични)");
+  assert.equal(r.source.en, "Sample data (synthetic)");
   assert.equal(r.source.url, null);
   assert.equal(r.source.attribution, null);
   assert.deepEqual(Object.keys(r.source).sort(), ["attribution", "bg", "en", "url"]);
 });
-test("frostResponse: без source_id (стара мрежа) -> CDS, както досега", () => {
+test("frostResponse: без source_id (стара решетка) -> CDS, както досега", () => {
   const { source_id, ...legacy } = grid;
   const r = frostResponse(legacy, 42.2, 24.9);
   assert.equal(r.source.bg, "ERA5-Land през Copernicus CDS, 1996–2025");

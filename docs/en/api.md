@@ -40,8 +40,8 @@ Example — `GET /api/v1/frost?lat=42.18425&lon=24.92936` (Manole):
   "period": {"start": 1996, "end": 2025},
   "threshold_c": 0,
   "note": {
-    "bg": "ERA5 е мрежа от 9–25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни височината на клетката с тази на мястото си.",
-    "en": "ERA5 is a 9–25 km grid; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the cell elevation with your location's elevation."
+    "bg": "ERA5 дава по едно число за площ от около 9 × 9 до 25 × 25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни средната височина на площта с височината на мястото си.",
+    "en": "ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the area's average elevation with your location's elevation."
   },
   "source": {
     "bg": "ERA5-Land през Copernicus CDS, 1996–2025",
@@ -90,7 +90,7 @@ missing seasonal date; a rejected year has no row.
 |---|---|---|---|
 | `cds` (production) | `ERA5-Land през Copernicus CDS, 1996–2025` / `ERA5-Land via Copernicus CDS, 1996–2025` | the dataset's page on CDS | `Contains modified Copernicus Climate Change Service information 2026` (the computation year; required by the CDS licence) |
 | `openmeteo` | `ERA5 през Open-Meteo, 1996–2025` / `ERA5 via Open-Meteo, 1996–2025` | `https://open-meteo.com/` | `Weather data by Open-Meteo.com` |
-| `synthetic` | `Пробни данни (синтетична мрежа)` / `Sample data (synthetic grid)` | `null` | `null` |
+| `synthetic` | `Пробни данни (синтетични)` / `Sample data (synthetic)` | `null` | `null` |
 
 The synthetic grid is only for local development without network access to
 CDS/Open-Meteo (`grid/compute_grid.py --synthetic`, see
@@ -226,7 +226,7 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.4",
+  "app_version": "0.3.5",
   "elevation": true
 }
 ```

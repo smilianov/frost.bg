@@ -1,5 +1,5 @@
 // Приемателен тест: сметката в браузъра при пълния прозорец дава същото,
-// което мрежата е записала — за всичките 2 080 клетки, включително
+// което решетката е записала — за всичките 2 080 клетки, включително
 // null-овете. Това е единственото, което пази страницата и grid.json да не
 // се разминат.
 import { test } from "node:test";
@@ -9,7 +9,7 @@ import { pair, selectWindow } from "./stats.js";
 
 const grid = JSON.parse(readFileSync(new URL("../../grid/grid.json", import.meta.url), "utf8"));
 
-test("всички клетки: пълният прозорец съвпада с typical/safe от мрежата", () => {
+test("всички клетки: пълният прозорец съвпада с typical/safe от решетката", () => {
   let checked = 0, withDates = 0;
   const n = grid.period.end - grid.period.start + 1;
   for (const c of grid.cells) {

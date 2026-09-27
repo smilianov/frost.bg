@@ -1,4 +1,4 @@
-"""Тестове за мрежата (решетка, запис на клетка, сглобяване, пробег) — пускат се с: python tests_grid.py"""
+"""Тестове за решетката (точките ѝ, запис на клетка, сглобяване, пробег) — пускат се с: python tests_grid.py"""
 import email.message
 import email.utils
 import io, json, os, sys, tempfile
@@ -96,7 +96,7 @@ try:
 except TypeError as e:
     check("source_id=cds -> source_id cds и source текстът на CDS", False, f"TypeError: {e}")
 
-section("Синтетичната мрежа (за разработка, докато истинската се смята)")
+section("Синтетичната решетка (за разработка, докато истинската се смята)")
 st = cg.synthetic_tmin(42.2, 24.9, 1996, 2025)
 check("30 години дни", len(st.days) >= 30 * 365, str(len(st.days)))
 check("има слана през пролетта и есента", any(t is not None and t <= 0 and d.month < 7 for d, t in st.days)
@@ -106,7 +106,7 @@ r_high = cg.cell_record(43.5, 25.0, cg.synthetic_tmin(43.5, 25.0, 1996, 2025), 1
 check("по на север пролетната слана е по-късна (синтетиката е правдоподобна)",
       r_high["typical"][0] > r_low["typical"][0], f"{r_low['typical']} {r_high['typical']}")
 
-section("Пробегът: подменена мрежа, продължаване, повторен опит, обобщение")
+section("Пробегът: подменени заявки, продължаване, повторен опит, обобщение")
 tmp = tempfile.mkdtemp()
 calls = []
 def fake_fetch(lat, lon, start, end):
@@ -164,7 +164,7 @@ finally:
     fe.fetch_daily_tmin = real
     cg.SLEEP = real_sleep_plain
 
-section("--synthetic пише мрежа без мрежа")
+section("--synthetic пише решетка без интернет")
 tmp3 = tempfile.mkdtemp()
 rc = cg.main(["--out", tmp3, "--synthetic", "--today", "2026-09-14"], stdout=io.StringIO())
 g3 = json.load(open(os.path.join(tmp3, "grid.json"), encoding="utf-8"))
@@ -275,7 +275,7 @@ try:
 finally:
     fe.fetch_daily_tmin = real
 
-# (c) повреда в средата (не в последния ред) -> спира с грешка, назовава реда, не докосва мрежата
+# (c) повреда в средата (не в последния ред) -> спира с грешка, назовава реда, не докосва решетката
 tmp8 = tempfile.mkdtemp()
 cells_path8 = os.path.join(tmp8, "cells.jsonl")
 _valid_rec = {"lat": 41.2, "lon": 22.3, "elev": 100, "typical": ["04-10", "10-20"],
@@ -287,7 +287,7 @@ with open(cells_path8, "w", encoding="utf-8") as f:
     f.write('{"lat":41.2,"lon":22.4, СЧУПЕНО\n')                       # повреда, НЕ последният ред
     f.write(json.dumps({**_valid_rec, "lon": 22.5}, ensure_ascii=False) + "\n")
 def _must_not_be_called(lat, lon, start, end):
-    raise AssertionError("не биваше да вика мрежата — повредата трябва да спре пробега преди заявки")
+    raise AssertionError("не биваше да излиза в интернет — повредата трябва да спре пробега преди заявки")
 fe.fetch_daily_tmin = _must_not_be_called
 try:
     out8 = io.StringIO()
@@ -512,7 +512,7 @@ finally:
 
 section("Кръстосаната проверка отказва чужд период, файл без header, празен файл и нула клетки")
 # Сравнение без валиден вход не е „успех“: rc 0 трябва да значи, че наистина е
-# имало какво да се сравни, и за същия период като мрежата.
+# имало какво да се сравни, и за същия период като решетката.
 tmp_cc = tempfile.mkdtemp()
 grid_cc = {"period": {"start": 1996, "end": 2025},
            "cells": [{"lat": 42.2, "lon": 24.9, "typical": ["04-10", "10-20"], "safe": ["04-10", "10-20"]}]}

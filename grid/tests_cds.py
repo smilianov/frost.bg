@@ -1,4 +1,4 @@
-"""Тестове за четенето от Copernicus CDS (NetCDF) и fetch_cds (без мрежа) —
+"""Тестове за четенето от Copernicus CDS (NetCDF) и fetch_cds (без интернет) —
 пускат се с: .venv-cds/bin/python tests_cds.py
 
 Ако интерпретаторът, който го стартира, не може да внесе netCDF4 (най-често,
@@ -145,7 +145,7 @@ check("source казва CDS, synthetic false", "CDS" in g["source"] and g["synt
 check("source_id е cds (Worker-ът етикетира източника по него)", g.get("source_id") == "cds", str(g.get("source_id")))
 check("period 1996–2025", g["period"] == {"start": 1996, "end": 2025})
 
-section("Липсваща година -> грешка, не тиха мрежа")
+section("Липсваща година -> грешка, не тиха решетка")
 os.remove(os.path.join(tmp, "t2m_daily_min_2010.nc"))
 out = io.StringIO()
 rc = cg.main(["--from-cds", tmp, "--out", tmp, "--today", "2026-09-14"], stdout=out)
@@ -204,9 +204,9 @@ with open(path9, "w", encoding="utf-8") as f:
 logs9 = []
 try:
     rc9 = cg._cross_check({"period": {"start": 1996, "end": 2025}, "cells": [cell29]}, path9, logs9.append)
-    check("02-29 в клетка от мрежата: не гърми, разлика 0 дни, rc 0", rc9 == 0, str(logs9))
+    check("02-29 в клетка от решетката: не гърми, разлика 0 дни, rc 0", rc9 == 0, str(logs9))
 except ValueError as e:
-    check("02-29 в клетка от мрежата: не гърми, разлика 0 дни, rc 0", False, f"ValueError: {e}")
+    check("02-29 в клетка от решетката: не гърми, разлика 0 дни, rc 0", False, f"ValueError: {e}")
 
 cell_norm = {"lat": 42.2, "lon": 24.9, "typical": ["03-01", "10-20"], "safe": ["03-01", "10-20"]}
 path10 = os.path.join(tmp, "leap_in_om.jsonl")
@@ -220,7 +220,7 @@ try:
 except ValueError as e:
     check("02-29 в OM файла: не гърми, разлика 0 дни, rc 0", False, f"ValueError: {e}")
 
-section("fetch_cds: заявките и разархивирането, без мрежа")
+section("fetch_cds: заявките и разархивирането, без интернет")
 req = fetch_cds.year_request(2000)
 check("year_request(2000): точните ключове/стойности", req == {
     "variable": ["2m_temperature"],

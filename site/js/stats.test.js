@@ -1,5 +1,5 @@
 // Сметките зад историята по години. Договорът е преписан дума по дума от
-// grid/frost_estimate.py — ако тези тестове минат, а мрежата казва друго,
+// grid/frost_estimate.py — ако тези тестове минат, а решетката казва друго,
 // значи договорът е нарушен (виж stats.parity.test.js).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -8,7 +8,7 @@ import { dayOfYear, toMMDD, selectWindow, pair } from "./stats.js";
 test("dayOfYear: календарът е невисокосен, 29 февруари е 1 март", () => {
   assert.equal(dayOfYear("01-01"), 1);
   assert.equal(dayOfYear("03-01"), 60);
-  assert.equal(dayOfYear("02-29"), 60);   // сгънато, както в мрежата
+  assert.equal(dayOfYear("02-29"), 60);   // сгънато, както в решетката
   assert.equal(dayOfYear("12-31"), 365);
   for (const bad of ["13-01", "00-10", "04-31", "4-1", "", null, undefined, "2026-04-01", "0a-01"]) {
     assert.equal(dayOfYear(bad), null, String(bad));

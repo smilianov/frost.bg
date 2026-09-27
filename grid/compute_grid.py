@@ -1,9 +1,9 @@
-"""Мрежата за frost.bg: 2 080 точки на 0,1° върху България → grid.json.
+"""Решетката за frost.bg: 2 080 точки на 0,1° върху България → grid.json.
 
     python3 compute_grid.py                  # точка по точка: ~64 точки на час, ~128 на ден; продължава след прекъсване
-    python3 compute_grid.py --synthetic      # правдоподобна мрежа без мрежа, за разработка
+    python3 compute_grid.py --synthetic      # пробна решетка без интернет, за разработка
     python3 compute_grid.py --finish         # сглобява grid.json от cells.jsonl, каквото има
-    python3 compute_grid.py --from-cds cds --cross-check cells.jsonl   # истинската мрежа, от Copernicus CDS (виж fetch_cds.py)
+    python3 compute_grid.py --from-cds cds --cross-check cells.jsonl   # истинската решетка, от Copernicus CDS (виж fetch_cds.py)
 
 Всяка сметната точка се записва веднага в cells.jsonl; при ново пускане
 готовите се прескачат. Open-Meteo има дневни лимити — --pause (s) между
@@ -32,7 +32,7 @@ STEP = 0.1
 ATTEMPTS = 3
 SOURCE = "ERA5 през Open-Meteo, дневен минимум на 2 м"
 SOURCE_CDS = "ERA5-Land през Copernicus CDS, дневен минимум на 2 м"
-SOURCE_SYNTHETIC = "Синтетична мрежа — пробни данни, не истински температури"
+SOURCE_SYNTHETIC = "Синтетична решетка — пробни данни, не истински температури"
 # Машинният етикет на произхода; Worker-ът (worker/frost.js) избира по него
 # какво да напише за източника и какво посочване иска лицензът.
 SOURCE_IDS = {"cds": SOURCE_CDS, "openmeteo": SOURCE, "synthetic": SOURCE_SYNTHETIC}
@@ -104,7 +104,7 @@ def build_grid(cells: List[dict], start_year: int, end_year: int, synthetic: boo
 
 
 def synthetic_tmin(lat: float, lon: float, start_year: int, end_year: int) -> fe.DailyTmin:
-    """Правдоподобни дни без мрежа: по на север и по-високо — по-късна пролет,
+    """Правдоподобни дни без интернет: по на север и по-високо — по-късна пролет,
     по-ранна есен; детерминистично по координатите, с малко „разсейване“ по години."""
     elev = int(200 + 900 * max(0.0, math.sin((lon - 22.3) * 1.3)) * max(0.0, 1 - abs(lat - 42.7)))
     base_spring = 85 + int((lat - 41.2) * 12) + elev // 40          # ден от годината
@@ -148,7 +148,7 @@ def _load_done(path: str, expected_period: Tuple[int, int], log) -> Dict[Tuple[f
     другаде във файла е фатална грешка — там
     няма как записът да е просто „недовършен“. Периодът в header-а трябва
     да съвпада с поискания, иначе годишното опресняване би написало нова
-    година върху стара мрежа.
+    година върху стара решетка.
     """
     done: Dict[Tuple[float, float], dict] = {}
     if not os.path.exists(path) or os.path.getsize(path) == 0:
@@ -394,7 +394,7 @@ def _cross_check(grid: dict, path: str, log) -> int:
     крайният код е 1; иначе 0 с обобщение.
 
     rc 0 значи „наистина сравнено“: header-ът трябва да е {"period": [Y0, Y1]}
-    със същия период като мрежата (иначе сравняваме различни 30-годишни
+    със същия период като решетката (иначе сравняваме различни 30-годишни
     прозорци), и поне една клетка трябва да е обща. Празен файл, файл без
     header, чужд период или нула общи клетки -> rc 1 с ясно съобщение — не
     тих „успех“ преди публикуване."""
@@ -418,7 +418,7 @@ def _cross_check(grid: dict, path: str, log) -> int:
     expected = [grid["period"]["start"], grid["period"]["end"]]
     if list(header["period"]) != expected:
         log(f"кръстосаната проверка е за друг период: {header['period'][0]}–{header['period'][1]}, "
-            f"мрежата е {expected[0]}–{expected[1]} — не се брои")
+            f"решетката е {expected[0]}–{expected[1]} — не се брои")
         return 1
     for line in lines[1:]:                                   # header-ът е проверен по-горе
         line = line.strip()

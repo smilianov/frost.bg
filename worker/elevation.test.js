@@ -1,4 +1,4 @@
-// Височината на самата точка (Open-Meteo Elevation). Мрежата е подменена.
+// Височината на самата точка (Open-Meteo Elevation). Заявките към интернет са подменени.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { elevation, ElevationError, resetCooldown } from "./elevation.js";
