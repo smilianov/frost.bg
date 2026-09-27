@@ -23,7 +23,7 @@ MB** неформатиран JSON, сметнат от дневния мини�
   `grid/frost_estimate.py` (виж по-долу).
 
 И двата скрипта са само за поддръжка на решетката: нито се пускат от Worker-а,
-нито влизат в продукционния bundle. В runtime решетката е чист JSON — Worker-ът
+нито влизат в production bundle-а. В runtime решетката е чист JSON — Worker-ът
 я импортира директно като JSON модул (`import grid from "../grid/grid.json" with {
 type: "json" }`), тя се вгражда в bundle-а при `deploy`/`dev` и живее в
 паметта на isolate-а, докато той е жив; никакво I/O при заявка не я чете от

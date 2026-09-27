@@ -52,7 +52,7 @@ npm test
 **офлайн**, не при всяка заявка — вижте формата и правилата ѝ в
 [спецификацията](../superpowers/specs/2026-09-14-frost-bg-design.md) (Р1).
 Два инструмента я пълнят; никой от двата не се пуска от Worker-а и не влиза
-в продукционния bundle. Решетката записва произхода си в `source_id` (`cds`,
+в production bundle-а. Решетката записва произхода си в `source_id` (`cds`,
 `openmeteo` или `synthetic`) — API-то и страницата етикетират източника,
 връзката и посочването по него (виж [`api.md`](api.md)).
 
@@ -334,7 +334,7 @@ grid/.venv-cds/bin/python -c 'import netCDF4' && npm test && npm run check:links
   `site/.assetsignore` (тестовете `*.test.js`; тест `worker/assets.test.js`
   пази списъка).
 - Променливите `GEOCODER`, `MAP`, `GOOGLE_MAPS_KEY` в `[vars]` на
-  `wrangler.toml` са и продукционните — прегледано при първия deploy:
+  `wrangler.toml` са и тези за production — прегледано при първия deploy:
   Open-Meteo и OSM, без ключ за Google.
 - При **първия** deploy на нов `workers.dev` адрес TLS сертификатът се
   издава минута-две — дотогава `curl` дава „SSL handshake failure“; не е
