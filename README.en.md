@@ -19,7 +19,7 @@ npm install
 npm run dev
 ```
 
-Opens at [http://localhost:8787](http://localhost:8787).
+The site opens at [http://localhost:8787](http://localhost:8787).
 
 The Google Geocoding key (if ever used) is a secret, not a variable: set it
 locally as `GOOGLE_KEY=…` in `.dev.vars`, and in production with
@@ -40,10 +40,10 @@ npm test
 | [`docs/en/README.md`](docs/en/README.md) | what frost.bg is, where the data comes from, what "typical"/"safe" mean |
 | [`docs/en/api.md`](docs/en/api.md) | API v1 — the four endpoints, parameters, example responses, errors, caching and CORS |
 | [`docs/en/architecture.md`](docs/en/architecture.md) | how the project is built: the grid, the Worker, the cache, the page, the environments and the tests |
-| [`docs/en/operations.md`](docs/en/operations.md) | how the grid is computed and refreshed, running locally, testing, the cache, what's missing for deploy |
+| [`docs/en/operations.md`](docs/en/operations.md) | how the grid is computed and refreshed, running locally, testing, the cache, deploy and what's still missing |
 | [The site guide](https://frost.bg/en/guide/) | how to read the dates, the chart and the risk figure — for people, not developers |
 
-Their Bulgarian twins: [`docs/bg/`](docs/bg/README.md) and
+The same in Bulgarian: [`docs/bg/`](docs/bg/README.md) and
 [the Bulgarian guide](https://frost.bg/guide/).
 
 Want to propose a change — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
@@ -53,7 +53,7 @@ Want to propose a change — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 Phase 1 (the grid and API v1):
 `docs/superpowers/specs/2026-09-14-frost-bg-design.md`
 
-Phase 2 (the page's year history):
+Phase 2 (the page's year history and the elevation of the point itself):
 `docs/superpowers/specs/2026-09-23-frost-bg-phase2-design.md`
 
 ## Data source
@@ -102,7 +102,7 @@ datasets on each dataset's page; the API key goes in `~/.cdsapirc` (per
 CDS's own instructions).
 
 ```bash
-# download: 30 years of daily minimum + geopotential (the CDS queue takes minutes to hours; resumes on interruption)
+# download: 30 years of daily minimum + geopotential (the CDS queue can take days — six last time; resumes on interruption)
 grid/.venv-cds/bin/python grid/fetch_cds.py --out grid/cds
 
 # compute grid.json from the download, cross-checked against the Open-Meteo probe in grid/cells.jsonl
@@ -114,7 +114,8 @@ or why there was nothing to compare, is explained in
 [`docs/en/operations.md`](docs/en/operations.md).
 
 Recommended cadence: once a year, in January (once the previous calendar
-year is complete in ERA5-Land).
+year is complete in ERA5-Land). The download can take days in the CDS
+queue, so start it early.
 
 Sea cells have no temperatures: ERA5-Land only covers land, so for cells over
 the Black Sea `read_year` returns `None` for every day (about 178 of the
@@ -132,8 +133,9 @@ experiment, pass an existing directory with `--out`; the site keeps reading
 `grid/grid.json`.
 
 ```bash
-python3 grid/compute_grid.py                  # point by point: ~64 points per hour, ~128 per day from one IP; resumes after interruption
+python3 grid/compute_grid.py                  # point by point; one IP has two quotas — ~64 points per hour and ~128 per day; resumes after interruption
 python3 grid/compute_grid.py --synthetic       # a plausible grid without network access, for development
+python3 grid/compute_grid.py --finish          # only assembles grid.json from what's in grid/cells.jsonl, no requests
 ```
 
 The whole grid via Open-Meteo would take about 16 days from one IP — which
