@@ -190,8 +190,8 @@ pipeline през API за същия SHA. Deploy не е част от CI пр�
 - **Всеки видим текст съществува и на двата езика** — интерфейсът
   (`site/js/texts.js`), грешките и посочванията на API-то
   (`worker/texts.js`), документацията (`docs/bg/` и `docs/en/`, огледални
-  по съдържание). Нов текст на един език без своя близнак на другия не се
-  приема.
+  по съдържание). Нов текст на един език без съответния текст на другия не
+  се приема.
 
 ## Мрежата не се редактира на ръка
 
@@ -429,8 +429,8 @@ not part of a CI change.
 - **Every user-visible text exists in both languages** — the interface
   (`site/js/texts.js`), the API's errors and attributions
   (`worker/texts.js`), the documentation (`docs/bg/` and `docs/en/`,
-  mirrored in content). New text in one language without its twin in the
-  other is not accepted.
+  mirrored in content). New text in one language without the matching text
+  in the other is not accepted.
 
 ## The grid is not hand-edited
 
