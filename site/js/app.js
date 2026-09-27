@@ -109,6 +109,8 @@ function render(d) {
   // не зависи от geocoder/MAP конфигурацията.
   const elevNoteP = el("p", { id: "elev-note", class: "hint" });
   elevNoteP.hidden = true;
+  const elevWarnP = el("p", { id: "elev-warn", class: "hint" });
+  elevWarnP.hidden = true;
   const elevSrcP = el("p", { id: "elev-source", class: "src" });
   elevSrcP.hidden = true;
 
@@ -129,7 +131,7 @@ function render(d) {
       : text(t.api),
   );
 
-  $("result").replaceChildren(pairs, pairsNote, cellP, elevNoteP, elevSrcP, noteP, srcP);
+  $("result").replaceChildren(pairs, pairsNote, cellP, elevNoteP, elevWarnP, elevSrcP, noteP, srcP);
   $("result").hidden = false;
   $("synthetic").hidden = !d?.synthetic;
   if (qLat !== null) $("lat").value = qLat;
@@ -307,12 +309,16 @@ async function fetchElevation(mySeq, lat, lon) {
   try { body = await r.json(); }
   catch (_) { return; }
   if (mySeq !== lookupSeq) return;
-  const view = elevationView(body, { lang, t });
+  // render(d) вече е минал за същата заявка (lookup вика fetchElevation СЛЕД
+  // него), значи lastData носи височината на клетката за това търсене.
+  const view = elevationView(body, { lang, t, cellElev: lastData?.cell?.elev_m });
   if (!view) return;
   const cell = $("cell");
   if (cell) cell.append(text(` · ${view.pointElevText}`));
   const note = $("elev-note");
   if (note) { note.textContent = view.elevNoteText; note.hidden = false; }
+  const warnP = $("elev-warn");
+  if (warnP && view.warnText) { warnP.textContent = view.warnText; warnP.hidden = false; }
   const src = $("elev-source");
   if (src) {
     src.replaceChildren(text(`${t.source}: `));
