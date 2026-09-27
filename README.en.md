@@ -65,8 +65,8 @@ reanalysis (ECMWF), downloaded from the
 `derived-era5-land-daily-statistics` dataset, a 0.1° ≈ 9 km grid).
 [Open-Meteo](https://open-meteo.com/) stays in the project for three things:
 place names (the default geocoder), the elevation of the selected point itself
-(the Elevation API — a real runtime dependency, with its own budget and its own
-failures) and the cross-check of the grid.
+(the Elevation API — the site uses it at runtime; the service has request
+limits and may be unavailable) and the cross-check of the grid.
 
 ## The grid
 

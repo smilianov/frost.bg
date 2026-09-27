@@ -17,7 +17,15 @@ const read = (p) => readFileSync(new URL(p, import.meta.url), "utf8");
 const page = (p) => read(p).replace(/<(script|style)\b[\s\S]*?<\/\1>/g, "");
 
 // Функциите в речника се четат като изходен код — шаблонът им е текстът.
-const dict = (lang) => Object.values(T[lang]).map(String).join("\n");
+//
+// Правилото е за СМИСЪЛА, а регулярният израз вижда само думата: „Няма връзка
+// с мрежата“ е за интернет и е напълно правилно. Затова ключовете, които
+// говорят за връзката, се изключват изрично — не се разчита на това, че
+// днешният им текст случайно не казва „мрежа“.
+const NETWORK_KEYS = new Set(["network_error"]);
+const human = (obj) =>
+  Object.entries(obj).filter(([k]) => !NETWORK_KEYS.has(k)).map(([, v]) => String(v)).join("\n");
+const dict = (lang) => human(T[lang]);
 const worker = (lang) =>
   [
     TEXTS.note[lang],
@@ -42,16 +50,32 @@ const HUMAN = {
 };
 
 // Само съществителното: „мрежова грешка“ (интернет) не е решетката.
-const MREZHA = /(?<!\p{L})мреж(?:а|ата|и|ите)(?!\p{L})/iu;
+// „Решетка“ също не е за хора — тя е думата за разработчиците.
+const MREZHA = /(?<!\p{L})(?:мреж(?:а|ата|и|ите)|решетк(?:а|ата|и|ите))(?!\p{L})/iu;
 const GRID = /(?<!\p{L})grids?(?!\p{L})/iu;
 
-test("в текста за хора няма „мрежа“ (bg) и „grid“ (en) — казва се „площ“ / „area“", () => {
+test("в текста за хора няма „мрежа“ или „решетка“ (bg) и „grid“ (en) — казва се „площ“ / „area“", () => {
   for (const [lang, re] of [["bg", MREZHA], ["en", GRID]]) {
     for (const [name, text] of Object.entries(HUMAN[lang])) {
       const m = text.match(re);
       assert.equal(m, null, `${name}: „${m?.[0]}“ в текст за хора — …${text.slice(Math.max(0, m?.index - 60), m?.index + 60)}…`);
     }
   }
+});
+
+test("съобщение за връзката може да казва „мрежата“ — то е за интернет, не за площта", () => {
+  const bg = human({ ...T.bg, network_error: "Няма връзка с мрежата. Опитай пак." });
+  const en = human({ ...T.en, network_error: "No network connection. Try again." });
+  assert.equal(bg.match(MREZHA), null, "bg: съобщението за връзката не бива да проваля правилото");
+  assert.equal(en.match(GRID), null, "en: съобщението за връзката не бива да проваля правилото");
+});
+test("…но същата дума в текст за сланата се хваща", () => {
+  const bg = human({ ...T.bg, no_history: "Няма история за тази мрежа." });
+  const bg2 = human({ ...T.bg, no_history: "Няма история за тази решетка." });
+  const en = human({ ...T.en, no_history: "No history for this grid." });
+  assert.notEqual(bg.match(MREZHA), null, "bg: „мрежа“ в текст за сланата трябва да се хване");
+  assert.notEqual(bg2.match(MREZHA), null, "bg: „решетка“ в текст за хора трябва да се хване");
+  assert.notEqual(en.match(GRID), null, "en: „grid“ в текст за сланата трябва да се хване");
 });
 
 test("размерът на площта е „9 × 9 км“, никога само „9 км“", () => {
@@ -64,16 +88,26 @@ test("размерът на площта е „9 × 9 км“, никога са
   }
 });
 
+// Точна фраза с граници: „19 × 9“ или липсваща мерна единица да не минават.
+const exact = (text, phrase) =>
+  new RegExp(`(?<![\\p{L}\\d])${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\d])`, "u").test(text);
+const visible = (p) => page(p).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+
 test("площта се въвежда с „около 9 × 9 км“ там, където човекът я среща за първи път", () => {
-  // Ръководството: абзацът, който започва „Двете височини“.
-  const bgIntro = read("../guide/index.html").match(/<h2>Двете височини<\/h2>\s*<p>([\s\S]*?)<\/p>/);
-  const enIntro = read("../en/guide/index.html").match(/<h2>The two elevations<\/h2>\s*<p>([\s\S]*?)<\/p>/);
-  assert.ok(bgIntro && bgIntro[1].includes("площ около 9 × 9 км"), `bg ръководство: ${bgIntro?.[1]}`);
-  assert.ok(enIntro && enIntro[1].includes("an area of about 9 × 9 km"), `en ръководство: ${enIntro?.[1]}`);
+  // Ръководството: първото „площ“/„area“ в реда на четене носи и размера.
+  for (const [p, word, phrase] of [
+    ["../guide/index.html", "площ", /^площ(?:та)? около 9 × 9 км(?![\p{L}\d])/u],
+    ["../en/guide/index.html", "area", /^area of about 9 × 9 km(?![\p{L}\d])/u],
+  ]) {
+    const text = visible(p);
+    const i = text.search(new RegExp(`(?<!\\p{L})${word}`, "u"));
+    assert.ok(i >= 0, `${p}: няма „${word}“`);
+    assert.match(text.slice(i), phrase, `${p}: първото „${word}“ е без размера — …${text.slice(i, i + 80)}…`);
+  }
   // Страницата: етикетът до координатите и височината.
   assert.equal(T.bg.cell, "Площ около 9 × 9 км");
   assert.equal(T.en.cell, "Area of about 9 × 9 km");
-  // API-то: бележката, която страницата показва под датите.
-  assert.ok(TEXTS.note.bg.includes("9 × 9") && TEXTS.note.bg.includes("площ"), TEXTS.note.bg);
-  assert.ok(TEXTS.note.en.includes("9 × 9") && TEXTS.note.en.includes("area"), TEXTS.note.en);
+  // API-то: бележката под датите — целият размер, с граници и мерна единица.
+  assert.ok(exact(TEXTS.note.bg, "площ от около 9 × 9 до 25 × 25 км"), TEXTS.note.bg);
+  assert.ok(exact(TEXTS.note.en, "area of about 9 × 9 to 25 × 25 km"), TEXTS.note.en);
 });

@@ -87,8 +87,8 @@ grid/.venv-cds/bin/python grid/fetch_cds.py --out grid/cds
 ```
 
 30 years of daily minimum plus one request for the geopotential. Each year
-is a separate request to CDS, and it queues — per the script's own note:
-minutes to hours, depending on CDS load at the time; `--parallel N`
+is a separate request to CDS, and it queues. The wait depends on CDS load;
+the last download of the complete 30-year dataset took six days; `--parallel N`
 (default 3) downloads up to N years at once, each in its own thread with
 its own `cdsapi.Client()` (`--parallel 1` for sequential downloads, if you
 prefer). **Resumes after interruption:** already-downloaded files are
