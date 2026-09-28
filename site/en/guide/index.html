@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>frost.bg — how to read this</title>
-<meta name="description" content="What the dates, the chart, the periods, the risk and the two elevations on frost.bg mean.">
+<title>frost.bg — how to read the dates</title>
+<meta name="description" content="What the frost dates on frost.bg mean and how to use them in your garden.">
 <link rel="stylesheet" href="/css/app.css">
 </head>
 <body data-lang="en">
@@ -14,54 +14,56 @@
   <a class="lang" href="/guide/">Български</a>
 </header>
 <main class="wrap">
-  <h1>How to read this</h1>
-  <p class="lead">The page gives you two pairs of dates for your point, and the history behind them. Here is what each number means.</p>
+  <h1>How to read the dates</h1>
+  <p class="lead">This page explains what the dates and numbers on the results page mean and how to use them in the garden. The examples are for Manole, a village near Plovdiv, using the data for 1996–2025.</p>
 
   <h2>The two pairs of dates</h2>
-  <p>For any point, the page gives four dates for the area of about 9 × 9 km that contains it: typical and safe for spring, typical and safe for autumn. The two seasons are computed separately — each from its own years with data, because a given area can be missing spring dates only, or autumn dates only.</p>
-  <p>The <strong>typical</strong> date is the median of the years with data for that season — close to "half the years," but not exactly: for Manole, 16 of the 30 years had the last spring frost on or before the typical date, and 16 of the 30 had the first autumn frost on or before the typical date too. With an even number of years, the choice is conservative: the later of the two middle dates in spring, the earlier one in autumn.</p>
-  <p>The <strong>safe</strong> date is a percentile of the same years — the 90th in spring, the 10th in autumn. The two boundaries are separate statistics for separate seasons, not one combined promise: for Manole, 3 of the 30 years had frost after the safe spring date (April 11), 2 of the 30 had frost before the safe autumn date (October 30), and 25 of the 30 had neither.</p>
-  <p>For Manole, over 30 years of data: typical March 29 / November 25, safe April 11 / October 30.</p>
-  <p class="hint">Tip: for your first spring at a new place, use the safe date as a more cautious guide — it is usually 7 to 14 days after the typical date, and the number for your own point is on the screen. Before sowing, also consider the forecast, the conditions in your garden and the plant's requirements: this date does not promise that frost is over.</p>
+  <p>For every place you get four dates: a typical and a safe date for the last spring frost, and a typical and a safe date for the first autumn frost. They apply to the whole area of about 9 × 9 km that your place falls in. Spring and autumn are worked out separately, each from its own years — some areas have enough spring dates but not autumn ones, or the other way round.</p>
+  <p>The <strong>typical</strong> date is the middle one: the dates from all the years are put in order from earliest to latest, and the one in the middle is taken. So in about half the years the frost came by that date. For Manole, 16 of the 30 years had the last spring frost on or before the typical date, and 16 of the 30 had the first autumn frost on or before it. When two dates share the middle, we take the more cautious one: the later one in spring and the earlier one in autumn.</p>
+  <p>The <strong>safe</strong> date is the more cautious one. In spring it is the date after which there was no more frost in 9 of 10 years. In autumn it is the date before which there was no frost yet in 9 of 10 years. The two dates are calculated separately and promise nothing about the whole year at once: for Manole, 3 of the 30 years had frost after the safe spring date (April 11), 2 of the 30 had frost before the safe autumn date (October 30), and 25 of the 30 had neither.</p>
+  <p>In short, for Manole over 30 years of data: typical March 29 / November 25, safe April 11 / October 30.</p>
+  <p class="hint">Tip: for your first spring in a new place, go by the safe date. It is usually 7 to 14 days after the typical one, and the exact number for your place is on the results page. Before planting, also check the weather forecast and what the plant needs — no date promises there will be no more frost.</p>
 
   <h2>The chart</h2>
-  <p>Each point on the chart is one year: a circle for the last spring frost, a diamond for the first autumn frost. The axis on the left is the months.</p>
-  <p>Arrow keys (or a finger on a phone) pick a year and show its dates.</p>
-  <p>Points outside the selected period are hollow, not hidden. The chart's range doesn't change with the period, so years never appear to vanish.</p>
+  <p>On the chart each year has two marks: a circle for the last spring frost and a diamond for the first autumn frost. The months are on the left.</p>
+  <p>Click or tap a year on the chart to see its dates. On a keyboard, use the left and right arrow keys.</p>
+  <p>The chart always shows all 30 years. Years outside the selected period stay, but their marks are hollow — so it doesn't look as if years are missing.</p>
 
   <h2>The 10, 20 and 30-year periods</h2>
-  <p>The dates are recalculated for the selected period from the same data, with no new request to the server.</p>
-  <p>There is no period shorter than 10 years: the safe date only makes sense with at least 10 years with frost for that season — a smaller sample isn't one you can trust.</p>
-  <p>Below the dates is how many days the typical frost has shifted over the last 10 years compared with all 30 — so you can see whether frost is coming earlier or later at your place than before.</p>
+  <p>The dates can be worked out from the last 10, 20 or all 30 years. Change the period and the dates are recalculated straight away.</p>
+  <p>There is no period shorter than 10 years. The site shows a safe date only if the selected period has at least 10 years with frost in that season — with fewer years we don't calculate it, because there are too few.</p>
+  <p>Under the dates it says by how many days the typical date for the last 10 years differs from the one for all 30. That shows which way recent years have gone, but a difference of a few days can also be chance.</p>
 
   <h2>The risk after a date</h2>
-  <p>Example for Manole: in 1 of 30 years there was frost after April 20 and before July 1 — 3%.</p>
-  <p>This is a historical frequency for this area and this date, not a forecast for this year; frost <strong>on</strong> the date itself does not count — only after it.</p>
-  <p>It answers for spring only: the first autumn frost before a given date says nothing about the days that follow.</p>
-  <p>The safe date works on the same idea, just with a fixed target instead of a date you pick — for your own point, use the "Risk of frost after a date" control on the results page.</p>
+  <p>On the results page you can pick a date and see in how many of the years there was a spring frost after it.</p>
+  <p>Example for Manole: in 1 of 30 years there was a spring frost after April 20 — 3%.</p>
+  <p>This is how often it happened in the past, not a forecast for this year. Frost <strong>on</strong> the chosen date itself doesn't count — only after it. Spring frosts are those up to the end of June.</p>
+  <p>This works for spring only: in autumn more frosts follow the first one, so the question "will there be frost after this date" makes no sense there.</p>
+  <p>The safe date is the same calculation in reverse: instead of you picking a date, the site finds the date after which there was frost in only 1 of 10 years.</p>
 
   <h2>The frost-free season</h2>
-  <p>The frost-free season and the risk after a date are computed from the years with data in the selected period — 10, 20 or 30 years. For each such year, the frost-free season length is the number of days between that year's last spring frost and first autumn frost, not counting either frost day.</p>
-  <p>If a year with data has no recorded spring frost, the season is counted from January 1; if it has no recorded autumn frost, it is counted through December 31. If both are absent, the calculation gives 365 days. The calendar has 365 days, with February 29 treated as March 1.</p>
-  <p>The typical length is the median of the yearly lengths — with an even number of years, the median is the average of the two middle ones: for Manole, with 30 years selected, (236 + 238) / 2 = 237 days. The shortest (194 days, 1997) and longest (281 days, 2023) are real, individual years, not a calculation.</p>
-  <p class="hint">That's why subtracting the two typical dates gives a different number: the same calculation, applied directly to March 29 and November 25, gives 240 days, while the median of the yearly lengths is 237. The median of the differences is not the difference of the medians.</p>
+  <p>For each year we work out the frost-free season length: how many days there are between the last spring frost and the first autumn frost, not counting the frost days themselves. The years in the selected period are used — 10, 20 or 30.</p>
+  <p>If a year has no recorded spring frost, the season is counted from January 1; if it has no autumn frost, through December 31; if it has neither, the season is the whole year — 365 days.</p>
+  <p>The typical length is the middle of those years. With an even number of years two values share the middle, and we take their average: for Manole, with 30 years selected, (236 + 238) / 2 = 237 days. (For the dates above we take the more cautious of the two middle dates; here, the average of the two day counts.) The shortest season was 194 days (1997), the longest 281 days (2023).</p>
+  <p class="hint">If you subtract the two typical dates yourself (March 29 and November 25), you get 240 days, not 237. It isn't a mistake: the typical length is worked out year by year and then the middle is taken, which isn't the same as the gap between the two typical dates.</p>
 
   <h2>The two elevations</h2>
-  <p>The dates are computed for an area of about 9 × 9 km, with a single average elevation for the whole area. For Manole it is the area centred on 42.2, 24.9, at an elevation of 99 m.</p>
-  <p>The point you pick or search for is usually elsewhere in that area and can be at a different elevation — for Manole the point is ≈ 152 m.</p>
-  <p>The two come from different models and <strong>do not</strong> correct the dates — they're there for you to judge for yourself.</p>
-  <p>When the point is at least 50 m above the area's average elevation, the page warns that frost there comes later in spring and earlier in autumn than the dates shown. When it is at least 50 m below, it warns you not to count on earlier dates: cold air settles in low ground at night. Manole is 53 m above its area's average elevation, so the warning shows there.</p>
-  <p>ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is usually overestimated, meaning frost is underestimated: real dates there may be later in spring and earlier in autumn than shown. This is a tendency, not a rule — the elevation difference alone isn't enough to tell you whether or by how much.</p>
+  <p>The dates are calculated for the whole area of about 9 × 9 km, with one average elevation for it. For Manole, the area's average elevation is 99 m.</p>
+  <p>The place you pick is rarely right in the middle of the area and may be at a different elevation — Manole itself is at about 152 m.</p>
+  <p>The two elevations come from different sources. The page doesn't adjust the dates for them — it shows them so you can judge for yourself.</p>
+  <p>When the place is at least 50 m above the area's average elevation, the page warns that frost there probably ends later in spring and comes earlier in autumn. When it is at least 50 m below, it warns you not to count on earlier dates, because at night cold air flows downhill and settles in low ground. Manole is 53 m above the average elevation of its area, so the warning shows there.</p>
+  <p>The numbers are averages for the whole area, and in valleys they often show warmer nights than there really are — that is, less frost. There the real dates may be later in spring and earlier in autumn. But the difference in elevation alone can't tell you whether, or by how much.</p>
 
   <h2>Where the numbers come from</h2>
-  <p>The data is ERA5-Land via Copernicus CDS, 30 full years. Frost means a day with a 2 m minimum temperature ≤ 0°C.</p>
-  <p>Each area is 0.1° × 0.1° (about 9 × 9 km); the dates were precomputed for 2,080 such areas over Bulgaria.</p>
-  <p>A year with under 300 valid days doesn't count for that area. The threshold of 10 years with recorded frost for the relevant season applies separately to spring and autumn, and separately to the selected period — so an area can have spring dates but no autumn dates, or the other way round.</p>
-  <p>A table row with no data for that year is labeled "not enough data". A date that wasn't recorded in a year that does have data is labeled "no frost recorded" — those are not the same thing.</p>
+  <p>The numbers are calculated from ERA5-Land — a European weather archive from the Copernicus programme that holds temperatures day by day for recent decades. We use 30 full years: 1996–2025.</p>
+  <p>A frost day is any day when the lowest temperature 2 m above the ground is 0 °C or below. Right at ground level, frost can form even when it is slightly above zero at 2 m.</p>
+  <p>Each area is 0.1° × 0.1° (about 9 × 9 km). The dates are calculated in advance for all 2,080 such areas.</p>
+  <p>A year with fewer than 300 days of data isn't counted. The threshold of 10 years with recorded frost applies separately to spring and autumn and to each period — so an area can have spring dates but no autumn ones, or the other way round.</p>
+  <p>In the year-by-year table you'll see two different labels: "not enough data" — the data for that year falls short and it isn't counted; "no frost recorded" — there is data, but it shows no frost in that season.</p>
 
   <h2>Why it doesn't match what I see</h2>
-  <p>The dates come from a model, not a thermometer in your garden: one area is about 9 × 9 km (≈ 11 km north–south, ≈ 8 km east–west), which is close to 90 km² under one and the same number — with a single average elevation for that whole area, no microrelief and no cold pocket behind the fence.</p>
-  <p>Use the dates as a frame for planning, not a verdict — and keep your own notes for your place. Over time, they become your best guide to your own garden specifically.</p>
+  <p>The dates are calculated, not measured by a thermometer in your garden. They apply to an area of about 9 × 9 km (about 11 km north to south and 8 km east to west) — close to 90 km² with one number and one average elevation. An area like that has hills and hollows. In a low spot in your yard where cold air collects at night, frost can form even when there is none higher up. And on the ground, frost forms even when it is slightly above zero at 2 m.</p>
+  <p>Use the dates as a guide, not a hard rule — and write down when frost comes at your place. After a few years those notes will be the most accurate guide for your garden.</p>
 </main>
 <footer class="foot">
   <a href="/en/">Back to the frost dates</a> · <a href="https://github.com/smilianov/frost.bg">Source on GitHub</a> · <a href="/api/v1/config">API configuration (JSON)</a>

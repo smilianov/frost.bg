@@ -8,6 +8,43 @@
 
 ---
 
+## [0.3.6] — 2026-09-28
+
+### 🇧🇬 Български
+
+- **Ръководството е пренаписано с обикновени думи**, за градинар, не за
+  специалист. Вместо „медиана“ и „персентил“: „датите се подреждат и се
+  взима средата“ и „в 9 от 10 години“. Махнати са „статистики“,
+  „извадка“, „контролата“, „заявка към сървъра“, „микрорелеф“ и
+  измисленият израз „студената яма зад плета“.
+- **Добавено:** кое е Маноле (село край Пловдив), от кои години са данните
+  (1996–2025) и че слана по земята пада и когато на 2 м е малко над нулата.
+- **Поправено:** „площ от 9 × 9 до 25 × 25 км“ → само „около 9 × 9 км“;
+  предупреждението за височината е „вероятно“, не твърдение; разликата
+  между последните 10 и всичките 30 години може да е и случайна; прагът
+  от 10 години е правило на сайта, не граница на надеждността.
+- Числата за Маноле са същите и тестовете продължават да ги смятат от
+  решетката; сменени са само думите, по които ги намират.
+
+### 🇬🇧 English
+
+- **The guide is rewritten in plain words**, for a gardener rather than a
+  specialist: "the dates are put in order and the middle one is taken" and
+  "in 9 of 10 years" instead of "median" and "percentile"; "statistics",
+  "sample", "control", "server request", "microrelief" and the "cold pocket
+  behind the fence" are gone.
+- **Added:** what Manole is (a village near Plovdiv), which years the data
+  covers (1996–2025), and that ground frost forms even when it is slightly
+  above zero at 2 m.
+- **Fixed:** "an area of 9 × 9 to 25 × 25 km" → just "about 9 × 9 km"; the
+  elevation warning says "probably", not a statement of fact; the 10 vs 30
+  year difference can also be chance; the 10-year threshold is the site's
+  rule, not a reliability boundary.
+- The numbers for Manole are unchanged and the tests still compute them
+  from the grid; only the words they are found by have changed.
+
+---
+
 ## [0.3.5] — 2026-09-27
 
 ### 🇧🇬 Български
