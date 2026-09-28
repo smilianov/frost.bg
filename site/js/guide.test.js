@@ -195,14 +195,14 @@ test("езикът на документа е обявен вярно", () => {
 // цялата фраза връща връзката.
 test("клетката и точката на Маноле стоят в изречението, което ги обяснява", () => {
   const bgP = paragraphContaining(bg, "надморска височина");
-  const enP = paragraphContaining(en, "elevation of");
-  assert.ok(includesExactPhraseWithTrailingUnit(bgP, `${manole.lat}, ${manole.lon}, на ${manole.elev} м`), "bg: клетката, координати+височина заедно (от grid.json)");
-  assert.ok(includesExactPhraseWithTrailingUnit(enP, `${manole.lat}, ${manole.lon}, at an elevation of ${manole.elev} m`), "en: клетката, координати+височина заедно (от grid.json)");
+  const enP = paragraphContaining(en, "average elevation is");
+  assert.ok(includesExactPhraseWithTrailingUnit(bgP, `средната височина на площта е ${manole.elev} м`), "bg: височината на площта в изречението, което я назовава (от grid.json)");
+  assert.ok(includesExactPhraseWithTrailingUnit(enP, `the area's average elevation is ${manole.elev} m`), "en: височината на площта в изречението, което я назовава (от grid.json)");
   // 152 м е височината на самата точка (Open-Meteo/Copernicus DEM за точния
   // Маноле от брифа) — идва от отделен доставчик, не е в grid.json, затова
   // остава документирана константа, не преизчислена стойност.
-  assert.ok(includesExactPhraseWithTrailingUnit(bg, "точката е ≈ 152 м"), "bg: точката, 152 м, точна граница");
-  assert.ok(includesExactPhraseWithTrailingUnit(en, "the point is ≈ 152 m"), "en: точката, 152 m, точна граница");
+  assert.ok(includesExactPhraseWithTrailingUnit(bg, "Маноле е на около 152 м"), "bg: мястото, 152 м, точна граница");
+  assert.ok(includesExactPhraseWithTrailingUnit(en, "Manole itself is at about 152 m"), "en: мястото, 152 m, точна граница");
 });
 
 // Обобщаващото изречение („типична 29 март / 25 ноември, сигурна 11 април /
@@ -228,7 +228,7 @@ test("в „защо не съвпада“ площта носи истинск
       includesExact(sizePara, size),
       `абзацът с ${cellMarker} (${lang}) трябва да носи размера на площта „${size}“`,
     );
-    const why = paragraphContaining(html, lang === "bg" ? "не от термометър" : "not a thermometer");
+    const why = paragraphContaining(html, lang === "bg" ? "с термометър" : "by a thermometer");
     assert.ok(
       !vague.test(why),
       `„защо не съвпада“ (${lang}) описва площта мъгляво: ${why}`,
@@ -272,8 +272,8 @@ test("рисковият пример носи истинските числа �
 // самите гранични дати (11 април/30 октомври) идват от formatMMDD, не са
 // преписани на ръка.
 test("границите на сигурната дата стоят поотделно, с истинските числа за Маноле, в изречението", () => {
-  const bgP = paragraphContaining(bg, "Двете граници са отделни статистики");
-  const enP = paragraphContaining(en, "The two boundaries are separate statistics");
+  const bgP = paragraphContaining(bg, "Двете дати се смятат поотделно");
+  const enP = paragraphContaining(en, "The two dates are calculated separately");
   assert.ok(includesExact(bgP, `${springBreach} от ${N} години е имало слана след сигурната пролетна дата (${safeSpringBg})`), "bg: пролетна граница");
   assert.ok(includesExact(bgP, `${autumnBreach} от ${N} — преди сигурната есенна (${safeAutumnBg})`), "bg: есенна граница");
   assert.ok(includesExact(bgP, `${neitherBreach} от ${N} — нито едното, нито другото`), "bg: нито едното");
@@ -285,8 +285,8 @@ test("границите на сигурната дата стоят поотд�
 // „Типичната“ не дели точно наполовина — реалният брой години „на или
 // преди“ границата, поотделно за пролет и есен, в абзаца, който го твърди.
 test("типичната дата дава истинския брой години „на или преди“ границата, не точно наполовина", () => {
-  const bgP = paragraphContaining(bg, "медианата на годините с данни за съответния сезон");
-  const enP = paragraphContaining(en, "median of the years with data for that season");
+  const bgP = paragraphContaining(bg, "Типичната</strong> дата е средата");
+  const enP = paragraphContaining(en, "date is the middle one");
   assert.ok(includesExact(bgP, `${springOnOrBefore} от ${N} години последната пролетна слана`), "bg: пролетта на/преди типичната");
   assert.ok(includesExact(bgP, `${autumnOnOrBefore} от ${N} — първата есенна слана`), "bg: есента на/преди типичната");
   assert.ok(includesExact(enP, `${springOnOrBefore} of the ${N} years had the last spring frost`), "en: пролетта на/преди типичната");
@@ -299,24 +299,24 @@ test("типичната дата дава истинския брой годи�
 // сметка, приложена направо върху двете типични дати. И четирите числа в
 // изречението, което ги обяснява.
 test("237, 240 и средните две годишни стойности стоят в изреченията, които ги обясняват", () => {
-  const bgTypicalP = paragraphContaining(bg, "средното на двете средни");
-  const enTypicalP = paragraphContaining(en, "average of the two middle ones");
+  const bgTypicalP = paragraphContaining(bg, "взимаме средното им");
+  const enTypicalP = paragraphContaining(en, "we take their average");
   assert.ok(includesExact(bgTypicalP, `(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} дни`), "bg: средното на двете средни");
   assert.ok(includesExact(enTypicalP, `(${midLow} + ${midHigh}) / 2 = ${seasonManole.typical} days`), "en: средното на двете средни");
 
-  const bgExtremesP = paragraphContaining(bg, "Най-късата");
+  const bgExtremesP = paragraphContaining(bg, "Най-краткият");
   const enExtremesP = paragraphContaining(en, "shortest");
-  assert.ok(includesExact(bgExtremesP, `${seasonManole.shortest.days} дни, ${seasonManole.shortest.years[0]}`), "bg: най-късата година");
-  assert.ok(includesExact(bgExtremesP, `${seasonManole.longest.days} дни, ${seasonManole.longest.years[0]}`), "bg: най-дългата година");
-  assert.ok(includesExact(enExtremesP, `${seasonManole.shortest.days} days, ${seasonManole.shortest.years[0]}`), "en: shortest year");
-  assert.ok(includesExact(enExtremesP, `${seasonManole.longest.days} days, ${seasonManole.longest.years[0]}`), "en: longest year");
+  assert.ok(includesExact(bgExtremesP, `${seasonManole.shortest.days} дни (${seasonManole.shortest.years[0]}`), "bg: най-кратката година");
+  assert.ok(includesExact(bgExtremesP, `${seasonManole.longest.days} дни (${seasonManole.longest.years[0]}`), "bg: най-дългата година");
+  assert.ok(includesExact(enExtremesP, `${seasonManole.shortest.days} days (${seasonManole.shortest.years[0]}`), "en: shortest year");
+  assert.ok(includesExact(enExtremesP, `${seasonManole.longest.days} days (${seasonManole.longest.years[0]}`), "en: longest year");
 
-  const bgHintP = paragraphContaining(bg, "Затова изваждането");
-  const enHintP = paragraphContaining(en, "That's why subtracting");
-  assert.ok(includesExact(bgHintP, `дава ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
-  assert.ok(includesExact(bgHintP, `е ${seasonManole.typical}`), "bg: 237 от медианата");
-  assert.ok(includesExact(enHintP, `gives ${typicalDatesDiffDays} days`), "en: 240 от типичните дати");
-  assert.ok(includesExact(enHintP, `is ${seasonManole.typical}`), "en: 237 от медианата");
+  const bgHintP = paragraphContaining(bg, "Ако сам извадиш");
+  const enHintP = paragraphContaining(en, "If you subtract");
+  assert.ok(includesExact(bgHintP, `ще получиш ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
+  assert.ok(includesExact(bgHintP, `а не ${seasonManole.typical}`), "bg: 237 от медианата");
+  assert.ok(includesExact(enHintP, `you get ${typicalDatesDiffDays} days`), "en: 240 от типичните дати");
+  assert.ok(includesExact(enHintP, `not ${seasonManole.typical}`), "en: 237 от медианата");
 });
 
 test("началните страници водят към ръководството", () => {
@@ -345,8 +345,8 @@ test("съветът за сеитба дава диапазон с уговор
   assert.ok(includesExactPhraseWithTrailingUnit(enP, "7 to 14 days"), "en: диапазонът 7–14 дни");
   assert.match(bgP, /обикновено/, "bg: „обикновено“, не твърдение за всички места");
   assert.match(enP, /usually/, "en: „usually“, не твърдение за всички места");
-  assert.match(bgP, /числото за твоята точка е на екрана/, "bg: препратка към своята точка");
-  assert.match(enP, /the number for your own point is on the screen/, "en: препратка към своята точка");
+  assert.match(bgP, /точното число за твоето място е на страницата с резултата/, "bg: препратка към своето място");
+  assert.match(enP, /the exact number for your place is on the results page/, "en: препратка към своето място");
 });
 
 // I2: дължината на сезона и рискът след дата следват ИЗБРАНИЯ период
@@ -372,12 +372,10 @@ test("ръководството обяснява дължината и кога
   // абзаца минаваше с „…дава 364 дни“, защото същият абзац казва и
   // „365-дневен“ за календара — два пъти „365“ в един абзац, и тестът мълчи за
   // сменения. (Доказано от прегледа с точно тази мутация.)
-  assert.ok(includesExactPhraseWithTrailingUnit(bg, "сметката дава 365 дни"), "bg: и двете липсващи дават 365 дни");
-  assert.ok(includesExactPhraseWithTrailingUnit(bg, "Календарът е 365-дневен"), "bg: календарът е 365-дневен");
+  assert.ok(includesExactPhraseWithTrailingUnit(bg, "сезонът е цялата година — 365 дни"), "bg: и двете липсващи дават 365 дни");
   assert.match(en, /no recorded spring frost, the season is counted from January 1/, "en: липсваща пролетна дата");
   assert.match(en, /through December 31/, "en: липсваща есенна дата");
-  assert.ok(includesExactPhraseWithTrailingUnit(en, "the calculation gives 365 days"), "en: и двете липсващи дават 365 дни");
-  assert.ok(includesExactPhraseWithTrailingUnit(en, "The calendar has 365 days"), "en: календарът е 365-дневен");
+  assert.ok(includesExactPhraseWithTrailingUnit(en, "the season is the whole year — 365 days"), "en: и двете липсващи дават 365 дни");
 });
 
 // L1: българското обобщение казва „Прагът от 10 години СО СЛАНА“, английското
@@ -395,9 +393,9 @@ test("английското обобщение носи условието „�
 // от двата api.md. Ако някой ден височината се смени, сменя се на едно място и
 // тестът иска същото и в справката.
 test("височината на точката в api.md е същата като в ръководството", () => {
-  const guideElev = bg.match(/точката е ≈ (\d+) м/);
+  const guideElev = bg.match(/Маноле е на около (\d+) м/);
   assert.ok(guideElev, "ръководството носи височината на самата точка");
-  const enElev = en.match(/the point is ≈ (\d+) m/);
+  const enElev = en.match(/Manole itself is at about (\d+) m/);
   assert.ok(enElev && enElev[1] === guideElev[1], "двата езика на ръководството носят едно и също число");
   for (const path of ["../../docs/bg/api.md", "../../docs/en/api.md"]) {
     const doc = read(path);

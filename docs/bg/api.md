@@ -221,7 +221,7 @@ Copernicus, и към Open-Meteo — фиксирани четирите клю�
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.5",
+  "app_version": "0.3.6",
   "elevation": true
 }
 ```
