@@ -108,6 +108,26 @@ test("площта се въвежда с „около 9 × 9 км“ там, �
   assert.equal(T.bg.cell, "Площ около 9 × 9 км");
   assert.equal(T.en.cell, "Area of about 9 × 9 km");
   // API-то: бележката под датите — целият размер, с граници и мерна единица.
-  assert.ok(exact(TEXTS.note.bg, "площ от около 9 × 9 до 25 × 25 км"), TEXTS.note.bg);
-  assert.ok(exact(TEXTS.note.en, "area of about 9 × 9 to 25 × 25 km"), TEXTS.note.en);
+  assert.ok(exact(TEXTS.note.bg, "площ около 9 × 9 км"), TEXTS.note.bg);
+  assert.ok(exact(TEXTS.note.en, "area of about 9 × 9 km"), TEXTS.note.en);
+});
+
+// Решение на собственика (28 септември 2026): българският текст за хора не е на
+// „ти“. Ръководството е безлично („може да се избере“), указанията на екрана
+// са на „Вие“ („Въведете и двете координати“), бутоните остават кратки
+// повелителни („Вземи от телефона“, „Покажи“, „Сметни“, „Свали CSV“) — те са
+// команди, не обръщение, и затова не се проверяват. Регулярният израз хваща
+// местоименията, сегашно време второ лице (-ш) и известните повелителни
+// форми на „ти“, които вече бяха тук.
+const BUTTON_KEYS = new Set(["locate", "go", "risk_go", "csv_download"]);
+const TI = /(?<!\p{L})(?:ти|теб|твой|твоя|твоят|твое|твоето|твоите|твоята|\p{L}+(?:аш|яш|еш|иш)|опитай|въведи|посочи|очаквай|разчитай|виж|ползвай|погледни|щракни|докосни)(?!\p{L})/iu;
+test("българският текст за хора не е на „ти“ (ръководството безлично, указанията на „Вие“)", () => {
+  const texts = {
+    ...HUMAN.bg,
+    "site/js/texts.js (bg)": Object.entries(T.bg).filter(([k]) => !BUTTON_KEYS.has(k)).map(([, v]) => String(v)).join("\n"),
+  };
+  for (const [name, text] of Object.entries(texts)) {
+    const m = text.match(TI);
+    assert.equal(m, null, `${name}: „${m?.[0]}“ — …${text.slice(Math.max(0, m?.index - 60), m?.index + 60)}…`);
+  }
 });

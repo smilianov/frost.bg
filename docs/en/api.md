@@ -40,8 +40,8 @@ Example — `GET /api/v1/frost?lat=42.18425&lon=24.92936` (Manole):
   "period": {"start": 1996, "end": 2025},
   "threshold_c": 0,
   "note": {
-    "bg": "ERA5 дава по едно число за площ от около 9 × 9 до 25 × 25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни средната височина на площта с височината на мястото си.",
-    "en": "ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the area's average elevation with your location's elevation."
+    "bg": "Числата са средни за площ около 9 × 9 км. В котловините често показват по-топли нощи, отколкото са в действителност — тоест по-малко слана, затова там истинските дати може да са по-късни напролет и по-ранни наесен. Полезно е да се сравни средната височина на площта с височината на мястото.",
+    "en": "The numbers are averages for an area of about 9 × 9 km. In valleys they often show warmer nights than there really are — that is, less frost — so the real dates there may be later in spring and earlier in autumn. It's worth comparing the area's average elevation with the place's own."
   },
   "source": {
     "bg": "ERA5-Land през Copernicus CDS, 1996–2025",
@@ -226,7 +226,7 @@ secret. Exactly these keys:
   "languages": ["bg", "en"],
   "grid": {"computed": "2026-09-20", "period": {"start": 1996, "end": 2025}, "synthetic": false, "source_id": "cds"},
   "version": "1",
-  "app_version": "0.3.6",
+  "app_version": "0.3.7",
   "elevation": true
 }
 ```
