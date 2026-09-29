@@ -311,9 +311,9 @@ test("237, 240 и средните две годишни стойности ст
   assert.ok(includesExact(enExtremesP, `${seasonManole.shortest.days} days (${seasonManole.shortest.years[0]}`), "en: shortest year");
   assert.ok(includesExact(enExtremesP, `${seasonManole.longest.days} days (${seasonManole.longest.years[0]}`), "en: longest year");
 
-  const bgHintP = paragraphContaining(bg, "Ако сам извадиш");
+  const bgHintP = paragraphContaining(bg, "се извадят една от друга");
   const enHintP = paragraphContaining(en, "If you subtract");
-  assert.ok(includesExact(bgHintP, `ще получиш ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
+  assert.ok(includesExact(bgHintP, `излизат ${typicalDatesDiffDays} дни`), "bg: 240 от типичните дати");
   assert.ok(includesExact(bgHintP, `а не ${seasonManole.typical}`), "bg: 237 от медианата");
   assert.ok(includesExact(enHintP, `you get ${typicalDatesDiffDays} days`), "en: 240 от типичните дати");
   assert.ok(includesExact(enHintP, `not ${seasonManole.typical}`), "en: 237 от медианата");
@@ -345,7 +345,7 @@ test("съветът за сеитба дава диапазон с уговор
   assert.ok(includesExactPhraseWithTrailingUnit(enP, "7 to 14 days"), "en: диапазонът 7–14 дни");
   assert.match(bgP, /обикновено/, "bg: „обикновено“, не твърдение за всички места");
   assert.match(enP, /usually/, "en: „usually“, не твърдение за всички места");
-  assert.match(bgP, /точното число за твоето място е на страницата с резултата/, "bg: препратка към своето място");
+  assert.match(bgP, /точното число за всяко място е на страницата с резултата/, "bg: препратка към числото за мястото");
   assert.match(enP, /the exact number for your place is on the results page/, "en: препратка към своето място");
 });
 
@@ -435,6 +435,6 @@ test("„Двете височини“ обяснява предупрежде�
     assert.ok(!noDays.test(p), `${lang}: абзацът не бива да обещава дни: ${p}`);
   }
   // Асиметрията: и двата езика казват, че по-ниско НЕ значи по-ранни дати.
-  assert.ok(paragraphContaining(bg, "поне 50 м по-високо").includes("не разчиташ на по-ранни дати"), "bg: ниско не значи по-ранно");
+  assert.ok(paragraphContaining(bg, "поне 50 м по-високо").includes("на по-ранни дати не бива да се разчита"), "bg: ниско не значи по-ранно");
   assert.ok(paragraphContaining(en, "at least 50 m above").includes("not to count on earlier dates"), "en: low does not mean earlier");
 });

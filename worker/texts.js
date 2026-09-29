@@ -1,8 +1,8 @@
 // Текстовете, които API-то връща на двата езика. Думата е „слана“.
 export const TEXTS = {
   note: {
-    bg: "ERA5 дава по едно число за площ от около 9 × 9 до 25 × 25 км; в котловини нощният минимум е надценен и сланата е подценена — истинските дати може да са по-късни напролет и по-ранни наесен. Сравни средната височина на площта с височината на мястото си.",
-    en: "ERA5 gives one number per area of about 9 × 9 to 25 × 25 km; in valley bottoms the night minimum is overestimated and frost is underestimated — real dates may be later in spring and earlier in autumn. Compare the area's average elevation with your location's elevation.",
+    bg: "Числата са средни за площ около 9 × 9 км. В котловините често показват по-топли нощи, отколкото са в действителност — тоест по-малко слана, затова там истинските дати може да са по-късни напролет и по-ранни наесен. Полезно е да се сравни средната височина на площта с височината на мястото.",
+    en: "The numbers are averages for an area of about 9 × 9 km. In valleys they often show warmer nights than there really are — that is, less frost — so the real dates there may be later in spring and earlier in autumn. It's worth comparing the area's average elevation with the place's own.",
   },
   // Задача 7: посочването за /api/v1/elevation (Open-Meteo Elevation,
   // Copernicus DEM GLO-90) — отделно от sourceLabel() по-долу, което е за
@@ -38,11 +38,11 @@ export const TEXTS = {
     bad_request: { bg: "Невалидни координати: lat и lon са десетични градуси.",
                    en: "Invalid coordinates: lat and lon are decimal degrees." },
     outside_bulgaria: { bg: "Засега само за България.", en: "Bulgaria only for now." },
-    geocoder_failed: { bg: "Услугата за търсене на места не отговори. Опитай пак след малко.",
+    geocoder_failed: { bg: "Услугата за търсене на места не отговори. Опитайте пак след малко.",
                        en: "The place search did not respond. Try again shortly." },
     bad_query: { bg: "Търсенето иска поне 2 знака.", en: "The search needs at least 2 characters." },
     not_found: { bg: "Няма такъв адрес в API-то.", en: "No such API endpoint." },
-    elevation_failed: { bg: "Услугата за височината не отговори. Опитай пак след малко.",
+    elevation_failed: { bg: "Услугата за височината не отговори. Опитайте пак след малко.",
                          en: "The elevation service did not respond. Try again shortly." },
   },
 };
