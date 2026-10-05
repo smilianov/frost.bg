@@ -8,6 +8,26 @@
 
 ---
 
+## [0.3.8] — 2026-10-05
+
+### 🇧🇬 Български
+
+- **Английското заглавие вече казва същото като българското „Кога пада
+  сланата в района?“** — „When does the frost come in your area?“, а не
+  „at your place“: датите са за площ около 9 × 9 км, не за точната градина.
+  Заглавието в раздела на браузъра е същото като на страницата; нов тест
+  пази и двете. Кешът се сменя с версията.
+
+### 🇬🇧 English
+
+- **The English title now matches the Bulgarian one**: "When does the frost
+  come in your area?" instead of "at your place" — the dates are for an
+  area of about 9 × 9 km, not the exact garden. The browser tab title
+  matches the page heading; a new test guards both. The cache changes with
+  the version.
+
+---
+
 ## [0.3.7] — 2026-09-28
 
 ### 🇧🇬 Български
