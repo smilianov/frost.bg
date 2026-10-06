@@ -72,7 +72,7 @@ export const T = {
     elev_below: (m) => `Мястото е около ${m} м под средната височина на площта. В ниско място студеният въздух се задържа нощем, затова на по-ранни дати не бива да се разчита.`,
   },
   en: {
-    title: "When is the frost at your place?",
+    title: "When does the frost come in your area?",
     lead: "Last spring and first autumn frost for any place in Bulgaria — from 30 years of data.",
     search_label: "Town or village", search_placeholder: "e.g. Manole",
     map_label: "Or point on the map", coords_label: "Or coordinates",
